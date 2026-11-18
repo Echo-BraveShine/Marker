@@ -1,0 +1,4 @@
+self-hosted-runner:
+  labels:
+    - marker-windows-x64
+    - marker-linux-arm64

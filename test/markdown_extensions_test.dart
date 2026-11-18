@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_math_fork/flutter_math.dart';
@@ -35,20 +36,46 @@ void main() {
   test(
     'relative images resolve against document, preserving encoded paths',
     () {
+      final root = Directory.systemTemp.path;
+      String localPath(String relative) =>
+          [root, ...relative.split('/')].join(Platform.pathSeparator);
+      final document = File(localPath('中文/test.md')).absolute;
+      final nested = File(localPath('docs/test.md')).absolute;
       expect(
-        resolveDocumentUri('images/a%20b.png', '/tmp/中文/test.md').toFilePath(),
-        '/tmp/中文/images/a b.png',
+        resolveDocumentUri('images/a%20b.png', document.path).toFilePath(),
+        File(localPath('中文/images/a b.png')).absolute.path,
       );
       expect(
-        resolveDocumentUri('../image.png', '/tmp/docs/test.md').toFilePath(),
-        '/tmp/image.png',
+        resolveDocumentUri('../image.png', nested.path).toFilePath(),
+        File(localPath('image.png')).absolute.path,
       );
       expect(
-        resolveDocumentUri('https://example.com/a.png', '/tmp/a.md').scheme,
+        resolveDocumentUri('https://example.com/a.png', document.path).scheme,
         'https',
       );
       expect(resolveDocumentUri('image.png', null).hasScheme, isFalse);
     },
+  );
+
+  test(
+    'Windows relative images preserve drive, UNC and encoded Unicode',
+    () {
+      expect(
+        resolveDocumentUri(
+          'images/a%20b.png',
+          r'C:\Docs\中文\test.md',
+        ).toFilePath(),
+        r'C:\Docs\中文\images\a b.png',
+      );
+      expect(
+        resolveDocumentUri(
+          '../%E5%9B%BE.png',
+          r'\\server\share\docs\test.md',
+        ).toFilePath(),
+        r'\\server\share\图.png',
+      );
+    },
+    skip: !Platform.isWindows,
   );
   test('inline and display math parse without affecting code', () {
     expect(

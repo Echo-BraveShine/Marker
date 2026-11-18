@@ -1,0 +1,128 @@
+name: Parallels self-hosted build
+
+# Personal persistent VMs only receive maintainer-initiated runs, never PR jobs.
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Trusted branch, tag or commit to validate
+        type: string
+        default: main
+        required: true
+      package:
+        description: Also create release installation packages
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: marker-parallels
+  cancel-in-progress: false
+
+jobs:
+  windows:
+    if: github.actor == github.repository_owner
+    runs-on: [self-hosted, Windows, marker-windows-x64]
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: powershell
+    env:
+      CI: 'true'
+      FLUTTER_SUPPRESS_ANALYTICS: 'true'
+      CMAKE_BUILD_PARALLEL_LEVEL: '1'
+      INNO_SETUP_COMPILER: C:\MarkerValidation\InnoSetup6\ISCC.exe
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+      - name: Use preinstalled x64 Flutter and Python
+        run: |
+          'C:\MarkerValidation\flutter-x64\bin' | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          'C:\MarkerValidation\python' | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+      - name: Verify SDK version and target ABI
+        run: |
+          $expected = (Get-Content .fvmrc -Raw | ConvertFrom-Json).flutter
+          $actual = flutter.bat --version --machine | ConvertFrom-Json
+          if ($actual.frameworkVersion -ne $expected) { throw 'Flutter version mismatch' }
+          $dart = dart.bat --version 2>&1 | Out-String
+          if ($dart -notmatch 'windows_x64') { throw 'An x64 Dart SDK is required for this build target' }
+      - run: python.exe -m unittest discover -s scripts/tests -v
+      - run: flutter.bat pub get --enforce-lockfile
+      - run: flutter.bat analyze --no-pub
+      - run: flutter.bat test --no-pub --concurrency=1
+      - run: flutter.bat build windows --release --no-pub
+      - name: Read build version
+        if: inputs.package
+        id: version
+        run: |
+          $line = (Select-String -Path pubspec.yaml -Pattern '^version:').Line
+          $version = ($line -split ':',2)[1].Trim().Split('+')[0]
+          python.exe scripts/release_version.py --project-dir . --tag "v$version"
+      - name: Create Windows packages
+        if: inputs.package
+        env:
+          EXPECTED_VERSION: ${{ steps.version.outputs.version }}
+          EXPECTED_BUILD: ${{ steps.version.outputs.build }}
+        run: ./.github/release/windows.ps1
+      - if: inputs.package
+        run: python.exe scripts/release_checksums.py --project-dir . --platform windows
+      - uses: actions/upload-artifact@v7
+        if: inputs.package
+        with:
+          name: Marker-parallels-windows-x64
+          path: dist/*
+          if-no-files-found: error
+
+  ubuntu:
+    if: github.actor == github.repository_owner
+    runs-on: [self-hosted, Linux, ARM64, marker-linux-arm64]
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+    env:
+      CI: 'true'
+      FLUTTER_SUPPRESS_ANALYTICS: 'true'
+      CMAKE_BUILD_PARALLEL_LEVEL: '1'
+      MARKER_LINUX_ARCH: arm64
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+      - name: Use preinstalled Flutter
+        run: echo '/opt/marker-ci/flutter/bin' >> "$GITHUB_PATH"
+      - name: Verify SDK version and architecture
+        run: |
+          test "$(uname -m)" = aarch64
+          flutter --version --machine > "$RUNNER_TEMP/marker-flutter.json"
+          python3 -c 'import json,os; assert json.load(open(".fvmrc",encoding="utf-8"))["flutter"] == json.load(open(os.path.join(os.environ["RUNNER_TEMP"],"marker-flutter.json"),encoding="utf-8"))["frameworkVersion"]'
+      - run: python3 -m unittest discover -s scripts/tests -v
+      - run: flutter pub get --enforce-lockfile
+      - run: flutter analyze --no-pub
+      - run: flutter test --no-pub --concurrency=1
+      - run: flutter build linux --release --no-pub
+      - name: Read build version
+        if: inputs.package
+        id: version
+        run: |
+          tag=$(python3 -c 'import re; print("v" + re.search(r"^version:\s*(\d+\.\d+\.\d+)",open("pubspec.yaml",encoding="utf-8").read(),re.M)[1])')
+          python3 scripts/release_version.py --project-dir . --tag "$tag"
+      - name: Create Linux ARM64 packages
+        if: inputs.package
+        env:
+          EXPECTED_VERSION: ${{ steps.version.outputs.version }}
+          EXPECTED_BUILD: ${{ steps.version.outputs.build }}
+        run: bash .github/release/linux.sh
+      - if: inputs.package
+        run: python3 scripts/release_checksums.py --project-dir . --platform linux --architecture arm64
+      - uses: actions/upload-artifact@v7
+        if: inputs.package
+        with:
+          name: Marker-parallels-linux-arm64
+          path: dist/*
+          if-no-files-found: error

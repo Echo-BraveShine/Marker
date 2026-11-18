@@ -58,13 +58,13 @@ bool FlutterWindow::ApplyAppearanceIcon(bool dark) {
   const UINT dpi = get_dpi ? get_dpi(GetHandle()) : 96;
   const int large_size = MulDiv(32, dpi ? dpi : 96, 96);
   const int small_size = MulDiv(16, dpi ? dpi : 96, 96);
-  HICON large = static_cast<HICON>(LoadImageW(GetModuleHandleW(nullptr), MAKEINTRESOURCEW(resource),
+  HICON large_icon = static_cast<HICON>(LoadImageW(GetModuleHandleW(nullptr), MAKEINTRESOURCEW(resource),
       IMAGE_ICON, large_size, large_size, LR_SHARED));
-  HICON small = static_cast<HICON>(LoadImageW(GetModuleHandleW(nullptr), MAKEINTRESOURCEW(resource),
+  HICON small_icon = static_cast<HICON>(LoadImageW(GetModuleHandleW(nullptr), MAKEINTRESOURCEW(resource),
       IMAGE_ICON, small_size, small_size, LR_SHARED));
-  if (!large || !small) return false;
-  SendMessageW(GetHandle(), WM_SETICON, ICON_BIG, reinterpret_cast<LPARAM>(large));
-  SendMessageW(GetHandle(), WM_SETICON, ICON_SMALL, reinterpret_cast<LPARAM>(small));
+  if (!large_icon || !small_icon) return false;
+  SendMessageW(GetHandle(), WM_SETICON, ICON_BIG, reinterpret_cast<LPARAM>(large_icon));
+  SendMessageW(GetHandle(), WM_SETICON, ICON_SMALL, reinterpret_cast<LPARAM>(small_icon));
   // Keep the existing AppUserModelID; never break taskbar grouping when changing theme.
   IPropertyStore* properties = nullptr;
   if (SUCCEEDED(SHGetPropertyStoreForWindow(GetHandle(), IID_PPV_ARGS(&properties)))) {

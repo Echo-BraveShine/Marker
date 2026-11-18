@@ -24,8 +24,10 @@ concurrency:
 jobs:
   resolve:
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     outputs:
       tag: ${{ steps.tag.outputs.tag }}
+      source_sha: ${{ steps.source.outputs.sha }}
     steps:
       - name: Validate release tag
         id: tag
@@ -37,6 +39,12 @@ jobs:
             exit 1
           fi
           echo "tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v6
+        with:
+          ref: refs/tags/${{ steps.tag.outputs.tag }}
+      - name: Resolve immutable application commit
+        id: source
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
   package:
     needs: resolve
@@ -46,18 +54,32 @@ jobs:
         include:
           - os: macos-latest
             platform: macos
+            arch: universal
           - os: windows-2025
             platform: windows
+            arch: x64
           - os: ubuntu-24.04
             platform: linux
+            arch: x64
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
     defaults:
       run:
         shell: bash
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: refs/tags/${{ needs.resolve.outputs.tag }}
+          ref: ${{ needs.resolve.outputs.source_sha }}
+      - name: Checkout current packaging tools
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: release-tools
+          sparse-checkout: |
+            .github/release
+            scripts
+            windows/installer
+            windows/runner/resources
       - uses: actions/setup-python@v6
         with:
           python-version: '3.13'
@@ -65,14 +87,23 @@ jobs:
         id: version
         env:
           RELEASE_TAG: ${{ needs.resolve.outputs.tag }}
-        run: python3 scripts/release_version.py --tag "$RELEASE_TAG"
+        run: python3 release-tools/scripts/release_version.py --project-dir . --tag "$RELEASE_TAG"
+      - name: Check runner architecture
+        if: matrix.arch != 'universal'
+        env:
+          RUNNER_ARCHITECTURE: ${{ runner.arch }}
+          EXPECTED_ARCHITECTURE: ${{ matrix.arch }}
+        run: |
+          actual=$(printf '%s' "$RUNNER_ARCHITECTURE" | tr '[:upper:]' '[:lower:]')
+          test "$actual" = "$EXPECTED_ARCHITECTURE"
+      - run: python3 -m unittest discover -s release-tools/scripts/tests -v
       - uses: subosito/flutter-action@v2
         with:
           flutter-version-file: .fvmrc
           cache: true
       - name: Install Linux build dependencies
         if: matrix.platform == 'linux'
-        run: sudo apt-get update && sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev libstdc++-12-dev libsecret-1-dev libjsoncpp-dev libcurl4-openssl-dev
+        run: sudo apt-get update && sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev libstdc++-12-dev libsecret-1-dev libjsoncpp-dev libcurl4-openssl-dev libgl1 libgl1-mesa-dri
       - run: flutter pub get --enforce-lockfile
       - run: flutter analyze --no-pub
       - run: flutter test --no-pub
@@ -83,22 +114,22 @@ jobs:
         env:
           EXPECTED_VERSION: ${{ steps.version.outputs.version }}
           EXPECTED_BUILD: ${{ steps.version.outputs.build }}
-        run: bash .github/release/macos.sh
+        run: bash release-tools/.github/release/macos.sh
       - name: Package Windows installer and portable ZIP
         if: matrix.platform == 'windows'
         shell: pwsh
         env:
           EXPECTED_VERSION: ${{ steps.version.outputs.version }}
           EXPECTED_BUILD: ${{ steps.version.outputs.build }}
-        run: ./.github/release/windows.ps1
+        run: ./release-tools/.github/release/windows.ps1
       - name: Package Linux TAR and DEB
         if: matrix.platform == 'linux'
         env:
           EXPECTED_VERSION: ${{ steps.version.outputs.version }}
           EXPECTED_BUILD: ${{ steps.version.outputs.build }}
-        run: bash .github/release/linux.sh
+        run: bash release-tools/.github/release/linux.sh
       - name: Create SHA256 checksums
-        run: python3 scripts/release_checksums.py
+        run: python3 release-tools/scripts/release_checksums.py --project-dir . --platform ${{ matrix.platform }}
       - uses: actions/upload-artifact@v7
         with:
           name: Marker-${{ matrix.platform }}
@@ -109,12 +140,30 @@ jobs:
     needs: [resolve, package]
     if: ${{ github.event_name == 'push' || !inputs.build_only }}
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: refs/tags/${{ needs.resolve.outputs.tag }}
+          ref: ${{ needs.resolve.outputs.source_sha }}
+      - name: Checkout current packaging tools
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: release-tools
+          sparse-checkout: |
+            .github/release
+            scripts
+            windows/installer
+            windows/runner/resources
+      - name: Confirm release tag still points to the built commit
+        env:
+          RELEASE_TAG: ${{ needs.resolve.outputs.tag }}
+          SOURCE_SHA: ${{ needs.resolve.outputs.source_sha }}
+        run: |
+          git fetch --depth=1 origin "refs/tags/$RELEASE_TAG:refs/tags/$RELEASE_TAG"
+          test "$(git rev-parse "refs/tags/$RELEASE_TAG^{}")" = "$SOURCE_SHA"
       - uses: actions/download-artifact@v7
         with:
           pattern: Marker-*
@@ -125,20 +174,8 @@ jobs:
           cat dist/SHA256SUMS-*.txt > dist/SHA256SUMS.txt
           (cd dist && sha256sum --check SHA256SUMS.txt)
           rm dist/SHA256SUMS-*.txt
-      - name: Publish stable release without replacing existing assets
+      - name: Publish or safely resume stable release
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ needs.resolve.outputs.tag }}
-        run: |
-          shopt -s nullglob
-          files=(dist/*)
-          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
-            echo 'Release already exists; preserving its installers and checksums.'
-            exit 0
-          fi
-          make_latest=true
-          if latest=$(gh release view --json tagName --jq '.tagName' 2>/dev/null); then
-            highest=$(printf '%s\n%s\n' "$latest" "$RELEASE_TAG" | sort -V | tail -n 1)
-            if [[ "$highest" != "$RELEASE_TAG" || "$latest" == "$RELEASE_TAG" ]]; then make_latest=false; fi
-          fi
-          gh release create "$RELEASE_TAG" "${files[@]}" --verify-tag --generate-notes --latest="$make_latest"
+        run: bash release-tools/.github/release/publish.sh

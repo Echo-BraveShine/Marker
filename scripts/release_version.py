@@ -9,8 +9,9 @@ import re
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--tag', required=True)
+    parser.add_argument('--project-dir', type=Path, default=Path(__file__).resolve().parents[1])
     args = parser.parse_args()
-    root = Path(__file__).resolve().parents[1]
+    root = args.project_dir
     match = re.search(r'^version:\s*(\d+\.\d+\.\d+)\+(\d+)\s*$', (root / 'pubspec.yaml').read_text(encoding='utf-8'), re.M)
     if not match or args.tag != f'v{match[1]}':
         raise SystemExit('Release tag must match pubspec version X.Y.Z+BUILD')
