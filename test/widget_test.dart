@@ -508,6 +508,11 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('编辑与预览'));
       await tester.pumpAndSettle();
+      expect(source.highlightEnabled, isFalse);
+      expect(find.byKey(const Key('settings-highlight-style')), findsNothing);
+      await tester.tap(find.byKey(const Key('settings-highlight-enabled')));
+      await tester.pumpAndSettle();
+      expect(source.highlightEnabled, isTrue);
       expect(find.byKey(const Key('settings-highlight-style')), findsOneWidget);
       await tester.tap(find.text('Solarized'));
       await tester.pumpAndSettle();
@@ -519,6 +524,11 @@ void main() {
         ),
         'solarized',
       );
+      await tester.tap(find.byKey(const Key('settings-highlight-enabled')));
+      await tester.pumpAndSettle();
+      expect(source.highlightEnabled, isFalse);
+      expect(source.value, before);
+      expect(find.byKey(const Key('settings-highlight-style')), findsNothing);
       expect(tester.takeException(), isNull);
     },
   );
@@ -566,6 +576,8 @@ void main() {
       expect(find.text('完成'), findsNothing);
       expect(find.byKey(const Key('dialog-close')), findsOneWidget);
       await tester.tap(find.text('编辑与预览'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('settings-highlight-enabled')));
       await tester.pumpAndSettle();
       for (final style in EditorHighlightStyle.values) {
         expect(find.byKey(ValueKey('highlight-${style.name}')), findsOneWidget);

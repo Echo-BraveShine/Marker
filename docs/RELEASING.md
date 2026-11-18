@@ -54,3 +54,11 @@ macOS 当前使用临时签名，未配置 Developer ID/公证；Windows 未配�
 Windows 与 Linux 的原生构建及安装器应由对应 runner 验证。本机完成的 YAML / Actions 静态检查不等于已在 GitHub 执行过工作流。
 
 参考本机 EJson 的 `.github/workflows/desktop.yml`、`release.yml` 与版本更新模块，按 Marker 的单应用目录与文件关联脚本调整；没有复制 EJson 的网站、包管理器发布和额外格式处理功能。
+
+## Windows MSVC 14.51 兼容
+
+当前 flutter_inappwebview_windows 的 WebView2/C++/WinRT 依赖在 C++17 下仍使用 experimental coroutine。MSVC 14.51 将其弃用提示升级为 STL1011。项目在生成插件目标后，仅给 `flutter_inappwebview_windows_plugin` 加入 `_SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS`，使用 Microsoft 提供的兼容开关；不修改 pub 缓存，也不全局关闭警告或降低应用自身的 `/WX` 检查。
+
+此配置同时适用于 Desktop checks 与 Release 的 Windows 构建。更新代码后重新执行失败工作流即可；单独重跑旧提交仍会使用旧配置。后续插件迁移到标准协程后应移除该兼容项。
+
+参考：[Microsoft STL experimental/coroutine](https://github.com/microsoft/STL/blob/main/stl/inc/experimental/coroutine)。

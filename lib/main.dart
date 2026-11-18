@@ -1249,18 +1249,30 @@ class _MarkerHomeState extends ConsumerState<MarkerHome> with WindowListener {
                           ]),
                         ] else if (editor.settingsPage == 1) ...[
                           group(t('语法高亮', 'Syntax highlighting'), [
-                            Padding(
-                              padding: const EdgeInsets.all(12),
-                              child: HighlightStylePicker(
-                                key: const Key('settings-highlight-style'),
-                                selected: settings.highlightStyle,
-                                colors: c,
-                                zh: _zh,
+                            row(
+                              CupertinoIcons.textformat,
+                              t('文本高亮', 'Text highlighting'),
+                              CupertinoSwitch(
+                                key: const Key('settings-highlight-enabled'),
+                                value: settings.highlightEnabled,
                                 onChanged: (value) => ref
                                     .read(themeProvider.notifier)
-                                    .setHighlightStyle(value),
+                                    .setHighlightEnabled(value),
                               ),
                             ),
+                            if (settings.highlightEnabled)
+                              Padding(
+                                padding: const EdgeInsets.all(12),
+                                child: HighlightStylePicker(
+                                  key: const Key('settings-highlight-style'),
+                                  selected: settings.highlightStyle,
+                                  colors: c,
+                                  zh: _zh,
+                                  onChanged: (value) => ref
+                                      .read(themeProvider.notifier)
+                                      .setHighlightStyle(value),
+                                ),
+                              ),
                           ]),
                           group(t('编辑器', 'Editor'), [
                             row(
@@ -1309,15 +1321,21 @@ class _MarkerHomeState extends ConsumerState<MarkerHome> with WindowListener {
                             ),
                             child: Text.rich(
                               TextSpan(
-                                children:
-                                    MarkdownHighlighter(
-                                      HighlightPalette.from(
-                                        settings.highlightStyle,
-                                        c,
-                                      ),
-                                    ).highlight(
-                                      '# Marker\n**Bold** and `code` [link](https://example.com)\n\n```json\n{"name": "Marker", "count": 3}\n```',
-                                    ),
+                                children: settings.highlightEnabled
+                                    ? MarkdownHighlighter(
+                                        HighlightPalette.from(
+                                          settings.highlightStyle,
+                                          c,
+                                        ),
+                                      ).highlight(
+                                        '# Marker\n**Bold** and `code` [link](https://example.com)\n\n```json\n{"name": "Marker", "count": 3}\n```',
+                                      )
+                                    : [
+                                        const TextSpan(
+                                          text:
+                                              '# Marker\n**Bold** and `code` [link](https://example.com)\n\n```json\n{"name": "Marker", "count": 3}\n```',
+                                        ),
+                                      ],
                               ),
                               style: TextStyle(
                                 fontFamily: 'Menlo',
@@ -1406,6 +1424,7 @@ class _MarkerHomeState extends ConsumerState<MarkerHome> with WindowListener {
     );
     _controller.colors = c;
     _controller.highlightStyle = ref.watch(themeProvider).highlightStyle;
+    _controller.highlightEnabled = ref.watch(themeProvider).highlightEnabled;
     MarkdownCommand commandByLabel(String label) => markdownCommandGroups.values
         .expand((items) => items)
         .firstWhere((command) => command.label == label);

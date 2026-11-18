@@ -57,6 +57,17 @@ add_subdirectory("runner")
 # them to the application.
 include(flutter/generated_plugins.cmake)
 
+# The WebView2/C++/WinRT dependency still uses experimental coroutines under
+# C++17. MSVC 14.51 turns their deprecation into STL1011 unless explicitly
+# acknowledged. Scope this compatibility opt-in to the affected plugin only;
+# keep warnings and compiler settings for our own targets unchanged.
+if(MSVC AND TARGET flutter_inappwebview_windows_plugin)
+  target_compile_definitions(flutter_inappwebview_windows_plugin PRIVATE
+    _SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS
+  )
+endif()
+
+
 
 # === Installation ===
 # Support files are copied into place next to the executable, so that it can

@@ -120,6 +120,7 @@ void main() {
       final first = ProviderContainer();
       addTearDown(first.dispose);
       await first.read(themeProvider.notifier).init();
+      expect(first.read(themeProvider).highlightEnabled, isFalse);
       expect(
         first.read(themeProvider).highlightStyle,
         EditorHighlightStyle.classic,
@@ -127,9 +128,20 @@ void main() {
       await first
           .read(themeProvider.notifier)
           .setHighlightStyle(EditorHighlightStyle.solarized);
+      await first.read(themeProvider.notifier).setHighlightEnabled(true);
       final next = ProviderContainer();
       addTearDown(next.dispose);
       await next.read(themeProvider.notifier).init();
+      expect(next.read(themeProvider).highlightEnabled, isTrue);
+      await next.read(themeProvider.notifier).setHighlightEnabled(false);
+      final restored = ProviderContainer();
+      addTearDown(restored.dispose);
+      await restored.read(themeProvider.notifier).init();
+      expect(restored.read(themeProvider).highlightEnabled, isFalse);
+      expect(
+        restored.read(themeProvider).highlightStyle,
+        EditorHighlightStyle.solarized,
+      );
       expect(
         next.read(themeProvider).highlightStyle,
         EditorHighlightStyle.solarized,

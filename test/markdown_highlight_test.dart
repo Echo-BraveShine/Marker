@@ -15,6 +15,15 @@ void main() {
         MaterialApp(
           home: Builder(
             builder: (context) {
+              expect(controller.highlightEnabled, isFalse);
+              final plain = controller.buildTextSpan(
+                context: context,
+                style: const TextStyle(fontSize: 14),
+                withComposing: true,
+              );
+              expect(plain.toPlainText(), controller.text);
+              expect(plain.children, isNull);
+              controller.highlightEnabled = true;
               final light = controller.buildTextSpan(
                 context: context,
                 style: const TextStyle(fontSize: 14),

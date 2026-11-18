@@ -27,7 +27,9 @@
 
 ## 编辑区语法高亮
 
-设置 → 编辑与预览 → 语法高亮提供经典、GitHub、Solarized、Monokai、Dracula、Nord、One Dark、Tokyo Night、Catppuccin、Rosé Pine、Gruvbox、Ayu 十二种风格，均适配浅色/深色界面。选择即时应用到编辑区与设置预览，并通过 Riverpod + Freezed 设置状态和 SharedPreferences 持久化；不改变 Markdown 原文、字体尺寸、行高及光标选区。
+编辑区文本高亮默认关闭；设置 → 编辑与预览 → 语法高亮中开启“文本高亮”后才显示主题选择。开关与所选风格分别保存，关闭后保留所选风格，编辑内容与选区不变。关闭状态使用纯文本绘制，不执行高亮解析。
+
+主题选择提供经典、GitHub、Solarized、Monokai、Dracula、Nord、One Dark、Tokyo Night、Catppuccin、Rosé Pine、Gruvbox、Ayu 十二种风格，均适配浅色/深色界面。选择即时应用到编辑区与设置预览，并通过 Riverpod + Freezed 设置状态和 SharedPreferences 持久化；不改变 Markdown 原文、字体尺寸、行高及光标选区。
 
 解析采用块级扫描与嵌套行内识别：围栏/缩进代码、标题、引用、列表任务标记、分隔线、表格分隔符、链接/图片、粗斜体、删除线、脚注、引用链接及数学公式。围栏代码按语言使用已有 highlight 库解析；Mermaid 对关键字、连接符和注释分别着色。未知语言和超过 100,000 字符的单个代码块保留统一代码颜色，避免自动语言检测或大代码块解析影响输入。缓存当前文档结果及最近 16 个语言代码块的解析结果。输入法组合区增加下划线，保留语法颜色。
 

@@ -6,6 +6,7 @@ import 'markdown_highlighter.dart';
 /// Foreground-only syntax rendering retains selection, undo and line geometry.
 class MarkdownEditingController extends TextEditingController {
   MarkdownEditingController({super.text});
+  bool highlightEnabled = false;
   MarkerColors colors = MarkerColors.light;
   EditorHighlightStyle highlightStyle = EditorHighlightStyle.classic;
   String? _cachedText;
@@ -19,6 +20,13 @@ class MarkdownEditingController extends TextEditingController {
     TextStyle? style,
     required bool withComposing,
   }) {
+    if (!highlightEnabled) {
+      return super.buildTextSpan(
+        context: context,
+        style: style,
+        withComposing: withComposing,
+      );
+    }
     if (_cachedText != text ||
         _cachedColors != colors ||
         _cachedStyle != highlightStyle) {

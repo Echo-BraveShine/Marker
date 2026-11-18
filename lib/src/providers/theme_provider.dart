@@ -11,6 +11,7 @@ abstract class SettingsState with _$SettingsState {
     @Default(ThemeMode.system) ThemeMode mode,
     @Default(Locale('zh', 'CN')) Locale locale,
     @Default(220.0) double sidebarWidth,
+    @Default(false) bool highlightEnabled,
     @Default(EditorHighlightStyle.classic) EditorHighlightStyle highlightStyle,
   }) = _SettingsState;
 }
@@ -42,6 +43,7 @@ class SettingsNotifier extends Notifier<SettingsState> {
           .clamp(180, 320)
           .toDouble(),
       highlightStyle: highlightStyle,
+      highlightEnabled: prefs.getBool('editorHighlightEnabled') ?? false,
       locale: Locale(language, language == 'zh' ? 'CN' : 'US'),
     );
   }
@@ -52,6 +54,12 @@ class SettingsNotifier extends Notifier<SettingsState> {
   Future<void> persistSidebarWidth() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setDouble('sidebarWidth', state.sidebarWidth);
+  }
+
+  Future<void> setHighlightEnabled(bool enabled) async {
+    state = state.copyWith(highlightEnabled: enabled);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('editorHighlightEnabled', enabled);
   }
 
   Future<void> setHighlightStyle(EditorHighlightStyle style) async {
