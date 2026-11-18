@@ -63,7 +63,7 @@ def main():
         for size, scale in ((512, '1x'), (1024, '2x')):
             shutil.copyfile(BRAND / 'export' / variant / f'marker-{size}.png', images / f'marker-{size}.png')
             entries.append({'idiom': 'mac', 'filename': f'marker-{size}.png', 'scale': scale})
-        (images / 'Contents.json').write_text(json.dumps({'images': entries, 'info': {'author': 'xcode', 'version': 1}}, indent=2) + '\n')
+        (images / 'Contents.json').write_text(json.dumps({'images': entries, 'info': {'author': 'xcode', 'version': 1}}, indent=2) + '\n', encoding='utf-8')
     # Native primary icons remain deterministic across operating systems.
     for size in (16, 32, 64, 128, 256, 512, 1024):
         shutil.copyfile(BRAND / 'export/light' / f'marker-{size}.png',

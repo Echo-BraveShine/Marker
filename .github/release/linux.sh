@@ -3,7 +3,7 @@ set -euo pipefail
 bundle=build/linux/x64/release/bundle
 python3 - "$bundle/data/flutter_assets/version.json" <<'PY'
 import json, os, sys
-info = json.load(open(sys.argv[1]))
+info = json.load(open(sys.argv[1], encoding='utf-8'))
 assert info['version'] == os.environ['EXPECTED_VERSION']
 assert info['build_number'] == os.environ['EXPECTED_BUILD']
 PY

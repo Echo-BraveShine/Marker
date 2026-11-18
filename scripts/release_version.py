@@ -11,7 +11,7 @@ def main():
     parser.add_argument('--tag', required=True)
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
-    match = re.search(r'^version:\s*(\d+\.\d+\.\d+)\+(\d+)\s*$', (root / 'pubspec.yaml').read_text(), re.M)
+    match = re.search(r'^version:\s*(\d+\.\d+\.\d+)\+(\d+)\s*$', (root / 'pubspec.yaml').read_text(encoding='utf-8'), re.M)
     if not match or args.tag != f'v{match[1]}':
         raise SystemExit('Release tag must match pubspec version X.Y.Z+BUILD')
     version, build = match.groups()
@@ -20,7 +20,7 @@ def main():
     values = f'version={version}\nbuild={build}\n'
     print(values, end='')
     if output := os.environ.get('GITHUB_OUTPUT'):
-        with open(output, 'a') as stream:
+        with open(output, 'a', encoding='utf-8', newline='\n') as stream:
             stream.write(values)
 
 

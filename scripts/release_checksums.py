@@ -16,4 +16,4 @@ for path in files:
         for chunk in iter(lambda: stream.read(1024 * 1024), b''):
             digest.update(chunk)
     lines.append(f'{digest.hexdigest()}  {path.name}\n')
-(folder / f'SHA256SUMS-{sys.platform}.txt').write_text(''.join(lines))
+(folder / f'SHA256SUMS-{sys.platform}.txt').write_text(''.join(lines), encoding='utf-8')
