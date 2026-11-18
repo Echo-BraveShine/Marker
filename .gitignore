@@ -1,0 +1,53 @@
+# Flutter / Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+coverage/
+**/doc/api/
+.fvm/
+
+# Editors / operating system
+.idea/
+.vscode/
+*.iml
+.DS_Store
+*.log
+__pycache__/
+*.pyc
+
+# Generated native build state
+**/ephemeral/
+**/Pods/
+**/.symlinks/
+**/xcuserdata/
+**/DerivedData/
+**/Flutter/Generated.xcconfig
+**/Flutter/flutter_export_environment.sh
+**/Flutter/Flutter.framework/
+**/Flutter/App.framework/
+**/Flutter/Flutter.podspec
+**/Flutter/.last_build_id
+**/local.properties
+**/.gradle/
+**/gradle-wrapper.jar
+**/GeneratedPluginRegistrant.java
+**/GeneratedPluginRegistrant.h
+**/GeneratedPluginRegistrant.m
+**/GeneratedPluginRegistrant.swift
+android/key.properties
+*.keystore
+*.jks
+*.p12
+*.mobileprovision
+.env
+.env.*
+
+# Legacy duplicate sandbox app (not part of Marker)
+/test_app/
+# Release products
+/dist/
+windows/installer/Output/

@@ -1,0 +1,144 @@
+name: Release
+
+on:
+  push:
+    tags: ['v[0-9]*.[0-9]*.[0-9]*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to build (vX.Y.Z)
+        required: true
+        type: string
+      build_only:
+        description: Build artifacts without publishing
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  resolve:
+    runs-on: ubuntu-24.04
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - name: Validate release tag
+        id: tag
+        env:
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo '::error::Expected stable release tag vX.Y.Z'
+            exit 1
+          fi
+          echo "tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+
+  package:
+    needs: resolve
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            platform: macos
+          - os: windows-2025
+            platform: windows
+          - os: ubuntu-24.04
+            platform: linux
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: refs/tags/${{ needs.resolve.outputs.tag }}
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Verify tag and application version
+        id: version
+        env:
+          RELEASE_TAG: ${{ needs.resolve.outputs.tag }}
+        run: python3 scripts/release_version.py --tag "$RELEASE_TAG"
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version-file: .fvmrc
+          cache: true
+      - name: Install Linux build dependencies
+        if: matrix.platform == 'linux'
+        run: sudo apt-get update && sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev libstdc++-12-dev libsecret-1-dev libjsoncpp-dev libcurl4-openssl-dev
+      - run: flutter pub get --enforce-lockfile
+      - run: flutter analyze --no-pub
+      - run: flutter test --no-pub
+      - name: Build release
+        run: flutter build ${{ matrix.platform }} --release --no-pub
+      - name: Package macOS universal ZIP and DMG
+        if: matrix.platform == 'macos'
+        env:
+          EXPECTED_VERSION: ${{ steps.version.outputs.version }}
+          EXPECTED_BUILD: ${{ steps.version.outputs.build }}
+        run: bash .github/release/macos.sh
+      - name: Package Windows installer and portable ZIP
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        env:
+          EXPECTED_VERSION: ${{ steps.version.outputs.version }}
+          EXPECTED_BUILD: ${{ steps.version.outputs.build }}
+        run: ./.github/release/windows.ps1
+      - name: Package Linux TAR and DEB
+        if: matrix.platform == 'linux'
+        env:
+          EXPECTED_VERSION: ${{ steps.version.outputs.version }}
+          EXPECTED_BUILD: ${{ steps.version.outputs.build }}
+        run: bash .github/release/linux.sh
+      - name: Create SHA256 checksums
+        run: python3 scripts/release_checksums.py
+      - uses: actions/upload-artifact@v7
+        with:
+          name: Marker-${{ matrix.platform }}
+          path: dist/*
+          if-no-files-found: error
+
+  publish:
+    needs: [resolve, package]
+    if: ${{ github.event_name == 'push' || !inputs.build_only }}
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: refs/tags/${{ needs.resolve.outputs.tag }}
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: Marker-*
+          path: dist
+          merge-multiple: true
+      - name: Combine and verify checksums
+        run: |
+          cat dist/SHA256SUMS-*.txt > dist/SHA256SUMS.txt
+          (cd dist && sha256sum --check SHA256SUMS.txt)
+          rm dist/SHA256SUMS-*.txt
+      - name: Publish stable release without replacing existing assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.resolve.outputs.tag }}
+        run: |
+          shopt -s nullglob
+          files=(dist/*)
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            echo 'Release already exists; preserving its installers and checksums.'
+            exit 0
+          fi
+          make_latest=true
+          if latest=$(gh release view --json tagName --jq '.tagName' 2>/dev/null); then
+            highest=$(printf '%s\n%s\n' "$latest" "$RELEASE_TAG" | sort -V | tail -n 1)
+            if [[ "$highest" != "$RELEASE_TAG" || "$latest" == "$RELEASE_TAG" ]]; then make_latest=false; fi
+          fi
+          gh release create "$RELEASE_TAG" "${files[@]}" --verify-tag --generate-notes --latest="$make_latest"

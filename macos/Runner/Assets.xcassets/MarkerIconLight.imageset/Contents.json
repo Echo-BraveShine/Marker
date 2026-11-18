@@ -1,0 +1,18 @@
+{
+  "images": [
+    {
+      "idiom": "mac",
+      "filename": "marker-512.png",
+      "scale": "1x"
+    },
+    {
+      "idiom": "mac",
+      "filename": "marker-1024.png",
+      "scale": "2x"
+    }
+  ],
+  "info": {
+    "author": "xcode",
+    "version": 1
+  }
+}

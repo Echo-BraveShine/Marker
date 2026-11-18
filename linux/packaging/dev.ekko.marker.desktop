@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Marker
+Comment=Markdown editor and preview
+Exec=marker %F
+Icon=marker
+Terminal=false
+Categories=Utility;TextEditor;
+MimeType=text/markdown;text/x-markdown;
+StartupWMClass=dev.ekko.marker
+StartupNotify=true

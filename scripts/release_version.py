@@ -1,0 +1,28 @@
+#!/usr/bin/env python3
+"""Validate pubspec/tag consistency and share the version with GitHub Actions."""
+import argparse
+import os
+from pathlib import Path
+import re
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--tag', required=True)
+    args = parser.parse_args()
+    root = Path(__file__).resolve().parents[1]
+    match = re.search(r'^version:\s*(\d+\.\d+\.\d+)\+(\d+)\s*$', (root / 'pubspec.yaml').read_text(), re.M)
+    if not match or args.tag != f'v{match[1]}':
+        raise SystemExit('Release tag must match pubspec version X.Y.Z+BUILD')
+    version, build = match.groups()
+    if any(int(number) > 65535 for number in version.split('.') + [build]):
+        raise SystemExit('Windows version components must be <= 65535')
+    values = f'version={version}\nbuild={build}\n'
+    print(values, end='')
+    if output := os.environ.get('GITHUB_OUTPUT'):
+        with open(output, 'a') as stream:
+            stream.write(values)
+
+
+if __name__ == '__main__':
+    main()
