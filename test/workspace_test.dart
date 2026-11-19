@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -11,9 +12,11 @@ void main() {
       final container = ProviderContainer();
       addTearDown(container.dispose);
       final workspace = container.read(workspaceProvider.notifier);
-      workspace.add(text: 'one', saved: 'one', path: '/tmp/one.md');
+      final documentPath =
+          '${Directory.systemTemp.path}${Platform.pathSeparator}中文 文档.md';
+      workspace.add(text: 'one', saved: 'one', path: documentPath);
       final first = workspace.active!.id;
-      workspace.snapshot('modified one', 'one', '/tmp/one.md');
+      workspace.snapshot('modified one', 'one', documentPath);
       workspace.add(text: 'two', saved: 'two');
       final second = workspace.active!.id;
       workspace.select(first);
@@ -25,6 +28,7 @@ void main() {
       expect(await reader.restore(), isTrue);
       expect(reader.active!.id, first);
       expect(reader.active!.text, 'modified one');
+      expect(reader.active!.path, documentPath);
       reader.remove(first);
       expect(reader.active!.id, second);
       reader.remove(second);

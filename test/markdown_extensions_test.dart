@@ -49,6 +49,16 @@ void main() {
         resolveDocumentUri('../image.png', nested.path).toFilePath(),
         File(localPath('image.png')).absolute.path,
       );
+      final image = resolveDocumentUri(
+        'images/%E5%9B%BE%20%23100%25.png?raw=1#preview',
+        document.path,
+      );
+      expect(image.query, 'raw=1');
+      expect(image.fragment, 'preview');
+      expect(
+        image.replace(query: '', fragment: '').toFilePath(),
+        File(localPath('中文/images/图 #100%.png')).absolute.path,
+      );
       expect(
         resolveDocumentUri('https://example.com/a.png', document.path).scheme,
         'https',

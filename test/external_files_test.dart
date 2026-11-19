@@ -19,6 +19,22 @@ void main() {
       [unicode, linked.path, r'C:\Docs\file.MD'],
     );
   });
+  test(
+    'Open With decodes literal URI delimiters and deduplicates file URLs',
+    () {
+      final file = File(
+        '${Directory.systemTemp.path}${Platform.pathSeparator}中文 #100%.md',
+      );
+      expect(
+        markdownOpenPaths([
+          file.uri.toString(),
+          file.path,
+          file.uri.toString(),
+        ]),
+        [file.path],
+      );
+    },
+  );
   test('Windows Open With decodes drive and UNC file URLs', () {
     expect(
       markdownOpenPaths([
