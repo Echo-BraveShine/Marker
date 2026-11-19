@@ -119,3 +119,8 @@ Windows 打包前必须验证 `flutter_windows.dll`、ICU、AOT 和 AssetManifes
 - Windows ARM64 虚拟机中的 x64 工具链：Release 构建通过；EXE、便携 ZIP、中英两个 MSI 已实际打包；两个 MSI 在干净目录静默安装、检查运行库及资源后卸载通过。ZIP 包含 60 个条目，13 个 PE 文件均为 x64，校验值验证通过。
 - Ubuntu ARM64：TAR、DEB、AppImage、RPM 实际打包及元数据校验通过；AppImage 解包与窗口启动检查通过；GTK 安装页中英切换和当前用户安装通过。
 - 发布与语言回归测试 15 项及 actionlint 通过。以上是本机验证，不代表 GitHub 托管环境的新一轮 Release 已运行；Linux x64 的新增格式仍需由对应云端 runner 验证。
+
+
+## AppImage 的无头启动检查
+
+AppImage 生成完成后，在独立 Xvfb 与 D-Bus 会话中启动实际运行文件，检查同一可见窗口连续出现且进程保持存活。CI 仅在此检查中启用 Mesa 软件渲染、X11 并关闭 AT-SPI 桥，避免无 GPU/辅助功能总线环境干扰。窗口枚举的临时 BadWindow 可在限定时间内重试；应用提前退出、窗口未稳定出现或超时仍会使 Release 失败，并输出启动日志。正式 AppImage 的运行环境不改变。

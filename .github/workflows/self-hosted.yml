@@ -105,7 +105,7 @@ jobs:
       - name: Check preinstalled packaging dependencies
         if: inputs.package
         run: |
-          for tool in rpmbuild rpm patchelf xvfb-run xauth xdotool; do
+          for tool in rpmbuild rpm patchelf xvfb-run xauth xdotool dbus-run-session setsid; do
             command -v "$tool" || { echo "::error::Preinstall $tool in the VM as administrator"; exit 1; }
           done
       - name: Use preinstalled Flutter

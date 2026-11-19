@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+tools_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 bundle=$(realpath "$1")
 arch=$2
 output="$PWD/dist/Marker-linux-$arch.AppImage"
@@ -47,10 +48,5 @@ jq -e --arg version "$EXPECTED_VERSION" --arg build "$EXPECTED_BUILD" \
   '.version == $version and .build_number == $build' \
   squashfs-root/data/flutter_assets/version.json
 
-# Wait for the actual window to become visible without relying on FUSE in CI.
-XDG_CONFIG_HOME="$staging/config" XDG_DATA_HOME="$staging/data" xvfb-run -a bash -eu -s -- "$output" <<'BASH'
-APPIMAGE_EXTRACT_AND_RUN=1 "$1" &
-app_pid=$!
-trap 'kill "$app_pid" 2>/dev/null || true; wait "$app_pid" 2>/dev/null || true' EXIT
-timeout 30 xdotool search --sync --onlyvisible --name '^Untitled\.md( •)?$'
-BASH
+# Exercise the runtime under an isolated software-rendered X11/DBus session.
+bash "$tools_dir/linux-smoke.sh" "$output"
