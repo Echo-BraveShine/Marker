@@ -1,3 +1,4 @@
+import '../theme/marker_fonts.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' show Theme;
@@ -53,11 +54,8 @@ class ShortcutSettings extends StatelessWidget {
                       Text(
                         shortcut.display(defaultTargetPlatform),
                         style: TextStyle(
-                          fontFamily: 'Menlo',
-                          fontFamilyFallback: const [
-                            'Consolas',
-                            'Noto Sans SC',
-                          ],
+                          fontFamily: MarkerFonts.monospace,
+                          fontFamilyFallback: MarkerFonts.codeFallback,
                           fontSize: 12,
                           color: c.textSecondary,
                         ),

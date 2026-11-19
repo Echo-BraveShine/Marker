@@ -1,3 +1,4 @@
+import '../theme/marker_fonts.dart';
 import 'marker_floating_surface.dart';
 import '../theme/marker_style.dart';
 import 'dart:math' as math;
@@ -61,6 +62,7 @@ class MarkerDialog extends StatelessWidget {
     final body = Padding(padding: contentPadding, child: content);
     return CupertinoTheme(
       data: CupertinoThemeData(
+        textTheme: MarkerFonts.cupertino,
         brightness: Theme.of(context).brightness,
         primaryColor: colors.textAccent,
       ),
@@ -74,12 +76,8 @@ class MarkerDialog extends StatelessWidget {
               height: height == null ? null : math.min(height!, available),
               child: DefaultTextStyle(
                 style: TextStyle(
-                  fontFamily: '.SF Pro Text',
-                  fontFamilyFallback: const [
-                    '.AppleSystemUIFont',
-                    'Helvetica Neue',
-                    'Noto Sans SC',
-                  ],
+                  fontFamily: MarkerFonts.ui,
+                  fontFamilyFallback: MarkerFonts.fallback,
                   fontSize: 13,
                   height: 1.38,
                   color: colors.textPrimary,
@@ -179,8 +177,8 @@ class MarkerDialogButton extends StatelessWidget {
         onPressed: onPressed,
         child: DefaultTextStyle(
           style: TextStyle(
-            fontFamily: '.SF Pro Text',
-            fontFamilyFallback: const ['Segoe UI', 'Noto Sans SC'],
+            fontFamily: MarkerFonts.ui,
+            fontFamilyFallback: MarkerFonts.fallback,
             fontSize: 12,
             fontWeight: primary ? FontWeight.w600 : FontWeight.w400,
             color: foreground,

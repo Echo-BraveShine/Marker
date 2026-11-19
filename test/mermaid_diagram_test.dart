@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:marker/src/widgets/markdown_templates.dart';
 import 'package:marker/src/widgets/mermaid_diagram.dart';
 
@@ -47,25 +48,35 @@ void main() {
             .setMockMethodCallHandler(MermaidDiagram.linuxChannel, null),
       );
       await tester.pumpWidget(
-        const CupertinoApp(
-          home: MermaidDiagram(source: 'flowchart LR\nA --> B', dark: false),
+        ProviderScope(
+          child: const CupertinoApp(
+            home: MermaidDiagram(source: 'flowchart LR\nA --> B', dark: false),
+          ),
         ),
       );
       await tester.pump(const Duration(milliseconds: 250));
       // rootBundle performs real asset IO in this test.
-      await tester.runAsync(
-        () => Future<void>.delayed(const Duration(milliseconds: 100)),
-      );
+      await tester.runAsync(() async {
+        await rootBundle.load('assets/fonts/NotoSansSC.ttf');
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+      });
       await tester.pumpAndSettle();
       expect(find.byType(Image), findsOneWidget);
       expect(calls.single.method, 'render');
+      expect((calls.single.arguments as Map)['width'], mermaidCanvasWidth);
+      expect(
+        (calls.single.arguments as Map)['html'],
+        contains('data:font/ttf;base64,'),
+      );
       expect(
         (calls.single.arguments as Map)['html'],
         contains("theme:'default'"),
       );
       await tester.pumpWidget(
-        const CupertinoApp(
-          home: MermaidDiagram(source: 'bad syntax', dark: true),
+        const ProviderScope(
+          child: CupertinoApp(
+            home: MermaidDiagram(source: 'bad syntax', dark: true),
+          ),
         ),
       );
       await tester.pump(const Duration(milliseconds: 250));
@@ -96,7 +107,14 @@ void main() {
         );
         File(
           '$directory/windows/${template.id}-${dark ? 'dark' : 'light'}.html',
-        ).writeAsStringSync(mermaidHtml(template.source, script, dark));
+        ).writeAsStringSync(
+          mermaidHtml(
+            template.source,
+            script,
+            dark,
+            fontUri: Platform.environment['MARKER_MERMAID_FONT_URI'],
+          ),
+        );
       }
     }
     for (final dark in [false, true]) {
@@ -114,7 +132,14 @@ void main() {
       );
       File(
         '$directory/windows/chinese-${dark ? 'dark' : 'light'}.html',
-      ).writeAsStringSync(mermaidHtml(chinese, script, dark));
+      ).writeAsStringSync(
+        mermaidHtml(
+          chinese,
+          script,
+          dark,
+          fontUri: Platform.environment['MARKER_MERMAID_FONT_URI'],
+        ),
+      );
     }
     File('$directory/invalid.html').writeAsStringSync(
       mermaidHtml('not-a-diagram', script, false, linux: true),

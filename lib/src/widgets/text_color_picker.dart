@@ -1,3 +1,4 @@
+import '../theme/marker_fonts.dart';
 import 'dart:math' as math;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/material.dart' show Theme;
@@ -102,7 +103,8 @@ class _TextColorPickerState extends ConsumerState<TextColorPicker> {
                     Text(
                       state.hex,
                       style: TextStyle(
-                        fontFamily: 'Menlo',
+                        fontFamily: MarkerFonts.monospace,
+                        fontFamilyFallback: MarkerFonts.codeFallback,
                         fontSize: 11,
                         color: colors.textSecondary,
                       ),
@@ -247,7 +249,8 @@ class _TextColorPickerState extends ConsumerState<TextColorPicker> {
                     vertical: 9,
                   ),
                   style: TextStyle(
-                    fontFamily: 'Menlo',
+                    fontFamily: MarkerFonts.monospace,
+                    fontFamilyFallback: MarkerFonts.codeFallback,
                     fontSize: 12,
                     color: colors.textPrimary,
                   ),

@@ -53,7 +53,7 @@ void SnapshotFinished(GObject* source, GAsyncResult* result, gpointer data) {
     task->Complete(nullptr, error ? error->message : "Snapshot failed");
     return;
   }
-  if (task->document && cairo_image_surface_get_width(surface) != task->width) {
+  if (cairo_image_surface_get_width(surface) != task->width) {
     const double scale = static_cast<double>(task->width) / cairo_image_surface_get_width(surface);
     auto* scaled = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, task->width,
         static_cast<int>(cairo_image_surface_get_height(surface) * scale));
@@ -139,6 +139,10 @@ void Message(WebKitUserContentManager*, WebKitJavascriptResult* result, gpointer
   g_autoptr(JSCValue) height = jsc_value_object_get_property(value, "height");
   if (!jsc_value_is_number(height)) return;
   task->ready = true;
+  g_autoptr(JSCValue) content_width = jsc_value_object_get_property(value, "width");
+  if (!task->document && jsc_value_is_number(content_width)) {
+    task->width = std::min(task->width, std::max(1, jsc_value_to_int32(content_width)));
+  }
   const int content_height = jsc_value_to_int32(height);
   if (task->pdf) { PrintDocument(task); return; }
   if (content_height < 1 || content_height > (task->document ? 32768 : 8192)) {
@@ -146,7 +150,7 @@ void Message(WebKitUserContentManager*, WebKitJavascriptResult* result, gpointer
     return;
   }
   gtk_widget_set_size_request(GTK_WIDGET(task->view), -1, content_height);
-  gtk_window_resize(GTK_WINDOW(task->window), gtk_widget_get_allocated_width(GTK_WIDGET(task->view)), content_height);
+  gtk_window_resize(GTK_WINDOW(task->window), task->width, content_height);
   // Allow the GTK allocation and WebKit paint to reflect the completed diagram.
   g_timeout_add_full(G_PRIORITY_DEFAULT, 150, TakeSnapshot, new Task(task), DeleteTask);
 }
@@ -158,10 +162,9 @@ static void StartRender(const gchar* html, int width, bool document, bool pdf,
   task->callback = std::move(callback);
   task->document = document; task->pdf = pdf; task->width = width;
   task->window = gtk_offscreen_window_new();
-  // Ephemeral context: no cookie/profile files, external resources blocked by CSP.
-  auto* context = webkit_web_context_new_ephemeral();
+  // Reuse the ephemeral WebKit process pool; diagrams never create disk profiles.
+  static auto* context = webkit_web_context_new_ephemeral();
   task->view = WEBKIT_WEB_VIEW(webkit_web_view_new_with_context(context));
-  g_object_unref(context);
   auto* settings = webkit_web_view_get_settings(task->view);
   webkit_settings_set_allow_file_access_from_file_urls(settings, TRUE);
   webkit_settings_set_hardware_acceleration_policy(settings, WEBKIT_HARDWARE_ACCELERATION_POLICY_NEVER);

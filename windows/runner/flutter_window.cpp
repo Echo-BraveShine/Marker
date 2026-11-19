@@ -1,6 +1,7 @@
 #include "flutter_window.h"
 
 #include <optional>
+#include <dwmapi.h>
 #include <flutter/standard_method_codec.h>
 #include <shobjidl.h>
 #include <initguid.h>
@@ -40,6 +41,13 @@ bool FlutterWindow::OnCreate() {
     if (call.method_name() != "setDark") { result->NotImplemented(); return; }
     const auto* dark = call.arguments() ? std::get_if<bool>(call.arguments()) : nullptr;
     if (!dark) { result->Error("invalid-arguments", "Expected dark appearance boolean"); return; }
+    const BOOL use_dark = *dark ? TRUE : FALSE;
+    // The plugin gates this on the OS theme; app appearance must be independent.
+    if (FAILED(DwmSetWindowAttribute(GetHandle(), 20, &use_dark, sizeof(use_dark)))) {
+      DwmSetWindowAttribute(GetHandle(), 19, &use_dark, sizeof(use_dark));
+    }
+    SetWindowPos(GetHandle(), nullptr, 0, 0, 0, 0,
+        SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
     if (!ApplyAppearanceIcon(*dark)) { result->Error("missing-icon", "Appearance icon resource not found"); return; }
     result->Success();
   });

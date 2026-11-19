@@ -17,11 +17,14 @@ info = json.load(open(sys.argv[1], encoding='utf-8'))
 assert info['version'] == os.environ['EXPECTED_VERSION']
 assert info['build_number'] == os.environ['EXPECTED_BUILD']
 PY
+# Packaging must retain the Chinese font for Flutter and the native installer.
+test -s "$bundle/data/flutter_assets/assets/fonts/NotoSansSC.ttf"
+test -s "$bundle/data/flutter_assets/assets/fonts/OFL-NotoSansSC.txt"
 mkdir -p dist
 install -Dm644 "$tools_dir/dev.ekko.marker.metainfo.xml" \
   "$bundle/share/metainfo/dev.ekko.marker.metainfo.xml"
 # Include a relocatable user installer alongside the bundle.
-cp "$packaging_dir/install-user.sh" "$packaging_dir/installer.py" "$packaging_dir/installer_i18n.py" \
+cp "$packaging_dir/install-user.sh" "$packaging_dir/installer.py" "$packaging_dir/installer_i18n.py" "$packaging_dir/bundled_fonts.py" \
   "$packaging_dir/installer-welcome.png" "$bundle/"
 cp "$packaging_dir/dev.ekko.marker.desktop" "$packaging_dir/dev.ekko.marker.xml" "$bundle/"
 tar -czf "dist/Marker-linux-$architecture.tar.gz" -C "$bundle" .
@@ -39,7 +42,7 @@ Architecture: $deb_arch
 Section: editors
 Priority: optional
 Maintainer: Marker <noreply@users.noreply.github.com>
-Depends: libc6 (>= $glibc_version), libstdc++6, libgtk-3-0t64 | libgtk-3-0, libgl1, libsecret-1-0, libwebkit2gtk-4.1-0, shared-mime-info, desktop-file-utils
+Depends: libc6 (>= $glibc_version), libstdc++6, libfontconfig1, libgtk-3-0t64 | libgtk-3-0, libgl1, libsecret-1-0, libwebkit2gtk-4.1-0, shared-mime-info, desktop-file-utils
 Homepage: https://github.com/Echo-BraveShine/Marker
 Description: Markdown editor with live preview / Markdown 编辑与实时预览
  Write Markdown with syntax highlighting, math and Mermaid support.

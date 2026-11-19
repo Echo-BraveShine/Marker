@@ -29,3 +29,6 @@ target_include_directories(${BINARY_NAME} PRIVATE "${CMAKE_SOURCE_DIR}")
 # WebKitGTK renders offline Mermaid into an image embedded by Flutter.
 pkg_check_modules(WEBKIT REQUIRED IMPORTED_TARGET webkit2gtk-4.1>=2.40)
 target_link_libraries(${BINARY_NAME} PRIVATE PkgConfig::WEBKIT)
+
+pkg_check_modules(FONTCONFIG REQUIRED IMPORTED_TARGET fontconfig)
+target_link_libraries(${BINARY_NAME} PRIVATE PkgConfig::FONTCONFIG)

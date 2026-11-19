@@ -84,4 +84,75 @@ void main() {
       }
     },
   );
+  test(
+    'API rate limits fall back to the trusted public release redirect',
+    () async {
+      final http = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() => http.close(force: true));
+      final paths = <String>[];
+      http.listen((request) async {
+        paths.add(request.uri.path);
+        if (request.uri.path == '/api') {
+          request.response.statusCode = 403;
+        } else {
+          request.response.statusCode = 302;
+          request.response.headers.set(
+            HttpHeaders.locationHeader,
+            '/Echo-BraveShine/Marker/releases/tag/v1.3.0',
+          );
+        }
+        await request.response.close();
+      });
+      final origin = 'http://127.0.0.1:${http.port}';
+      final client = GitHubReleaseClient(
+        endpoint: Uri.parse('$origin/api'),
+        fallbackEndpoint: Uri.parse('$origin/latest'),
+      );
+      final result = await client.check('1.2.0');
+      expect(result.status, ReleaseStatus.available);
+      expect(result.latest, '1.3.0');
+      expect(result.page!.host, 'github.com');
+      expect(paths, ['/api', '/latest']);
+    },
+  );
+
+  test('bad installed version is distinct from bad release data', () async {
+    await expectLater(
+      GitHubReleaseClient().check('unknown'),
+      throwsA(
+        isA<ReleaseException>().having(
+          (e) => e.kind,
+          'kind',
+          UpdateError.version,
+        ),
+      ),
+    );
+  });
+
+  test('fallback refuses a redirect outside the repository', () async {
+    final http = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(() => http.close(force: true));
+    http.listen((request) async {
+      request.response.statusCode = request.uri.path == '/api' ? 429 : 302;
+      request.response.headers.set(
+        HttpHeaders.locationHeader,
+        'https://untrusted.test/releases/tag/v9.0.0',
+      );
+      await request.response.close();
+    });
+    final origin = 'http://127.0.0.1:${http.port}';
+    await expectLater(
+      GitHubReleaseClient(
+        endpoint: Uri.parse('$origin/api'),
+        fallbackEndpoint: Uri.parse('$origin/latest'),
+      ).check('1.0.0'),
+      throwsA(
+        isA<ReleaseException>().having(
+          (e) => e.kind,
+          'kind',
+          UpdateError.restricted,
+        ),
+      ),
+    );
+  });
 }

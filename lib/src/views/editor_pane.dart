@@ -1,3 +1,4 @@
+import '../theme/marker_fonts.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:marker/src/theme/marker_colors.dart';
@@ -43,8 +44,8 @@ class _EditorPaneState extends ConsumerState<EditorPane> {
         textAlignVertical: TextAlignVertical.top,
         keyboardType: TextInputType.multiline,
         style: TextStyle(
-          fontFamily: 'Menlo',
-          fontFamilyFallback: const ['Consolas', 'Noto Sans SC'],
+          fontFamily: MarkerFonts.monospace,
+          fontFamilyFallback: MarkerFonts.codeFallback,
           fontSize: 14,
           height: 1.6,
           color: colors.textPrimary,

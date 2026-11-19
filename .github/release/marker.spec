@@ -15,6 +15,7 @@ Source0: marker.tar.gz
 %global __brp_strip_comment_note %{nil}
 %global __brp_strip_static_archive %{nil}
 
+Requires: libfontconfig.so.1()(64bit)
 Requires: libgtk-3.so.0()(64bit)
 Requires: libwebkit2gtk-4.1.so.0()(64bit)
 Requires: libGL.so.1()(64bit)

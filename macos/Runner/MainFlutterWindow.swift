@@ -89,8 +89,11 @@ private final class DocumentExportRenderer {
 }
 
 private final class DocumentExportJob: NSObject, WKNavigationDelegate {
+  // Share an ephemeral browsing session across successive diagram snapshots.
+  private static let dataStore = WKWebsiteDataStore.nonPersistent()
   private let path: String
   private let width: Int
+  private var contentWidth: Int?
   private let pdf: Bool
   private let completion: (Data?, String?) -> Void
   private var view: WKWebView!
@@ -105,7 +108,7 @@ private final class DocumentExportJob: NSObject, WKNavigationDelegate {
   }
   func start() {
     let config = WKWebViewConfiguration()
-    config.websiteDataStore = .nonPersistent()
+    config.websiteDataStore = Self.dataStore
     view = WKWebView(frame: NSRect(x: 0, y: 0, width: width, height: 800), configuration: config)
     view.navigationDelegate = self
     window = NSWindow(contentRect: NSRect(x: -12000, y: 0, width: width, height: 800), styleMask: .borderless, backing: .buffered, defer: false)
@@ -129,6 +132,9 @@ private final class DocumentExportJob: NSObject, WKNavigationDelegate {
       guard let status = value as? [String: Any] else { return }
       if let error = status["error"] as? String { self.finish(nil, error); return }
       if status["ready"] as? Bool == true, let height = status["height"] as? NSNumber {
+        if let contentWidth = status["width"] as? NSNumber {
+          self.contentWidth = min(self.width, max(1, contentWidth.intValue))
+        }
         self.timer?.invalidate(); self.timer = nil
         if self.pdf { DispatchQueue.main.async { [weak self] in self?.printPdf() } } else { self.snapshot(height.intValue) }
       }
@@ -215,21 +221,22 @@ private final class DocumentExportJob: NSObject, WKNavigationDelegate {
   }
   private func snapshot(_ height: Int) {
     guard height > 0 && height <= 32768 else { finish(nil, "Document is too tall for PNG; choose PDF"); return }
+    let width = contentWidth ?? self.width
     view.setFrameSize(NSSize(width: width, height: height))
     window.setContentSize(NSSize(width: width, height: height))
     DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
       guard let self = self, !self.finished else { return }
       let config = WKSnapshotConfiguration()
-      config.rect = CGRect(x: 0, y: 0, width: self.width, height: height)
+      config.rect = CGRect(x: 0, y: 0, width: width, height: height)
       config.afterScreenUpdates = true
       self.view.takeSnapshot(with: config) { [weak self] image, error in
         guard let self = self, !self.finished else { return }
-        guard let image = image, let bitmap = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: self.width, pixelsHigh: height,
+        guard let image = image, let bitmap = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: width, pixelsHigh: height,
           bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0),
           let graphics = NSGraphicsContext(bitmapImageRep: bitmap) else { self.finish(nil, error?.localizedDescription ?? "Snapshot failed"); return }
         NSGraphicsContext.saveGraphicsState(); NSGraphicsContext.current = graphics
         graphics.imageInterpolation = .high
-        image.draw(in: NSRect(x: 0, y: 0, width: self.width, height: height))
+        image.draw(in: NSRect(x: 0, y: 0, width: width, height: height))
         NSGraphicsContext.restoreGraphicsState()
         self.finish(bitmap.representation(using: .png, properties: [:]), nil)
       }

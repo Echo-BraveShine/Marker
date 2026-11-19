@@ -39,7 +39,7 @@ static gboolean apply_appearance_icon(GtkWindow* window, gboolean dark) {
   return launcher_updated;
 }
 
-static void appearance_method_call(FlMethodChannel* channel, FlMethodCall* call,
+static void appearance_method_call(FlMethodChannel*, FlMethodCall* call,
                                    gpointer user_data) {
   g_autoptr(FlMethodResponse) response = nullptr;
   if (g_strcmp0(fl_method_call_get_name(call), "setDark") != 0) {
@@ -49,11 +49,30 @@ static void appearance_method_call(FlMethodChannel* channel, FlMethodCall* call,
     if (arguments == nullptr || fl_value_get_type(arguments) != FL_VALUE_TYPE_BOOL) {
       response = FL_METHOD_RESPONSE(fl_method_error_response_new("invalid-arguments",
           "Expected dark appearance boolean", nullptr));
-    } else if (!apply_appearance_icon(GTK_WINDOW(user_data), fl_value_get_bool(arguments))) {
-      response = FL_METHOD_RESPONSE(fl_method_error_response_new("missing-icon",
-          "Appearance icon files not found", nullptr));
     } else {
-      response = FL_METHOD_RESPONSE(fl_method_success_response_new(nullptr));
+      const gboolean dark = fl_value_get_bool(arguments);
+      // Apply native chrome even when launcher artwork cannot be updated.
+      GtkSettings* settings = gtk_settings_get_default();
+      g_object_set(settings, "gtk-application-prefer-dark-theme", dark, nullptr);
+      GtkWidget* titlebar = gtk_window_get_titlebar(GTK_WINDOW(user_data));
+      if (titlebar) {
+        auto* style = gtk_widget_get_style_context(titlebar);
+        auto* provider = GTK_CSS_PROVIDER(g_object_get_data(G_OBJECT(titlebar), "marker-titlebar-css"));
+        if (!provider) {
+          provider = gtk_css_provider_new();
+          gtk_style_context_add_provider(style, GTK_STYLE_PROVIDER(provider), GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+          g_object_set_data_full(G_OBJECT(titlebar), "marker-titlebar-css", provider, g_object_unref);
+        }
+        gtk_css_provider_load_from_data(provider, dark
+            ? "headerbar { background-image:none; background-color:#262628; color:#f5f5f7; } headerbar button { color:#f5f5f7; }"
+            : "headerbar { background-image:none; background-color:#f6f6f7; color:#252527; } headerbar button { color:#252527; }", -1, nullptr);
+      }
+      if (!apply_appearance_icon(GTK_WINDOW(user_data), dark)) {
+        response = FL_METHOD_RESPONSE(fl_method_error_response_new("missing-icon",
+            "Appearance icon files not found", nullptr));
+      } else {
+        response = FL_METHOD_RESPONSE(fl_method_success_response_new(nullptr));
+      }
     }
   }
   fl_method_call_respond(call, response, nullptr);
@@ -129,23 +148,9 @@ static void my_application_activate(GApplication* application) {
   GtkWindow* window =
       GTK_WINDOW(gtk_application_window_new(GTK_APPLICATION(application)));
 
-  // Use a header bar when running in GNOME as this is the common style used
-  // by applications and is the setup most users will be using (e.g. Ubuntu
-  // desktop).
-  // If running on X and not using GNOME then just use a traditional title bar
-  // in case the window manager does more exotic layout, e.g. tiling.
-  // If running on Wayland assume the header bar will work (may need changing
-  // if future cases occur).
-  gboolean use_header_bar = TRUE;
-#ifdef GDK_WINDOWING_X11
-  GdkScreen* screen = gtk_window_get_screen(window);
-  if (GDK_IS_X11_SCREEN(screen)) {
-    const gchar* wm_name = gdk_x11_screen_get_window_manager_name(screen);
-    if (g_strcmp0(wm_name, "GNOME Shell") != 0) {
-      use_header_bar = FALSE;
-    }
-  }
-#endif
+  // Own the header on all desktops so app theme is independent of WM chrome.
+  const gboolean use_header_bar = TRUE;
+
   if (use_header_bar) {
     GtkHeaderBar* header_bar = GTK_HEADER_BAR(gtk_header_bar_new());
     gtk_widget_show(GTK_WIDGET(header_bar));

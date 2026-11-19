@@ -11,7 +11,7 @@ int main(int argc, char** argv) {
   GMainLoop* loop = g_main_loop_new(nullptr, FALSE);
   bool passed = false;
   const bool invalid = g_str_has_suffix(argv[1], "invalid.html");
-  render_mermaid(html, 900, [&](GBytes* png, const gchar* error) {
+  render_mermaid(html, 960, [&](GBytes* png, const gchar* error) {
     if (error) {
       g_print("%s: %s\n", invalid ? "EXPECTED ERROR" : "FAILED", error);
       passed = invalid;

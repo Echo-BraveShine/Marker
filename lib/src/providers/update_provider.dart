@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -29,13 +30,22 @@ class UpdateNotifier extends Notifier<UpdateState> {
     if (state.status == ReleaseStatus.checking) return;
     state = const UpdateState(status: ReleaseStatus.checking);
     try {
-      final info = await ref.read(packageInfoProvider.future);
+      final info = await ref
+          .read(packageInfoProvider.future)
+          .timeout(const Duration(seconds: 6));
       final result = await ref.read(releaseClientProvider).check(info.version);
       if (ref.mounted) {
         state = UpdateState(
           status: result.status,
           latest: result.latest,
           page: result.page,
+        );
+      }
+    } on TimeoutException {
+      if (ref.mounted) {
+        state = const UpdateState(
+          status: ReleaseStatus.error,
+          error: UpdateError.version,
         );
       }
     } on ReleaseException catch (error) {

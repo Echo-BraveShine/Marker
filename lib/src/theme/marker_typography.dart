@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'marker_fonts.dart';
 
 /// Markdown 编辑预览专用字体令牌，跟随浅/深主题自动适配
 class MarkerTypography {
@@ -7,10 +8,10 @@ class MarkerTypography {
   factory MarkerTypography() => _instance;
 
   // 编辑区等宽字体（平台相关）
-  String get editorFontFamily => 'Menlo'; // 默认回退
+  String get editorFontFamily => MarkerFonts.monospace;
 
-  // UI 字体：系统默认 fontFamily（no explicit family）+ 可选自定义
-  String get uiFontFamily => 'system'; // Flutter 会使用系统默认 font
+  // UI 与中文回退统一使用平台字体令牌。
+  String get uiFontFamily => MarkerFonts.ui;
 
   // Markdown 正文字号：15pt，行高 1.7
   double get previewBaseFontSize => 15.0;

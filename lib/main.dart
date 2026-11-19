@@ -9,6 +9,7 @@ import 'src/widgets/highlight_style_picker.dart';
 import 'src/theme/highlight_style.dart';
 import 'src/widgets/markdown_highlighter.dart';
 import 'src/theme/marker_style.dart';
+import 'src/theme/marker_fonts.dart';
 import 'package:flutter/cupertino.dart';
 import 'dart:convert';
 import 'src/widgets/desktop_startup.dart';
@@ -108,6 +109,7 @@ class MarkerApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final vm = ref.watch(themeProvider);
+
     return MaterialApp(
       title: 'Marker',
       debugShowCheckedModeBanner: false,
@@ -122,10 +124,18 @@ class MarkerApp extends ConsumerWidget {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      builder: (context, child) => DesktopIconSync(
-        enabled: desktopWindow,
-        child: child ?? const SizedBox.shrink(),
+      builder: (context, child) => CupertinoTheme(
+        // 确保 Cupertino 组件在所有平台上使用正确的字体，尤其是中文
+        data: CupertinoThemeData(
+          brightness: Theme.of(context).brightness,
+          textTheme: MarkerFonts.cupertino,
+        ),
+        child: DesktopIconSync(
+          enabled: desktopWindow,
+          child: child ?? const SizedBox.shrink(),
+        ),
       ),
+
       home: const MarkerHome(),
     );
   }
@@ -257,6 +267,7 @@ class _MarkerHomeState extends ConsumerState<MarkerHome> with WindowListener {
   }
 
   void _loadActive() {
+    _linkedScroll.reset();
     _draftTimer?.cancel();
     final document = _workspace.active;
     _switchingDocument = true;
@@ -315,7 +326,8 @@ class _MarkerHomeState extends ConsumerState<MarkerHome> with WindowListener {
               padding: const EdgeInsets.all(6),
               child: DefaultTextStyle(
                 style: TextStyle(
-                  fontFamily: '.SF Pro Text',
+                  fontFamily: MarkerFonts.ui,
+                  fontFamilyFallback: MarkerFonts.fallback,
                   fontSize: 13,
                   height: 1.38,
                   color: c.textPrimary,
@@ -371,7 +383,8 @@ class _MarkerHomeState extends ConsumerState<MarkerHome> with WindowListener {
                                 Text(
                                   entry.$2,
                                   style: TextStyle(
-                                    fontFamily: '.SF Pro Text',
+                                    fontFamily: MarkerFonts.ui,
+                                    fontFamilyFallback: MarkerFonts.fallback,
                                     fontSize: 13,
                                     color: entry.$1 == 'delete'
                                         ? CupertinoColors.systemRed
@@ -479,6 +492,7 @@ class _MarkerHomeState extends ConsumerState<MarkerHome> with WindowListener {
 
   void _changed() {
     if (!mounted || _switchingDocument) return;
+    _linkedScroll.takeControl(_editorScroll);
     final offset = _controller.selection.isValid
         ? _controller.selection.extentOffset
         : 0;
@@ -596,7 +610,8 @@ class _MarkerHomeState extends ConsumerState<MarkerHome> with WindowListener {
             child: Text(
               message,
               style: TextStyle(
-                fontFamily: '.SF Pro Text',
+                fontFamily: MarkerFonts.ui,
+                fontFamilyFallback: MarkerFonts.fallback,
                 fontSize: 13,
                 color: colors.bgEditor,
               ),
@@ -1041,7 +1056,8 @@ class _MarkerHomeState extends ConsumerState<MarkerHome> with WindowListener {
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
-                                fontFamily: 'Menlo',
+                                fontFamily: MarkerFonts.monospace,
+                                fontFamilyFallback: MarkerFonts.codeFallback,
                                 fontSize: 11,
                                 color: c.textSecondary,
                               ),
@@ -1424,7 +1440,9 @@ class _MarkerHomeState extends ConsumerState<MarkerHome> with WindowListener {
                                             ],
                                     ),
                                     style: TextStyle(
-                                      fontFamily: 'Menlo',
+                                      fontFamily: MarkerFonts.monospace,
+                                      fontFamilyFallback:
+                                          MarkerFonts.codeFallback,
                                       fontSize: editor.fontSize,
                                       height: 1.6,
                                       color: c.textSecondary,
@@ -1502,70 +1520,69 @@ class _MarkerHomeState extends ConsumerState<MarkerHome> with WindowListener {
       ),
     );
     final editorStyle = TextStyle(
-      fontFamily: switch (defaultTargetPlatform) {
-        TargetPlatform.macOS => 'SF Mono',
-        TargetPlatform.windows => 'Cascadia Code',
-        TargetPlatform.linux => 'JetBrains Mono',
-        _ => 'Menlo',
-      },
-      fontFamilyFallback: const ['Consolas', 'monospace', 'Noto Sans SC'],
+      fontFamily: MarkerFonts.monospace,
+      fontFamilyFallback: MarkerFonts.codeFallback,
       fontSize: _fontSize,
       height: 1.6,
       color: c.textPrimary,
     );
-    final editor = KeyedSubtree(
-      key: ValueKey(workspace.activeId),
-      child: ColoredBox(
-        color: c.bgEditor,
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final digits = _lineIndex.length.toString().length;
-            final numberMeasure = TextPainter(
-              text: TextSpan(text: '9' * digits, style: editorStyle),
-              textDirection: TextDirection.ltr,
-              textScaler: MediaQuery.textScalerOf(context),
-            )..layout();
-            final gutterWidth = numberMeasure.width + 8;
-            numberMeasure.dispose();
-            return Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                LineNumberGutter(
-                  key: const Key('line-numbers'),
-                  controller: _controller,
-                  scrollController: _editorScroll,
-                  style: editorStyle,
-                  index: _lineIndex,
-                  editable: _editable,
-                  color: c.textTertiary,
-                  width: gutterWidth,
-                ),
-                Expanded(
-                  child: CupertinoTextField(
-                    key: const Key('editor'),
-                    scrollPadding: EdgeInsets.zero,
+    final editor = LinkedScrollRegion(
+      link: _linkedScroll,
+      controller: _editorScroll,
+      child: KeyedSubtree(
+        key: ValueKey(workspace.activeId),
+        child: ColoredBox(
+          color: c.bgEditor,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final digits = _lineIndex.length.toString().length;
+              final numberMeasure = TextPainter(
+                text: TextSpan(text: '9' * digits, style: editorStyle),
+                textDirection: TextDirection.ltr,
+                textScaler: MediaQuery.textScalerOf(context),
+              )..layout();
+              final gutterWidth = numberMeasure.width + 8;
+              numberMeasure.dispose();
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  LineNumberGutter(
+                    key: const Key('line-numbers'),
                     controller: _controller,
-                    undoController: _undo,
-                    focusNode: _focus,
-                    readOnly: _restoring,
-                    maxLines: null,
-                    expands: true,
-                    textAlignVertical: TextAlignVertical.top,
-                    style: editorStyle,
-                    strutStyle: StrutStyle.fromTextStyle(
-                      editorStyle,
-                      forceStrutHeight: true,
-                    ),
                     scrollController: _editorScroll,
-                    minLines: null,
-                    decoration: null,
-                    padding: const EdgeInsets.fromLTRB(4, 10, 4, 10),
-                    placeholder: t('开始书写…', 'Start writing…'),
+                    style: editorStyle,
+                    index: _lineIndex,
+                    editable: _editable,
+                    color: c.textTertiary,
+                    width: gutterWidth,
                   ),
-                ),
-              ],
-            );
-          },
+                  Expanded(
+                    child: CupertinoTextField(
+                      key: const Key('editor'),
+                      scrollPadding: EdgeInsets.zero,
+                      controller: _controller,
+                      undoController: _undo,
+                      focusNode: _focus,
+                      readOnly: _restoring,
+                      maxLines: null,
+                      expands: true,
+                      textAlignVertical: TextAlignVertical.top,
+                      style: editorStyle,
+                      strutStyle: StrutStyle.fromTextStyle(
+                        editorStyle,
+                        forceStrutHeight: true,
+                      ),
+                      scrollController: _editorScroll,
+                      minLines: null,
+                      decoration: null,
+                      padding: const EdgeInsets.fromLTRB(4, 10, 4, 10),
+                      placeholder: t('开始书写…', 'Start writing…'),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
         ),
       ),
     );
@@ -1580,125 +1597,135 @@ class _MarkerHomeState extends ConsumerState<MarkerHome> with WindowListener {
     );
     if (_previewSignature != previewSignature) {
       _previewSignature = previewSignature;
-      _previewCache = RepaintBoundary(
-        child: ColoredBox(
-          color: c.bgPreview,
-          child: SizedBox.expand(
-            child: Markdown(
-              key: const Key('preview'),
-              extensionSet: md.ExtensionSet.gitHubFlavored,
-              controller: _previewScroll,
-              blockSyntaxes: [MermaidSyntax(), MathBlockSyntax()],
-              inlineSyntaxes: [TextColorSyntax(), MathInlineSyntax()],
-              builders: {
-                'text-color': TextColorBuilder(),
-                'math-inline': MathBuilder(),
-                'math-block': MathBuilder(block: true),
-                'mermaid': MermaidBuilder(
-                  enabled: ref.watch(mermaidPreviewEnabledProvider),
-                ),
-              },
-              onTapLink: (text, href, title) async {
-                if (href == null) return;
-                try {
-                  if (href.startsWith('#')) {
-                    if (_previewScroll.hasClients) {
-                      await _previewScroll.animateTo(
-                        href.startsWith('#fnref')
-                            ? 0
-                            : _previewScroll.position.maxScrollExtent,
-                        duration: const Duration(milliseconds: 200),
-                        curve: Curves.easeOut,
-                      );
+      _previewCache = LinkedScrollRegion(
+        link: _linkedScroll,
+        controller: _previewScroll,
+        child: RepaintBoundary(
+          child: ColoredBox(
+            color: c.bgPreview,
+            child: SizedBox.expand(
+              child: Markdown(
+                key: const Key('preview'),
+                extensionSet: md.ExtensionSet.gitHubFlavored,
+                controller: _previewScroll,
+                blockSyntaxes: [MermaidSyntax(), MathBlockSyntax()],
+                inlineSyntaxes: [TextColorSyntax(), MathInlineSyntax()],
+                builders: {
+                  'text-color': TextColorBuilder(),
+                  'math-inline': MathBuilder(),
+                  'math-block': MathBuilder(block: true),
+                  'mermaid': MermaidBuilder(
+                    enabled: ref.watch(mermaidPreviewEnabledProvider),
+                  ),
+                },
+                onTapLink: (text, href, title) async {
+                  if (href == null) return;
+                  try {
+                    if (href.startsWith('#')) {
+                      if (_previewScroll.hasClients) {
+                        _linkedScroll.takeControl(_previewScroll);
+                        await _previewScroll.animateTo(
+                          href.startsWith('#fnref')
+                              ? 0
+                              : _previewScroll.position.maxScrollExtent,
+                          duration: const Duration(milliseconds: 200),
+                          curve: Curves.easeOut,
+                        );
+                      }
+                      return;
                     }
-                    return;
+                    final uri = resolveDocumentUri(href, _path);
+                    if (![
+                      'http',
+                      'https',
+                      'mailto',
+                      'file',
+                    ].contains(uri.scheme)) {
+                      _toast(t('不支持此链接类型', 'Unsupported link type'));
+                      return;
+                    }
+                    if (!await launchUrl(
+                      uri,
+                      mode: LaunchMode.externalApplication,
+                    )) {
+                      throw StateError('无法打开链接');
+                    }
+                  } catch (e) {
+                    _error(e);
                   }
-                  final uri = resolveDocumentUri(href, _path);
-                  if (![
-                    'http',
-                    'https',
-                    'mailto',
-                    'file',
-                  ].contains(uri.scheme)) {
-                    _toast(t('不支持此链接类型', 'Unsupported link type'));
-                    return;
-                  }
-                  if (!await launchUrl(
-                    uri,
-                    mode: LaunchMode.externalApplication,
-                  )) {
-                    throw StateError('无法打开链接');
-                  }
-                } catch (e) {
-                  _error(e);
-                }
-              },
-              sizedImageBuilder: (config) {
-                final uri = config.uri;
-                final alt = config.alt;
-                final resolved = resolveDocumentUri(uri.toString(), _path);
-                Widget failure(
-                  BuildContext context,
-                  Object error,
-                  StackTrace? stack,
-                ) => Text(
-                  '${alt ?? ''} · ${t('图片无法加载', 'Image unavailable')}',
-                  style: TextStyle(color: c.textSecondary),
-                );
-                if (resolved.scheme == 'file') {
-                  return Image.file(
-                    File.fromUri(resolved),
-                    key: ValueKey((resolved.toString(), _imageEpoch)),
-                    width: config.width,
-                    height: config.height,
-                    errorBuilder: (context, error, stack) => Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        failure(context, error, stack),
-                        CupertinoButton(
-                          onPressed: () => _action(() async {
-                            final directory = await getDirectoryPath(
-                              confirmButtonText: t(
-                                '允许访问图片目录',
-                                'Allow image folder',
-                              ),
-                            );
-                            if (directory != null) {
-                              await FileImage(File.fromUri(resolved)).evict();
-                              _imageEpoch++;
-                            }
-                          }),
-                          child: Text(
-                            t('授权图片所在目录并重试', 'Allow image folder and retry'),
+                },
+                sizedImageBuilder: (config) {
+                  final uri = config.uri;
+                  final alt = config.alt;
+                  final resolved = resolveDocumentUri(uri.toString(), _path);
+                  Widget failure(
+                    BuildContext context,
+                    Object error,
+                    StackTrace? stack,
+                  ) => Text(
+                    '${alt ?? ''} · ${t('图片无法加载', 'Image unavailable')}',
+                    style: TextStyle(color: c.textSecondary),
+                  );
+                  if (resolved.scheme == 'file') {
+                    return Image.file(
+                      File.fromUri(resolved),
+                      key: ValueKey((resolved.toString(), _imageEpoch)),
+                      width: config.width,
+                      height: config.height,
+                      errorBuilder: (context, error, stack) => Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          failure(context, error, stack),
+                          CupertinoButton(
+                            onPressed: () => _action(() async {
+                              final directory = await getDirectoryPath(
+                                confirmButtonText: t(
+                                  '允许访问图片目录',
+                                  'Allow image folder',
+                                ),
+                              );
+                              if (directory != null) {
+                                await FileImage(File.fromUri(resolved)).evict();
+                                _imageEpoch++;
+                              }
+                            }),
+                            child: Text(
+                              t('授权图片所在目录并重试', 'Allow image folder and retry'),
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
+                    );
+                  }
+                  if (['http', 'https'].contains(resolved.scheme)) {
+                    return Image.network(
+                      resolved.toString(),
+                      errorBuilder: failure,
+                    );
+                  }
+                  return Text(
+                    t(
+                      '请先保存文档以加载相对路径图片',
+                      'Save the document to resolve relative images',
                     ),
                   );
-                }
-                if (['http', 'https'].contains(resolved.scheme)) {
-                  return Image.network(
-                    resolved.toString(),
-                    errorBuilder: failure,
-                  );
-                }
-                return Text(
-                  t(
-                    '请先保存文档以加载相对路径图片',
-                    'Save the document to resolve relative images',
+                },
+                data: _controller.text,
+                selectable: true,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 10,
+                ),
+                styleSheet: MarkerMarkdownStyle.build(context).copyWith(
+                  p: TextStyle(
+                    fontFamily: _serif ? 'New York' : MarkerFonts.ui,
+                    fontFamilyFallback: _serif
+                        ? MarkerFonts.serifFallback
+                        : MarkerFonts.fallback,
+                    fontSize: 15,
+                    height: 1.7,
+                    color: c.textPrimary,
                   ),
-                );
-              },
-              data: _controller.text,
-              selectable: true,
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-              styleSheet: MarkerMarkdownStyle.build(context).copyWith(
-                p: TextStyle(
-                  fontFamily: _serif ? 'New York' : null,
-                  fontFamilyFallback: const ['Georgia', 'Noto Sans SC'],
-                  fontSize: 15,
-                  height: 1.7,
-                  color: c.textPrimary,
                 ),
               ),
             ),

@@ -5,13 +5,17 @@ from pathlib import Path
 import subprocess
 import sys
 import threading
+from bundled_fonts import register_bundled_font
+
+# Register before importing GTK/Pango so their first font map includes Chinese.
+bundle = Path(sys.argv[1]).resolve()
+register_bundled_font(bundle)
+
 import gi
 from installer_i18n import TEXT, language_for_environment
 
 gi.require_version('Gtk', '3.0')
 from gi.repository import GLib, Gtk
-
-bundle = Path(sys.argv[1]).resolve()
 
 
 class Installer(Gtk.Window):

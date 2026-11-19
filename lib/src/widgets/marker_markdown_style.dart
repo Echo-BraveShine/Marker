@@ -1,3 +1,4 @@
+import '../theme/marker_fonts.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:marker/src/theme/marker_colors.dart';
@@ -25,8 +26,8 @@ class MarkerMarkdownStyle {
       a: TextStyle(color: link, decoration: TextDecoration.none),
       // ── 行内代码 ──
       code: TextStyle(
-        fontFamily: 'Menlo',
-        fontFamilyFallback: const ['Consolas', 'Noto Sans SC'],
+        fontFamily: MarkerFonts.monospace,
+        fontFamilyFallback: MarkerFonts.codeFallback,
         fontSize: 13,
         color: colors.syntaxCodeInline,
         backgroundColor: colors.bgCodeBlock,

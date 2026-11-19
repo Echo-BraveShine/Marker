@@ -26,3 +26,10 @@ Marker 明确使用 GitHub Flavored Markdown（GFM）解析。Markdown 有多种
 必须使用半角 `#`，其后加空格：`# 一级标题`、`## 二级标题`。`#一级标题`、全角 `＃` 均不属于标准标题写法。围栏代码块内的标记原样展示。可打开同目录的 `markdown-sample.md` 对照。
 
 Linux 编译需 `libwebkit2gtk-4.1-dev`（WebKitGTK >= 2.40），运行需 `libwebkit2gtk-4.1-0`；DEB/RPM 声明相应运行依赖。TAR/AppImage 使用系统 WebKitGTK。Windows 10 如缺少 WebView2 Runtime，需安装 Microsoft Edge WebView2 Runtime。Mermaid 预览不请求在线服务。
+
+
+### Mermaid 显示一致性与性能
+
+三端预览共用 960 CSS 像素的排版画布、14px 字号和内置 Noto Sans SC 字体，字体就绪后才计算图形布局。相同预览宽度下，图形按相同比例缩放，不再由桌面端固定占用 340px 高度。
+
+预览使用静态快照和最多 24 项 / 24 MB 的渲染缓存；调整分屏宽度、滚动或重新打开相同图形不会再次启动渲染。修改图形后等待 240ms 再渲染，完成前保留旧图。原生渲染串行处理并复用浏览器环境，减少多个图表同时加载造成的卡顿。

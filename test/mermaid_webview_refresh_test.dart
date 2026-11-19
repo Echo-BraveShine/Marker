@@ -1,78 +1,87 @@
+import 'dart:io';
+
+import 'dart:convert';
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:marker/src/widgets/mermaid_diagram.dart';
+import 'package:marker/src/widgets/offline_html_renderer.dart';
 
 void main() {
   testWidgets(
-    'native preview reloads the completed page on source and theme changes',
+    'cached snapshots survive remount/resize and debounce rapid edits',
     (tester) async {
-      final previous = InAppWebViewPlatform.instance;
-      InAppWebViewPlatform.instance = _WebViewPlatform();
-      addTearDown(() {
-        if (previous != null) InAppWebViewPlatform.instance = previous;
-      });
-      await tester.pumpWidget(
-        const CupertinoApp(
-          home: MermaidDiagram(source: 'flowchart LR\nA --> B', dark: false),
+      final pages = <String>[];
+      final widths = <int>[];
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(OfflineHtmlRenderer.channel, (call) async {
+            final args = call.arguments as Map;
+            pages.add(await File(args['path'] as String).readAsString());
+            widths.add(args['width'] as int);
+            return base64Decode(
+              'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==',
+            );
+          });
+      addTearDown(
+        () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(OfflineHtmlRenderer.channel, null),
+      );
+      final renderer = MermaidRenderer();
+      Widget host(String source, bool dark, double width) => ProviderScope(
+        overrides: [mermaidRenderProvider.overrideWithValue(renderer)],
+        child: CupertinoApp(
+          home: Align(
+            alignment: Alignment.topLeft,
+            child: SizedBox(
+              width: width,
+              child: MermaidDiagram(source: source, dark: dark),
+            ),
+          ),
         ),
       );
+      Future<void> finish() async {
+        await tester.pump(const Duration(milliseconds: 250));
+        await tester.runAsync(() async {
+          await Future<void>.delayed(const Duration(milliseconds: 300));
+        });
+        await tester.pumpAndSettle();
+      }
+
       await tester.runAsync(
-        () => rootBundle.loadString('assets/mermaid.min.js', cache: false),
+        () => renderer.render('flowchart LR\nA --> B', false),
       );
-      await tester.pumpAndSettle();
-      expect(find.text('original light'), findsOneWidget);
+      await tester.pumpWidget(host('flowchart LR\nA --> B', false, 500));
+      await finish();
+      expect(pages.length, 1);
+      expect(find.byType(Image), findsOneWidget);
+      expect(widths.single, mermaidCanvasWidth);
+      expect(pages.single, contains('data:font/ttf;base64,'));
+      expect(
+        pages.single.indexOf("await document.fonts.load('400"),
+        lessThan(pages.single.indexOf("await mermaid.render(")),
+      );
+      await tester.pumpWidget(host('flowchart LR\nA --> B', false, 320));
+      await finish();
+      expect(pages.length, 1);
+      await tester.pumpWidget(const SizedBox());
+      await tester.pumpWidget(host('flowchart LR\nA --> B', false, 500));
+      await finish();
+      expect(pages.length, 1);
       await tester.pumpWidget(
-        const CupertinoApp(
-          home: MermaidDiagram(source: 'flowchart LR\nA --> C', dark: false),
-        ),
+        host('flowchart LR\nA --> intermediate', false, 500),
       );
-      await tester.pumpAndSettle();
-      expect(find.text('changed light'), findsOneWidget);
-      await tester.pumpWidget(
-        const CupertinoApp(
-          home: MermaidDiagram(source: 'flowchart LR\nA --> C', dark: true),
-        ),
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.runAsync(
+        () => renderer.render('flowchart LR\nA --> C', true),
       );
-      await tester.pumpAndSettle();
-      expect(find.text('changed dark'), findsOneWidget);
+      await tester.pumpWidget(host('flowchart LR\nA --> C', true, 500));
+      await finish();
+      expect(pages.length, 2);
+      expect(pages.last, contains('A --> C'));
+      expect(pages.last, contains("theme:'dark'"));
+      expect(pages.last, isNot(contains('A --> intermediate')));
+      expect(tester.takeException(), isNull);
     },
     variant: TargetPlatformVariant({TargetPlatform.macOS}),
-  );
-}
-
-class _WebViewPlatform extends InAppWebViewPlatform {
-  @override
-  PlatformInAppWebViewWidget createPlatformInAppWebViewWidget(
-    PlatformInAppWebViewWidgetCreationParams params,
-  ) => _WebViewWidget(params);
-}
-
-class _WebViewWidget extends PlatformInAppWebViewWidget {
-  _WebViewWidget(super.params) : super.implementation();
-  @override
-  Widget build(BuildContext context) =>
-      _FrozenWebView(html: params.initialData!.data);
-  @override
-  T controllerFromPlatform<T>(PlatformInAppWebViewController controller) =>
-      throw UnimplementedError();
-  @override
-  void dispose() {}
-}
-
-// Native views consume initialData once; later widget updates do not navigate.
-class _FrozenWebView extends StatefulWidget {
-  const _FrozenWebView({required this.html});
-  final String html;
-  @override
-  State<_FrozenWebView> createState() => _FrozenWebViewState();
-}
-
-class _FrozenWebViewState extends State<_FrozenWebView> {
-  late final html = widget.html;
-  @override
-  Widget build(BuildContext context) => Text(
-    '${html.contains('A --> B') ? 'original' : 'changed'} ${html.contains("theme:'dark'") ? 'dark' : 'light'}',
   );
 }

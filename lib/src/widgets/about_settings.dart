@@ -42,6 +42,10 @@ class AboutSettings extends ConsumerWidget {
           '无法连接，请检查网络后重试。',
           'Cannot connect. Check your connection and retry.',
         ),
+        UpdateError.version => t(
+          '无法读取当前版本信息，请重试。',
+          'Cannot read the installed version. Please retry.',
+        ),
         UpdateError.invalidData => t(
           '版本信息格式异常，请稍后重试。',
           'Invalid release information. Try again later.',
@@ -136,6 +140,22 @@ class AboutSettings extends ConsumerWidget {
                     style: const TextStyle(fontSize: 12),
                   ),
                 ),
+              CupertinoButton(
+                key: const Key('release-page'),
+                minimumSize: Size.zero,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+                onPressed: () => launchUrl(
+                  releasePage,
+                  mode: LaunchMode.externalApplication,
+                ),
+                child: Text(
+                  t('发布页面', 'Releases'),
+                  style: const TextStyle(fontSize: 12),
+                ),
+              ),
               CupertinoButton(
                 minimumSize: Size.zero,
                 padding: const EdgeInsets.symmetric(

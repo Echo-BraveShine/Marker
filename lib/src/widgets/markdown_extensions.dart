@@ -4,6 +4,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_math_fork/flutter_math.dart';
 import 'mermaid_diagram.dart';
+import 'cjk_math.dart';
 import 'package:markdown/markdown.dart' as md;
 
 Uri resolveDocumentUri(String value, String? documentPath) {
@@ -70,7 +71,7 @@ class MathBuilder extends MarkdownElementBuilder {
     TextStyle? preferredStyle,
     TextStyle? parentStyle,
   ) {
-    final math = Math.tex(
+    final math = markerMath(
       element.textContent,
       mathStyle: block ? MathStyle.display : MathStyle.text,
       textStyle: parentStyle,
