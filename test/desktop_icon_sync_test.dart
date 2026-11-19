@@ -84,4 +84,44 @@ void main() {
     await tester.pumpAndSettle();
     expect(calls.last, false);
   });
+  testWidgets('explicit application theme overrides system icon appearance', (
+    tester,
+  ) async {
+    final calls = <bool>[];
+    tester.binding.platformDispatcher.platformBrightnessTestValue =
+        Brightness.dark;
+    addTearDown(
+      tester.binding.platformDispatcher.clearPlatformBrightnessTestValue,
+    );
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          DesktopIconController.channel,
+          (call) async => calls.add(call.arguments as bool),
+        );
+    final mode = ValueNotifier(ThemeMode.light);
+    addTearDown(mode.dispose);
+    await tester.pumpWidget(
+      ProviderScope(
+        child: ValueListenableBuilder<ThemeMode>(
+          valueListenable: mode,
+          builder: (context, value, child) => MaterialApp(
+            theme: ThemeData.light(),
+            darkTheme: ThemeData.dark(),
+            themeMode: value,
+            builder: (context, child) =>
+                DesktopIconSync(enabled: true, child: child!),
+            home: const SizedBox(),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(calls.last, false);
+    mode.value = ThemeMode.dark;
+    await tester.pumpAndSettle();
+    expect(calls.last, true);
+    mode.value = ThemeMode.light;
+    await tester.pumpAndSettle();
+    expect(calls.last, false);
+  });
 }

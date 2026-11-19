@@ -18,8 +18,10 @@
                Value="WelcomeDlg" Order="2" />
     </UI>
     <Property Id="MARKER_BUILD_NUMBER" Value="$(var.BuildNumber)" />
-    <Icon Id="MarkerIcon" SourceFile="../runner/resources/app_icon.ico" />
-    <Property Id="ARPPRODUCTICON" Value="MarkerIcon" />
+    <Icon Id="MarkerIcon.ico" SourceFile="../runner/resources/app_icon.ico" />
+    <Property Id="ARPPRODUCTICON" Value="MarkerIcon.ico" />
+    <!-- Advertised EXE shortcuts require a PE icon stream with a matching extension. -->
+    <Icon Id="MarkerShortcut.exe" SourceFile="$(var.BundleDir)\marker.exe" />
 
     <StandardDirectory Id="ProgramFiles64Folder">
       <Directory Id="INSTALLFOLDER" Name="Marker" />
@@ -33,7 +35,9 @@
       <Component Directory="INSTALLFOLDER">
         <File Id="MarkerExe" Source="$(var.BundleDir)\marker.exe" KeyPath="yes">
           <Shortcut Id="MarkerStartMenu" Directory="ProgramMenuFolder" Name="Marker"
-                    WorkingDirectory="INSTALLFOLDER" Advertise="yes" />
+                    WorkingDirectory="INSTALLFOLDER" Advertise="yes" Icon="MarkerShortcut.exe" IconIndex="0">
+            <ShortcutProperty Key="System.AppUserModel.ID" Value="dev.ekko.marker" />
+          </Shortcut>
         </File>
         <RegistryKey Root="HKLM" Key="Software\Classes\.md\OpenWithProgids">
           <RegistryValue Name="dev.ekko.marker.Markdown" Type="string" Value="" />

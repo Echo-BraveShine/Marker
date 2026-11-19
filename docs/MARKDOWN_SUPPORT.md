@@ -16,7 +16,7 @@ Marker 明确使用 GitHub Flavored Markdown（GFM）解析。Markdown 有多种
 | 文字颜色 | 支持 `<span style="color:#RRGGBB">文字</span>`，兼容 #RGB 和常用颜色名；工具栏提供预设色和自定义颜色 |
 | 其他原始 HTML | 不作为浏览器 HTML 渲染，不执行任意 CSS 或脚本 |
 | LaTeX 数学公式 | 支持 `$...$` 行内和 `$$...$$` 块公式；使用 flutter_math_fork 的 TeX 子集，不执行完整 LaTeX |
-| Mermaid 图 | macOS 等 WebView 平台使用离线打包 Mermaid 10.9.3 渲染；固定高度容器内部滚动，错误会展示提示；Linux/Web 暂无图形预览 |
+| Mermaid 图 | 桌面三端均使用离线打包 Mermaid 10.9.3；macOS/Windows 使用内嵌 WebView，Windows 缓存位于用户数据目录并检查 WebView2 Runtime，页面使用本地文件以避开 NavigateToString 的 2MB 上限；Linux 使用 WebKitGTK 4.1 离线渲染为内嵌图片，并复用随应用打包的中文字体，自动适应高度（最高 8192px）。错误显示具体原因；Web 暂无图形预览 |
 | 脚注 | 支持 `[^id]` / `[^id]: 内容`；点击引用滚动到脚注区域，返回链接回到文档顶部，尚非逐条精确定位 |
 | 目录指令、自定义容器、高亮 `==文本==` | 未接入对应扩展 |
 | 本地相对路径图片 | 相对于当前已保存文档目录解析，支持 `../`、中文及编码空格；macOS 访问受限时可选择授权图片所在目录 |
@@ -24,3 +24,5 @@ Marker 明确使用 GitHub Flavored Markdown（GFM）解析。Markdown 有多种
 ## 标题看不出区别时
 
 必须使用半角 `#`，其后加空格：`# 一级标题`、`## 二级标题`。`#一级标题`、全角 `＃` 均不属于标准标题写法。围栏代码块内的标记原样展示。可打开同目录的 `markdown-sample.md` 对照。
+
+Linux 编译需 `libwebkit2gtk-4.1-dev`（WebKitGTK >= 2.40），运行需 `libwebkit2gtk-4.1-0`；DEB/RPM 声明相应运行依赖。TAR/AppImage 使用系统 WebKitGTK。Windows 10 如缺少 WebView2 Runtime，需安装 Microsoft Edge WebView2 Runtime。Mermaid 预览不请求在线服务。

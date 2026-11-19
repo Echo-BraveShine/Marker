@@ -124,3 +124,10 @@ Windows 打包前必须验证 `flutter_windows.dll`、ICU、AOT 和 AssetManifes
 ## AppImage 的无头启动检查
 
 AppImage 生成完成后，在独立 Xvfb 与 D-Bus 会话中启动实际运行文件，检查同一可见窗口连续出现且进程保持存活。CI 仅在此检查中启用 Mesa 软件渲染、X11 并关闭 AT-SPI 桥，避免无 GPU/辅助功能总线环境干扰。窗口枚举的临时 BadWindow 可在限定时间内重试；应用提前退出、窗口未稳定出现或超时仍会使 Release 失败，并输出启动日志。正式 AppImage 的运行环境不改变。
+
+
+### Mermaid 桌面回归检查
+
+Linux 构建环境增加 `libwebkit2gtk-4.1-dev`；DEB/RPM 增加 WebKitGTK 4.1 运行依赖。Desktop checks 在 Linux 导出离线测试页，再运行 `scripts/ci/test-linux-native.sh`，覆盖 9 类图表的深浅主题、中文标签、无效语法，以及桌面入口的主题图标与配置保留。TAR/AppImage 使用系统 WebKitGTK 4.1。
+
+Windows 离线页面必须通过本地文件 URL 加载，不能将 3.3MB 的 Mermaid 脚本内联后交给限制 2MB 的 `NavigateToString`；页面显式使用 UTF-8。WebView2 profile 使用用户数据目录，不能写 Program Files。`test/windows_mermaid_test.cpp` 是原生 WebView2 回归探针，需在登录用户会话运行（SYSTEM 后台会话无法可靠创建控制器）；`test/windows_icon_sizes_test.cpp` 校验两套 ICO 在 10 个尺寸的原生加载结果。

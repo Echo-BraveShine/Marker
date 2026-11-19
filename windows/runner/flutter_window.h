@@ -26,6 +26,9 @@ class FlutterWindow : public Win32Window {
 
  private:
   bool ApplyAppearanceIcon(bool dark);
+  bool dark_icon_ = false;
+  HICON appearance_large_icon_ = nullptr;
+  HICON appearance_small_icon_ = nullptr;
   std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> appearance_channel_;
 
   // The project to run.

@@ -39,7 +39,7 @@ Architecture: $deb_arch
 Section: editors
 Priority: optional
 Maintainer: Marker <noreply@users.noreply.github.com>
-Depends: libc6 (>= $glibc_version), libstdc++6, libgtk-3-0t64 | libgtk-3-0, libgl1, libsecret-1-0, shared-mime-info, desktop-file-utils
+Depends: libc6 (>= $glibc_version), libstdc++6, libgtk-3-0t64 | libgtk-3-0, libgl1, libsecret-1-0, libwebkit2gtk-4.1-0, shared-mime-info, desktop-file-utils
 Homepage: https://github.com/Echo-BraveShine/Marker
 Description: Markdown editor with live preview / Markdown 编辑与实时预览
  Write Markdown with syntax highlighting, math and Mermaid support.

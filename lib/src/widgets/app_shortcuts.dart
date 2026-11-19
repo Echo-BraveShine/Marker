@@ -1,6 +1,9 @@
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
+// Keep export entry points hidden until the feature is ready to release.
+const documentExportEnabled = false;
+
 class AppShortcut {
   const AppShortcut(
     this.id,
@@ -51,6 +54,14 @@ const appShortcuts = [
   AppShortcut('open', '打开文档', 'Open document', LogicalKeyboardKey.keyO),
   AppShortcut('save', '保存', 'Save', LogicalKeyboardKey.keyS),
   AppShortcut('saveAs', '另存为', 'Save as', LogicalKeyboardKey.keyS, shift: true),
+  if (documentExportEnabled)
+    AppShortcut(
+      'export',
+      '导出文档',
+      'Export document',
+      LogicalKeyboardKey.keyE,
+      shift: true,
+    ),
   AppShortcut('close', '关闭当前文档', 'Close document', LogicalKeyboardKey.keyW),
   AppShortcut('find', '查找', 'Find', LogicalKeyboardKey.keyF),
   AppShortcut(

@@ -44,6 +44,7 @@ class _EditorPaneState extends ConsumerState<EditorPane> {
         keyboardType: TextInputType.multiline,
         style: TextStyle(
           fontFamily: 'Menlo',
+          fontFamilyFallback: const ['Consolas', 'Noto Sans SC'],
           fontSize: 14,
           height: 1.6,
           color: colors.textPrimary,

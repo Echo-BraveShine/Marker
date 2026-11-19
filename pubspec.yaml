@@ -2,7 +2,7 @@ name: marker
 description: "轻量级 Markdown 编辑预览工具"
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev.
 
-version: 0.0.1+1
+version: 0.0.2+1
 
 environment:
   sdk: ^3.12.2
@@ -63,3 +63,11 @@ flutter:
     - assets/branding/marker-dark.png
     - assets/mermaid.min.js
     - assets/mermaid.LICENSE
+    - assets/export/
+    - assets/export/fonts/
+    - assets/fonts/OFL-NotoSansSC.txt
+
+  fonts:
+    - family: Noto Sans SC
+      fonts:
+        - asset: assets/fonts/NotoSansSC.ttf

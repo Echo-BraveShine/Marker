@@ -26,6 +26,7 @@ class MarkerMarkdownStyle {
       // ── 行内代码 ──
       code: TextStyle(
         fontFamily: 'Menlo',
+        fontFamilyFallback: const ['Consolas', 'Noto Sans SC'],
         fontSize: 13,
         color: colors.syntaxCodeInline,
         backgroundColor: colors.bgCodeBlock,

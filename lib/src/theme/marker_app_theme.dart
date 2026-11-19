@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:marker/src/theme/marker_colors.dart';
 import 'package:marker/src/theme/marker_typography.dart';
@@ -6,8 +7,17 @@ class MarkerAppTheme {
   ThemeData light() {
     return ThemeData(
       useMaterial3: false,
-      fontFamily: '.SF Pro Text',
-      fontFamilyFallback: const ['.AppleSystemUIFont', 'Helvetica Neue'],
+      fontFamily: defaultTargetPlatform == TargetPlatform.linux
+          ? 'Noto Sans SC'
+          : (defaultTargetPlatform == TargetPlatform.windows
+                ? 'Segoe UI'
+                : '.SF Pro Text'),
+      fontFamilyFallback: const [
+        '.AppleSystemUIFont',
+        'Helvetica Neue',
+        'Segoe UI',
+        'Noto Sans SC',
+      ],
       brightness: Brightness.light,
       colorScheme: const ColorScheme.light(
         primary: Color(0xFF0066CC),
@@ -32,8 +42,17 @@ class MarkerAppTheme {
   ThemeData dark() {
     return ThemeData(
       useMaterial3: false,
-      fontFamily: '.SF Pro Text',
-      fontFamilyFallback: const ['.AppleSystemUIFont', 'Helvetica Neue'],
+      fontFamily: defaultTargetPlatform == TargetPlatform.linux
+          ? 'Noto Sans SC'
+          : (defaultTargetPlatform == TargetPlatform.windows
+                ? 'Segoe UI'
+                : '.SF Pro Text'),
+      fontFamilyFallback: const [
+        '.AppleSystemUIFont',
+        'Helvetica Neue',
+        'Segoe UI',
+        'Noto Sans SC',
+      ],
       brightness: Brightness.dark,
       colorScheme: const ColorScheme.dark(
         primary: Color(0xFF3D9BFF),

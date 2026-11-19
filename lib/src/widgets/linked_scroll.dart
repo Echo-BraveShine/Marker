@@ -1,4 +1,5 @@
 import 'package:flutter/widgets.dart';
+import 'package:flutter/scheduler.dart';
 
 /// Maps document progress, avoiding feedback when the follower is updated.
 class LinkedScroll {
@@ -9,9 +10,21 @@ class LinkedScroll {
   final ScrollController editor, preview;
   final bool Function() enabled;
   bool _updating = false;
+  int? _frame;
+  ScrollController? _source, _target;
   void _fromEditor() => _sync(editor, preview);
   void _fromPreview() => _sync(preview, editor);
   void _sync(ScrollController source, ScrollController target) {
+    if (_updating || !enabled()) return;
+    _source = source;
+    _target = target;
+    _frame ??= SchedulerBinding.instance.scheduleFrameCallback((_) {
+      _frame = null;
+      _apply(_source!, _target!);
+    });
+  }
+
+  void _apply(ScrollController source, ScrollController target) {
     if (_updating ||
         !enabled() ||
         source.positions.length != 1 ||
@@ -38,6 +51,9 @@ class LinkedScroll {
   }
 
   void dispose() {
+    if (_frame != null) {
+      SchedulerBinding.instance.cancelFrameCallbackWithId(_frame!);
+    }
     editor.removeListener(_fromEditor);
     preview.removeListener(_fromPreview);
   }

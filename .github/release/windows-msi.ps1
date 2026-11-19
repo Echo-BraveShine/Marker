@@ -38,6 +38,30 @@ function Test-MarkerMsi([string]$msi, [string]$culture) {
         $properties.ProductLanguage -ne $(if ($culture -eq 'zh-CN') { '2052' } else { '1033' })) {
         throw "Unexpected MSI version: $($properties.ProductVersion)+$($properties.MARKER_BUILD_NUMBER)"
     }
+    $shortcutView = $database.OpenView('SELECT `Icon_`, `IconIndex` FROM `Shortcut` WHERE `Shortcut` = ''MarkerStartMenu''')
+    $shortcutView.Execute()
+    $shortcut = $shortcutView.Fetch()
+    if (-not $shortcut -or $shortcut.StringData(1) -ne 'MarkerShortcut.exe' -or $shortcut.IntegerData(2) -ne 0) {
+        throw 'MSI Start Menu shortcut must reference its EXE icon stream'
+    }
+    $shortcutView.Close()
+    $iconView = $database.OpenView('SELECT `Data` FROM `Icon` WHERE `Name` = ''MarkerShortcut.exe''')
+    $iconView.Execute()
+    $icon = $iconView.Fetch()
+    if (-not $icon -or $icon.ReadStream(1, 2, 1) -ne 'MZ') {
+        throw 'MSI advertised shortcut icon must contain a PE executable'
+    }
+    $iconView.Close()
+    $modelView = $database.OpenView('SELECT `PropVariantValue` FROM `MsiShortcutProperty` WHERE `PropertyKey` = ''System.AppUserModel.ID''')
+    $modelView.Execute()
+    $model = $modelView.Fetch()
+    if (-not $model -or $model.StringData(1) -ne 'dev.ekko.marker') {
+        throw 'MSI Start Menu shortcut AppUserModelID is missing'
+    }
+    $modelView.Close()
+    foreach ($metadataView in $shortcutView, $iconView, $modelView) {
+        [void][Runtime.InteropServices.Marshal]::ReleaseComObject($metadataView)
+    }
     $upgradeView = $database.OpenView('SELECT `Language` FROM `Upgrade`')
     $upgradeView.Execute()
     while ($upgrade = $upgradeView.Fetch()) {

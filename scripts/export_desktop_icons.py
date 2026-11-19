@@ -64,6 +64,26 @@ def main():
             shutil.copyfile(BRAND / 'export' / variant / f'marker-{size}.png', images / f'marker-{size}.png')
             entries.append({'idiom': 'mac', 'filename': f'marker-{size}.png', 'scale': scale})
         (images / 'Contents.json').write_text(json.dumps({'images': entries, 'info': {'author': 'xcode', 'version': 1}}, indent=2) + '\n', encoding='utf-8')
+    # Windows uses tighter, consistent optical bounds and native DPI frames.
+    # Keep macOS/Linux artwork unchanged; only normalize the Windows canvases.
+    from PIL import Image
+    windows_sizes = (16, 20, 24, 32, 40, 48, 64, 96, 128, 256)
+    for variant in ('light', 'dark'):
+        image = Image.open(BRAND / f'marker-{variant}-master.png').convert('RGBA')
+        bounds = image.getchannel('A').point(lambda alpha: 255 if alpha > 16 else 0).getbbox()
+        if bounds is None:
+            raise ValueError('Icon artwork is empty')
+        left, top, right, bottom = bounds
+        side = round(max(right-left, bottom-top) * 1.08)
+        canvas = Image.new('RGBA', (side, side))
+        canvas.paste(image, (round(side/2-(left+right)/2), round(side/2-(top+bottom)/2)))
+        frames = []
+        for size in windows_sizes:
+            target = BRAND / 'export' / variant / 'windows' / f'marker-{size}.png'
+            target.parent.mkdir(parents=True, exist_ok=True)
+            canvas.resize((size, size), Image.Resampling.LANCZOS).save(target)
+            frames.append((size, target))
+        ico(frames, BRAND / 'export' / variant / 'marker.ico')
     # Native primary icons remain deterministic across operating systems.
     for size in (16, 32, 64, 128, 256, 512, 1024):
         shutil.copyfile(BRAND / 'export/light' / f'marker-{size}.png',

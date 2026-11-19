@@ -56,15 +56,31 @@ bool FlutterWindow::ApplyAppearanceIcon(bool dark) {
   const auto get_dpi = reinterpret_cast<GetWindowDpi>(
       GetProcAddress(GetModuleHandleW(L"user32.dll"), "GetDpiForWindow"));
   const UINT dpi = get_dpi ? get_dpi(GetHandle()) : 96;
-  const int large_size = MulDiv(32, dpi ? dpi : 96, 96);
-  const int small_size = MulDiv(16, dpi ? dpi : 96, 96);
+  using GetMetricsDpi = int(WINAPI*)(int, UINT);
+  const auto metrics = reinterpret_cast<GetMetricsDpi>(
+      GetProcAddress(GetModuleHandleW(L"user32.dll"), "GetSystemMetricsForDpi"));
+  const UINT effective_dpi = dpi ? dpi : 96;
+  const int large_size = metrics ? metrics(SM_CXICON, effective_dpi) : MulDiv(32, effective_dpi, 96);
+  const int small_size = metrics ? metrics(SM_CXSMICON, effective_dpi) : MulDiv(16, effective_dpi, 96);
   HICON large_icon = static_cast<HICON>(LoadImageW(GetModuleHandleW(nullptr), MAKEINTRESOURCEW(resource),
-      IMAGE_ICON, large_size, large_size, LR_SHARED));
+      IMAGE_ICON, large_size, large_size, LR_DEFAULTCOLOR));
   HICON small_icon = static_cast<HICON>(LoadImageW(GetModuleHandleW(nullptr), MAKEINTRESOURCEW(resource),
-      IMAGE_ICON, small_size, small_size, LR_SHARED));
-  if (!large_icon || !small_icon) return false;
+      IMAGE_ICON, small_size, small_size, LR_DEFAULTCOLOR));
+  if (!large_icon || !small_icon) {
+    if (large_icon) DestroyIcon(large_icon);
+    if (small_icon) DestroyIcon(small_icon);
+    return false;
+  }
+  // LR_SHARED can return a cached frame of the wrong size. Own DPI-specific icons.
+  HICON previous_large = appearance_large_icon_;
+  HICON previous_small = appearance_small_icon_;
+  appearance_large_icon_ = large_icon;
+  appearance_small_icon_ = small_icon;
+  dark_icon_ = dark;
   SendMessageW(GetHandle(), WM_SETICON, ICON_BIG, reinterpret_cast<LPARAM>(large_icon));
   SendMessageW(GetHandle(), WM_SETICON, ICON_SMALL, reinterpret_cast<LPARAM>(small_icon));
+  if (previous_large) DestroyIcon(previous_large);
+  if (previous_small) DestroyIcon(previous_small);
   // Keep the existing AppUserModelID; never break taskbar grouping when changing theme.
   IPropertyStore* properties = nullptr;
   if (SUCCEEDED(SHGetPropertyStoreForWindow(GetHandle(), IID_PPV_ARGS(&properties)))) {
@@ -90,6 +106,8 @@ bool FlutterWindow::ApplyAppearanceIcon(bool dark) {
 }
 
 void FlutterWindow::OnDestroy() {
+  if (appearance_large_icon_) { DestroyIcon(appearance_large_icon_); appearance_large_icon_ = nullptr; }
+  if (appearance_small_icon_) { DestroyIcon(appearance_small_icon_); appearance_small_icon_ = nullptr; }
   appearance_channel_.reset();
   if (flutter_controller_) {
     flutter_controller_ = nullptr;
@@ -102,6 +120,7 @@ LRESULT
 FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
                               WPARAM const wparam,
                               LPARAM const lparam) noexcept {
+  if (message == WM_DPICHANGED) { ApplyAppearanceIcon(dark_icon_); }
   // Give Flutter, including plugins, an opportunity to handle window messages.
   if (flutter_controller_) {
     std::optional<LRESULT> result =

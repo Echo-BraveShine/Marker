@@ -31,12 +31,23 @@ void main() {
       ),
     );
     a.jumpTo(a.position.maxScrollExtent * .4);
+    await tester.pump();
     expect(b.offset / b.position.maxScrollExtent, closeTo(.4, .001));
     b.jumpTo(b.position.maxScrollExtent * .75);
+    await tester.pump();
     expect(a.offset / a.position.maxScrollExtent, closeTo(.75, .001));
+    var updates = 0;
+    b.addListener(() => updates++);
+    for (var i = 1; i <= 20; i++) {
+      a.jumpTo(a.position.maxScrollExtent * i / 20);
+    }
+    expect(updates, 0);
+    await tester.pump();
+    expect(updates, 1);
+    expect(b.offset / b.position.maxScrollExtent, closeTo(1, .001));
     enabled = false;
     a.jumpTo(0);
-    expect(b.offset / b.position.maxScrollExtent, closeTo(.75, .001));
+    expect(b.offset / b.position.maxScrollExtent, closeTo(1, .001));
     await tester.pumpWidget(const SizedBox());
     link.dispose();
     a.dispose();

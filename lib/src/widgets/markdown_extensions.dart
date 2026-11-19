@@ -1,12 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_math_fork/flutter_math.dart';
-import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+import 'mermaid_diagram.dart';
 import 'package:markdown/markdown.dart' as md;
 
 Uri resolveDocumentUri(String value, String? documentPath) {
@@ -114,56 +111,6 @@ class MermaidBuilder extends MarkdownElementBuilder {
           source: element.textContent,
           dark: CupertinoTheme.brightnessOf(context) == Brightness.dark,
         );
-}
-
-class MermaidDiagram extends StatelessWidget {
-  const MermaidDiagram({super.key, required this.source, required this.dark});
-  final String source;
-  final bool dark;
-  static final Future<String> _script = rootBundle.loadString(
-    'assets/mermaid.min.js',
-  );
-  @override
-  Widget build(BuildContext context) {
-    if (kIsWeb ||
-        ![
-          TargetPlatform.macOS,
-          TargetPlatform.windows,
-          TargetPlatform.iOS,
-          TargetPlatform.android,
-        ].contains(defaultTargetPlatform)) {
-      return const Text('此平台暂不支持 Mermaid 预览');
-    }
-    return FutureBuilder<String>(
-      future: _script,
-      builder: (context, snapshot) {
-        if (snapshot.hasError) return const Text('Mermaid 加载失败');
-        if (!snapshot.hasData) {
-          return const SizedBox(
-            height: 80,
-            child: Center(child: CupertinoActivityIndicator()),
-          );
-        }
-        final html =
-            '''<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:;"><style>body{margin:12px;color:${dark ? '#f5f5f7' : '#1d1d1f'};font:13px -apple-system,sans-serif}svg{max-width:100%;height:auto}pre{white-space:pre-wrap}</style></head><body><div id="diagram"></div><script>${snapshot.data}</script><script>
-mermaid.initialize({startOnLoad:false,securityLevel:'strict',theme:'${dark ? 'dark' : 'default'}'});
-(async()=>{try{const result=await mermaid.render('markerDiagram',${jsonEncode(source).replaceAll('<', r'\u003c')});document.getElementById('diagram').innerHTML=result.svg;}catch(e){document.getElementById('diagram').textContent='Mermaid: '+e.message;}})();
-</script></body></html>''';
-        return SizedBox(
-          height: 340,
-          child: InAppWebView(
-            key: ValueKey('$dark:$source'),
-            initialData: InAppWebViewInitialData(data: html),
-            initialSettings: InAppWebViewSettings(
-              javaScriptEnabled: true,
-              disableContextMenu: true,
-              transparentBackground: true,
-            ),
-          ),
-        );
-      },
-    );
-  }
 }
 
 /// Only recognizes color spans. Other HTML/CSS remains outside the renderer.

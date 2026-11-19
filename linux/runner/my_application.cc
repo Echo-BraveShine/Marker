@@ -1,4 +1,6 @@
 #include "my_application.h"
+#include "appearance_launcher.h"
+#include "mermaid_renderer.h"
 #include <initializer_list>
 
 #include <flutter_linux/flutter_linux.h>
@@ -15,41 +17,6 @@ struct _MyApplication {
 
 G_DEFINE_TYPE(MyApplication, my_application, GTK_TYPE_APPLICATION)
 
-// Preserve the stable desktop ID and user launcher settings. Desktop shells that
-// ignore window icons can observe this user-local launcher metadata change.
-static void update_launcher_icon(const gchar* directory, const gchar* executable,
-                                 gboolean dark) {
-  g_autofree gchar* applications = g_build_filename(g_get_user_data_dir(), "applications", nullptr);
-  g_autofree gchar* launcher = g_build_filename(applications, APPLICATION_ID ".desktop", nullptr);
-  g_autofree gchar* bundled = g_build_filename(directory, "share", "applications", APPLICATION_ID ".desktop", nullptr);
-  const gboolean existing = g_file_test(launcher, G_FILE_TEST_IS_REGULAR);
-  g_autoptr(GKeyFile) entry = g_key_file_new();
-  if (!g_key_file_load_from_file(entry, existing ? launcher : bundled,
-      static_cast<GKeyFileFlags>(G_KEY_FILE_KEEP_COMMENTS | G_KEY_FILE_KEEP_TRANSLATIONS), nullptr)) return;
-  g_autofree gchar* icon = g_build_filename(directory, "share", "icons", "hicolor",
-      "256x256", "apps", dark ? "marker-dark.png" : "marker.png", nullptr);
-  g_autofree gchar* previous = g_key_file_get_string(entry, "Desktop Entry", "Icon", nullptr);
-  if (g_strcmp0(previous, icon) == 0) return;
-  if (!existing) {
-    GString* command = g_string_new("\"");
-    for (const gchar* c = executable; *c != '\0'; ++c) {
-      if (*c == '\\' || *c == '"' || *c == '$' || *c == '`') g_string_append_c(command, '\\');
-      if (*c == '%') g_string_append_c(command, '%');
-      g_string_append_c(command, *c);
-    }
-    g_string_append(command, "\" %F");
-    g_key_file_set_string(entry, "Desktop Entry", "Exec", command->str);
-    g_string_free(command, TRUE);
-  }
-  g_key_file_set_string(entry, "Desktop Entry", "Icon", icon);
-  gsize length = 0;
-  g_autofree gchar* contents = g_key_file_to_data(entry, &length, nullptr);
-  if (g_mkdir_with_parents(applications, 0755) == 0) {
-    // Only this app's current-user launcher; never rewrite a system desktop file.
-    g_file_set_contents(launcher, contents, length, nullptr);
-  }
-}
-
 // GTK/X11 forwards this icon list to the window manager. Wayland docks may
 // instead use the stable desktop-file icon and ignore per-window artwork.
 static gboolean apply_appearance_icon(GtkWindow* window, gboolean dark) {
@@ -65,11 +32,11 @@ static gboolean apply_appearance_icon(GtkWindow* window, gboolean dark) {
     if (image != nullptr) icons = g_list_append(icons, image);
   }
   if (icons == nullptr) return FALSE;
-  update_launcher_icon(directory, executable, dark);
+  const gboolean launcher_updated = update_launcher_icon(directory, executable, dark);
   gtk_window_set_default_icon_list(icons);
   gtk_window_set_icon_list(window, icons);
   g_list_free_full(icons, g_object_unref);
-  return TRUE;
+  return launcher_updated;
 }
 
 static void appearance_method_call(FlMethodChannel* channel, FlMethodCall* call,
@@ -90,6 +57,70 @@ static void appearance_method_call(FlMethodChannel* channel, FlMethodCall* call,
     }
   }
   fl_method_call_respond(call, response, nullptr);
+}
+
+static void mermaid_method_call(FlMethodChannel*, FlMethodCall* call, gpointer) {
+  if (g_strcmp0(fl_method_call_get_name(call), "render") != 0) {
+    fl_method_call_respond_not_implemented(call, nullptr);
+    return;
+  }
+  FlValue* args = fl_method_call_get_args(call);
+  FlValue* html = args && fl_value_get_type(args) == FL_VALUE_TYPE_MAP
+      ? fl_value_lookup_string(args, "html") : nullptr;
+  FlValue* width = args && fl_value_get_type(args) == FL_VALUE_TYPE_MAP
+      ? fl_value_lookup_string(args, "width") : nullptr;
+  if (!html || fl_value_get_type(html) != FL_VALUE_TYPE_STRING ||
+      !width || fl_value_get_type(width) != FL_VALUE_TYPE_INT) {
+    fl_method_call_respond_error(call, "invalid-arguments", "Expected HTML and width", nullptr, nullptr);
+    return;
+  }
+  g_object_ref(call);
+  render_mermaid(fl_value_get_string(html), static_cast<int>(fl_value_get_int(width)),
+      [call](GBytes* bytes, const gchar* error) {
+    if (error) {
+      fl_method_call_respond_error(call, "mermaid-render", error, nullptr, nullptr);
+    } else {
+      gsize size = 0;
+      const auto* data = static_cast<const uint8_t*>(g_bytes_get_data(bytes, &size));
+      g_autoptr(FlValue) value = fl_value_new_uint8_list(data, size);
+      fl_method_call_respond_success(call, value, nullptr);
+    }
+    g_object_unref(call);
+  });
+}
+
+static void export_method_call(FlMethodChannel*, FlMethodCall* call, gpointer) {
+  if (g_strcmp0(fl_method_call_get_name(call), "render") != 0) {
+    fl_method_call_respond_not_implemented(call, nullptr); return;
+  }
+  FlValue* args = fl_method_call_get_args(call);
+  if (!args || fl_value_get_type(args) != FL_VALUE_TYPE_MAP) {
+    fl_method_call_respond_error(call, "invalid-export", "Expected export arguments", nullptr, nullptr); return;
+  }
+  FlValue* path = fl_value_lookup_string(args, "path");
+  FlValue* format = fl_value_lookup_string(args, "format");
+  FlValue* width = fl_value_lookup_string(args, "width");
+  if (!path || fl_value_get_type(path) != FL_VALUE_TYPE_STRING ||
+      !format || fl_value_get_type(format) != FL_VALUE_TYPE_STRING ||
+      !width || fl_value_get_type(width) != FL_VALUE_TYPE_INT) {
+    fl_method_call_respond_error(call, "invalid-export", "Expected document path, format and width", nullptr, nullptr); return;
+  }
+  g_autofree gchar* html = nullptr;
+  if (!g_file_get_contents(fl_value_get_string(path), &html, nullptr, nullptr)) {
+    fl_method_call_respond_error(call, "missing-document", "Export document not found", nullptr, nullptr); return;
+  }
+  g_object_ref(call);
+  render_document_export(html, static_cast<int>(fl_value_get_int(width)),
+      g_strcmp0(fl_value_get_string(format), "pdf") == 0, [call](GBytes* bytes, const gchar* error) {
+    if (error) fl_method_call_respond_error(call, "export-failed", error, nullptr, nullptr);
+    else {
+      gsize length = 0;
+      auto* data = static_cast<const uint8_t*>(g_bytes_get_data(bytes, &length));
+      g_autoptr(FlValue) value = fl_value_new_uint8_list(data, length);
+      fl_method_call_respond_success(call, value, nullptr);
+    }
+    g_object_unref(call);
+  });
 }
 
 // Implements GApplication::activate.
@@ -160,6 +191,16 @@ static void my_application_activate(GApplication* application) {
       fl_engine_get_binary_messenger(fl_view_get_engine(view)), "marker/appearance", FL_METHOD_CODEC(codec));
   fl_method_channel_set_method_call_handler(channel, appearance_method_call, window, nullptr);
   g_object_set_data_full(G_OBJECT(window), "marker-appearance-channel", g_object_ref(channel), g_object_unref);
+
+  g_autoptr(FlMethodChannel) mermaid = fl_method_channel_new(
+      fl_engine_get_binary_messenger(fl_view_get_engine(view)), "marker/mermaid", FL_METHOD_CODEC(codec));
+  fl_method_channel_set_method_call_handler(mermaid, mermaid_method_call, nullptr, nullptr);
+  g_object_set_data_full(G_OBJECT(window), "marker-mermaid-channel", g_object_ref(mermaid), g_object_unref);
+
+  g_autoptr(FlMethodChannel) exporter = fl_method_channel_new(
+      fl_engine_get_binary_messenger(fl_view_get_engine(view)), "marker/export", FL_METHOD_CODEC(codec));
+  fl_method_channel_set_method_call_handler(exporter, export_method_call, nullptr, nullptr);
+  g_object_set_data_full(G_OBJECT(window), "marker-export-channel", g_object_ref(exporter), g_object_unref);
 
   gtk_widget_grab_focus(GTK_WIDGET(view));
 }

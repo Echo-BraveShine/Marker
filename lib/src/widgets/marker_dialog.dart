@@ -78,6 +78,7 @@ class MarkerDialog extends StatelessWidget {
                   fontFamilyFallback: const [
                     '.AppleSystemUIFont',
                     'Helvetica Neue',
+                    'Noto Sans SC',
                   ],
                   fontSize: 13,
                   height: 1.38,
@@ -179,6 +180,7 @@ class MarkerDialogButton extends StatelessWidget {
         child: DefaultTextStyle(
           style: TextStyle(
             fontFamily: '.SF Pro Text',
+            fontFamilyFallback: const ['Segoe UI', 'Noto Sans SC'],
             fontSize: 12,
             fontWeight: primary ? FontWeight.w600 : FontWeight.w400,
             color: foreground,

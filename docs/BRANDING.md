@@ -12,7 +12,7 @@
 | 平台 | 主图标接入 | 深色备选 |
 | --- | --- | --- |
 | macOS | AppIcon.appiconset，16/32/128/256/512pt 的 1x/2x，最大 1024px | export/dark/Marker.icns |
-| Windows | runner/resources/app_icon.ico，16/24/32/48/64/128/256px，PNG 帧及透明通道；安装器复用图标 | export/dark/marker.ico |
+| Windows | runner/resources/app_icon.ico，16/20/24/32/40/48/64/96/128/256px，PNG 帧及透明通道；安装器复用图标 | export/dark/marker.ico |
 | Linux | hicolor 下 16/24/32/48/64/128/256/512/1024px；desktop 与 GTK 窗口图标名 marker | 同目录 marker-dark.png |
 
 运行时图标现在通过 `marker/appearance` 原生通道跟随应用实际主题切换：
@@ -20,7 +20,7 @@
 - 启动时读取已保存主题并设置图标；选择自动时跟随系统外观；快速连续切换串行执行，防止旧请求覆盖新主题。
 - macOS 使用 `NSApp.applicationIconImage` 更新运行中 Dock 图标，资源来自浅色/深色 imageset。Finder 内应用包的静态主图标保持浅色。
 - Windows 使用 `WM_SETICON` 更新窗口与运行中任务栏图标，按当前 DPI 选择尺寸，并更新任务栏 RelaunchIconResource；保持 `dev.ekko.marker` 分组标识。关闭应用后的已有固定快捷方式可能受 Windows 图标缓存影响。
-- Linux 设置 GTK 多尺寸窗口/默认图标列表，同时更新本应用用户级 `dev.ekko.marker.desktop` 的 Icon 路径，保留现有启动器其他配置，不修改系统文件。首次从 bundle 创建用户级入口时使用实际可执行路径。支持监听 desktop 文件变化的 Dock 可刷新；部分 Wayland 桌面可能缓存启动器图标，需要目标环境验证，不通过修改 app_id 破坏固定图标分组。
+- Linux 设置 GTK 多尺寸窗口/默认图标列表，同时更新本应用用户级 `dev.ekko.marker.desktop` 的 Icon 路径，保留现有启动器其他配置，不修改系统文件。图标复制到持久用户目录，避免引用 AppImage 临时挂载目录；优先保留用户/系统入口配置，首次从 AppImage 创建入口时使用 APPIMAGE 原始路径。支持监听 desktop 文件变化的 Dock 可刷新；部分 Wayland 桌面可能缓存启动器图标，需要目标环境验证，不通过修改 app_id 破坏固定图标分组。
 - 设置页中的 `MarkerLogo` 同样按实际主题选择浅色/深色资源。
 
 
@@ -28,7 +28,7 @@
 
 ## 导出与检查
 
-在 macOS 运行 `python3 scripts/export_desktop_icons.py`，使用系统 sips 重采样、iconutil 创建 ICNS，并写入原生路径。无需额外图片处理依赖。导出脚本只处理尺寸与封装，不修改已选图案。
+在 macOS 运行 `python3 scripts/export_desktop_icons.py`，使用系统 sips 重采样、iconutil 创建 ICNS，并写入原生路径。Windows 图标导出还需要开发依赖 Pillow（`python3 -m pip install Pillow`），按可见图形边界统一深浅图标占比，并生成常用 DPI 帧；不改变已选图案。MSI 广告快捷方式使用包含图标的 PE 文件，并保持 .exe 后缀与目标一致（ARPPRODUCTICON 单独使用 .ico），同时指定稳定 AppUserModelID，供搜索与任务栏分组使用。
 
 Windows 和 Linux 需要在目标系统构建并验证任务栏/启动器效果。更新系统已缓存的图标可能需要重新安装或重新启动应用；不强制重启 Finder 或桌面环境。
 

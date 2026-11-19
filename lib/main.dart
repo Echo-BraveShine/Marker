@@ -1,3 +1,7 @@
+import 'src/widgets/shortcut_settings.dart';
+import 'src/export/document_exporter.dart';
+import 'src/export/export_options_panel.dart';
+import 'package:flutter/rendering.dart' show RenderEditable;
 import 'src/widgets/about_settings.dart';
 import 'src/widgets/desktop_icon_sync.dart';
 import 'src/widgets/marker_logo.dart';
@@ -153,6 +157,13 @@ class _MarkerHomeState extends ConsumerState<MarkerHome> with WindowListener {
   WorkspaceNotifier get _workspace => ref.read(workspaceProvider.notifier);
   final _controller = MarkdownEditingController(text: defaultMarkdown);
   final _focus = FocusNode();
+  final _lineIndex = LineNumberIndex();
+  Widget? _previewCache;
+  Object? _previewSignature;
+  int _imageEpoch = 0;
+  RenderEditable? _editable() => _focus.context
+      ?.findAncestorStateOfType<EditableTextState>()
+      ?.renderEditable;
   final _searchFocus = FocusNode();
   final _editorScroll = ScrollController();
   final _previewScroll = ScrollController();
@@ -440,13 +451,15 @@ class _MarkerHomeState extends ConsumerState<MarkerHome> with WindowListener {
           .map((d) => d.id)
           .toList();
       for (final id in ids) {
-        await _selectDocument(id);
+        _snapshot();
+        _workspace.select(id);
+        _loadActive();
         if (!mounted || !await _confirm()) return;
         // Keep only the saved baseline when the user discards at exit.
         _workspace.snapshot(_saved, _saved, _path);
         _loadActive();
       }
-      if (originalId != null) {
+      if (ids.isNotEmpty && originalId != null) {
         _workspace.select(originalId);
         _loadActive();
       }
@@ -457,6 +470,8 @@ class _MarkerHomeState extends ConsumerState<MarkerHome> with WindowListener {
           'marker/lifecycle',
         ).invokeMethod<void>('quit');
       } else {
+        // Persistence/confirmation succeeded; hide before native plugin teardown.
+        await windowManager.hide();
         await windowManager.destroy();
       }
     });
@@ -467,14 +482,15 @@ class _MarkerHomeState extends ConsumerState<MarkerHome> with WindowListener {
     final offset = _controller.selection.isValid
         ? _controller.selection.extentOffset
         : 0;
-    final before = _controller.text.substring(0, offset);
+    _lineIndex.update(_controller.text);
+    final lineIndex = _lineIndex.lineAt(offset);
     ref
         .read(editorProvider.notifier)
         .update(
           (state) => state.copyWith(
             markdown: _controller.text,
-            cursorLine: '\n'.allMatches(before).length + 1,
-            cursorColumn: before.length - before.lastIndexOf('\n'),
+            cursorLine: lineIndex + 1,
+            cursorColumn: offset - _lineIndex.start(lineIndex) + 1,
           ),
         );
     if (_restoring || _lastDraftText == _controller.text) return;
@@ -625,6 +641,45 @@ class _MarkerHomeState extends ConsumerState<MarkerHome> with WindowListener {
       ),
     );
     return answer == 1 || (answer == 2 && await _save());
+  }
+
+  Future<void> _exportDocument() async {
+    if (_busy || _restoring) return;
+    final options = await showMarkerDialog<DocumentExportOptions>(
+      context: context,
+      builder: (context) => ExportOptionsPanel(zh: _zh),
+    );
+    if (options == null || !mounted) return;
+    // Export a stable snapshot while allowing the editor to remain responsive.
+    final source = _controller.text, documentPath = _path, title = _name;
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    await _action(() async {
+      final basename = title.replaceFirst(
+        RegExp(r'\.(md|markdown)$', caseSensitive: false),
+        '',
+      );
+      final extension = options.format.name;
+      final target = await getSaveLocation(
+        suggestedName: '$basename.$extension',
+        acceptedTypeGroups: [
+          XTypeGroup(label: extension.toUpperCase(), extensions: [extension]),
+        ],
+      );
+      if (target == null) return;
+      final bytes = await ref
+          .read(exportControllerProvider.notifier)
+          .export(
+            source: source,
+            title: title,
+            documentPath: documentPath,
+            options: options,
+            dark: dark,
+          );
+      await XFile.fromData(bytes).saveTo(target.path);
+      if (mounted) {
+        _toast(t('已导出到 ${target.path}', 'Exported to ${target.path}'));
+      }
+    });
   }
 
   Future<void> _action(Future<void> Function() action) async {
@@ -846,6 +901,7 @@ class _MarkerHomeState extends ConsumerState<MarkerHome> with WindowListener {
       'save': () => _action(() async {
         await _save();
       }),
+      if (documentExportEnabled) 'export': _exportDocument,
       'saveAs': () => _action(() async {
         await _save(as: true);
       }),
@@ -1166,229 +1222,221 @@ class _MarkerHomeState extends ConsumerState<MarkerHome> with WindowListener {
                 Container(width: 1, color: c.separatorSoft),
                 const SizedBox(width: 16),
                 Expanded(
-                  child: SingleChildScrollView(
-                    key: PageStorageKey(
-                      'settings-content-${editor.settingsPage}',
-                    ),
-                    padding: EdgeInsets.zero,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          labels[editor.settingsPage],
-                          style: MarkerStyle.heading,
-                        ),
-                        const SizedBox(height: 12),
-                        if (editor.settingsPage == 0) ...[
-                          group(t('外观', 'Appearance'), [
-                            row(
-                              CupertinoIcons.circle_lefthalf_fill,
-                              t('主题', 'Theme'),
-                              SizedBox(
-                                width: 224,
-                                child:
-                                    CupertinoSlidingSegmentedControl<ThemeMode>(
-                                      key: const Key('settings-theme'),
-                                      groupValue: settings.mode,
-                                      children: {
-                                        ThemeMode.system: Text(
-                                          t('自动', 'Auto'),
-                                          style: const TextStyle(fontSize: 12),
-                                        ),
-                                        ThemeMode.light: Text(
-                                          t('浅色', 'Light'),
-                                          style: const TextStyle(fontSize: 12),
-                                        ),
-                                        ThemeMode.dark: Text(
-                                          t('深色', 'Dark'),
-                                          style: const TextStyle(fontSize: 12),
-                                        ),
-                                      },
-                                      onValueChanged: (v) {
-                                        if (v != null) {
-                                          ref
-                                              .read(themeProvider.notifier)
-                                              .setThemeMode(v);
-                                        }
-                                      },
-                                    ),
-                              ),
-                            ),
-                          ]),
-                          group(t('语言', 'Language'), [
-                            row(
-                              CupertinoIcons.globe,
-                              t('界面语言', 'Language'),
-                              SizedBox(
-                                width: 224,
-                                child: CupertinoSlidingSegmentedControl<String>(
-                                  key: const Key('settings-language'),
-                                  groupValue: settings.locale.languageCode,
-                                  children: const {
-                                    'zh': Text(
-                                      '简体中文',
-                                      style: TextStyle(fontSize: 12),
-                                    ),
-                                    'en': Text(
-                                      'English',
-                                      style: TextStyle(fontSize: 12),
-                                    ),
-                                  },
-                                  onValueChanged: (v) {
-                                    if (v != null) {
-                                      ref
-                                          .read(themeProvider.notifier)
-                                          .setLocale(
-                                            Locale(v, v == 'zh' ? 'CN' : 'US'),
-                                          );
-                                    }
-                                  },
-                                ),
-                              ),
-                            ),
-                          ]),
-                        ] else if (editor.settingsPage == 1) ...[
-                          group(t('语法高亮', 'Syntax highlighting'), [
-                            row(
-                              CupertinoIcons.textformat,
-                              t('文本高亮', 'Text highlighting'),
-                              CupertinoSwitch(
-                                key: const Key('settings-highlight-enabled'),
-                                value: settings.highlightEnabled,
-                                onChanged: (value) => ref
-                                    .read(themeProvider.notifier)
-                                    .setHighlightEnabled(value),
-                              ),
-                            ),
-                            if (settings.highlightEnabled)
-                              Padding(
-                                padding: const EdgeInsets.all(12),
-                                child: HighlightStylePicker(
-                                  key: const Key('settings-highlight-style'),
-                                  selected: settings.highlightStyle,
-                                  colors: c,
-                                  zh: _zh,
-                                  onChanged: (value) => ref
-                                      .read(themeProvider.notifier)
-                                      .setHighlightStyle(value),
-                                ),
-                              ),
-                          ]),
-                          group(t('编辑器', 'Editor'), [
-                            row(
-                              CupertinoIcons.textformat_size,
-                              t('字号', 'Text size'),
-                              Text(
-                                '${editor.fontSize.round()} pt',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: c.textSecondary,
-                                ),
-                              ),
-                            ),
-                            Padding(
-                              padding: const EdgeInsets.fromLTRB(48, 0, 12, 8),
-                              child: SizedBox(
-                                width: double.infinity,
-                                child: CupertinoSlider(
-                                  min: 10,
-                                  max: 24,
-                                  divisions: 14,
-                                  value: editor.fontSize,
-                                  onChanged: (v) => _fontSize = v,
-                                ),
-                              ),
-                            ),
-                          ]),
-                          group(t('预览', 'Preview'), [
-                            row(
-                              CupertinoIcons.doc_text,
-                              t('衬线字体', 'Serif font'),
-                              CupertinoSwitch(
-                                value: editor.serif,
-                                onChanged: (v) => _serif = v,
-                              ),
-                            ),
-                          ]),
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: c.bgEditor,
-                              borderRadius: BorderRadius.circular(
-                                MarkerStyle.groupRadius,
-                              ),
-                            ),
-                            child: Text.rich(
-                              TextSpan(
-                                children: settings.highlightEnabled
-                                    ? MarkdownHighlighter(
-                                        HighlightPalette.from(
-                                          settings.highlightStyle,
-                                          c,
-                                        ),
-                                      ).highlight(
-                                        '# Marker\n**Bold** and `code` [link](https://example.com)\n\n```json\n{"name": "Marker", "count": 3}\n```',
-                                      )
-                                    : [
-                                        const TextSpan(
-                                          text:
-                                              '# Marker\n**Bold** and `code` [link](https://example.com)\n\n```json\n{"name": "Marker", "count": 3}\n```',
-                                        ),
-                                      ],
-                              ),
-                              style: TextStyle(
-                                fontFamily: 'Menlo',
-                                fontSize: editor.fontSize,
-                                height: 1.6,
-                                color: c.textSecondary,
-                              ),
-                            ),
+                  child: editor.settingsPage == 2
+                      ? ShortcutSettings(zh: _zh)
+                      : SingleChildScrollView(
+                          key: PageStorageKey(
+                            'settings-content-${editor.settingsPage}',
                           ),
-                        ] else if (editor.settingsPage == 3) ...[
-                          AboutSettings(zh: _zh),
-                        ] else ...[
-                          group(t('应用操作', 'App commands'), [
-                            for (final shortcut in appShortcuts)
-                              Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 10,
-                                ),
-                                child: Row(
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        _zh ? shortcut.zh : shortcut.en,
-                                        style: const TextStyle(fontSize: 12),
+                          padding: EdgeInsets.zero,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                labels[editor.settingsPage],
+                                style: MarkerStyle.heading,
+                              ),
+                              const SizedBox(height: 12),
+                              if (editor.settingsPage == 0) ...[
+                                group(t('外观', 'Appearance'), [
+                                  row(
+                                    CupertinoIcons.circle_lefthalf_fill,
+                                    t('主题', 'Theme'),
+                                    SizedBox(
+                                      width: 224,
+                                      child:
+                                          CupertinoSlidingSegmentedControl<
+                                            ThemeMode
+                                          >(
+                                            key: const Key('settings-theme'),
+                                            groupValue: settings.mode,
+                                            children: {
+                                              ThemeMode.system: Text(
+                                                t('自动', 'Auto'),
+                                                style: const TextStyle(
+                                                  fontSize: 12,
+                                                ),
+                                              ),
+                                              ThemeMode.light: Text(
+                                                t('浅色', 'Light'),
+                                                style: const TextStyle(
+                                                  fontSize: 12,
+                                                ),
+                                              ),
+                                              ThemeMode.dark: Text(
+                                                t('深色', 'Dark'),
+                                                style: const TextStyle(
+                                                  fontSize: 12,
+                                                ),
+                                              ),
+                                            },
+                                            onValueChanged: (v) {
+                                              if (v != null) {
+                                                ref
+                                                    .read(
+                                                      themeProvider.notifier,
+                                                    )
+                                                    .setThemeMode(v);
+                                              }
+                                            },
+                                          ),
+                                    ),
+                                  ),
+                                ]),
+                                group(t('语言', 'Language'), [
+                                  row(
+                                    CupertinoIcons.globe,
+                                    t('界面语言', 'Language'),
+                                    SizedBox(
+                                      width: 224,
+                                      child:
+                                          CupertinoSlidingSegmentedControl<
+                                            String
+                                          >(
+                                            key: const Key('settings-language'),
+                                            groupValue:
+                                                settings.locale.languageCode,
+                                            children: const {
+                                              'zh': Text(
+                                                '简体中文',
+                                                style: TextStyle(fontSize: 12),
+                                              ),
+                                              'en': Text(
+                                                'English',
+                                                style: TextStyle(fontSize: 12),
+                                              ),
+                                            },
+                                            onValueChanged: (v) {
+                                              if (v != null) {
+                                                ref
+                                                    .read(
+                                                      themeProvider.notifier,
+                                                    )
+                                                    .setLocale(
+                                                      Locale(
+                                                        v,
+                                                        v == 'zh' ? 'CN' : 'US',
+                                                      ),
+                                                    );
+                                              }
+                                            },
+                                          ),
+                                    ),
+                                  ),
+                                ]),
+                              ] else if (editor.settingsPage == 1) ...[
+                                group(t('语法高亮', 'Syntax highlighting'), [
+                                  row(
+                                    CupertinoIcons.textformat,
+                                    t('文本高亮', 'Text highlighting'),
+                                    CupertinoSwitch(
+                                      key: const Key(
+                                        'settings-highlight-enabled',
+                                      ),
+                                      value: settings.highlightEnabled,
+                                      onChanged: (value) => ref
+                                          .read(themeProvider.notifier)
+                                          .setHighlightEnabled(value),
+                                    ),
+                                  ),
+                                  if (settings.highlightEnabled)
+                                    Padding(
+                                      padding: const EdgeInsets.all(12),
+                                      child: HighlightStylePicker(
+                                        key: const Key(
+                                          'settings-highlight-style',
+                                        ),
+                                        selected: settings.highlightStyle,
+                                        colors: c,
+                                        zh: _zh,
+                                        onChanged: (value) => ref
+                                            .read(themeProvider.notifier)
+                                            .setHighlightStyle(value),
                                       ),
                                     ),
+                                ]),
+                                group(t('编辑器', 'Editor'), [
+                                  row(
+                                    CupertinoIcons.textformat_size,
+                                    t('字号', 'Text size'),
                                     Text(
-                                      shortcut.display(defaultTargetPlatform),
+                                      '${editor.fontSize.round()} pt',
                                       style: TextStyle(
-                                        fontFamily: 'Menlo',
                                         fontSize: 12,
                                         color: c.textSecondary,
                                       ),
                                     ),
-                                  ],
+                                  ),
+                                  Padding(
+                                    padding: const EdgeInsets.fromLTRB(
+                                      48,
+                                      0,
+                                      12,
+                                      8,
+                                    ),
+                                    child: SizedBox(
+                                      width: double.infinity,
+                                      child: CupertinoSlider(
+                                        min: 10,
+                                        max: 24,
+                                        divisions: 14,
+                                        value: editor.fontSize,
+                                        onChanged: (v) => _fontSize = v,
+                                      ),
+                                    ),
+                                  ),
+                                ]),
+                                group(t('预览', 'Preview'), [
+                                  row(
+                                    CupertinoIcons.doc_text,
+                                    t('衬线字体', 'Serif font'),
+                                    CupertinoSwitch(
+                                      value: editor.serif,
+                                      onChanged: (v) => _serif = v,
+                                    ),
+                                  ),
+                                ]),
+                                Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
+                                    color: c.bgEditor,
+                                    borderRadius: BorderRadius.circular(
+                                      MarkerStyle.groupRadius,
+                                    ),
+                                  ),
+                                  child: Text.rich(
+                                    TextSpan(
+                                      children: settings.highlightEnabled
+                                          ? MarkdownHighlighter(
+                                              HighlightPalette.from(
+                                                settings.highlightStyle,
+                                                c,
+                                              ),
+                                            ).highlight(
+                                              '# Marker\n**Bold** and `code` [link](https://example.com)\n\n```json\n{"name": "Marker", "count": 3}\n```',
+                                            )
+                                          : [
+                                              const TextSpan(
+                                                text:
+                                                    '# Marker\n**Bold** and `code` [link](https://example.com)\n\n```json\n{"name": "Marker", "count": 3}\n```',
+                                              ),
+                                            ],
+                                    ),
+                                    style: TextStyle(
+                                      fontFamily: 'Menlo',
+                                      fontSize: editor.fontSize,
+                                      height: 1.6,
+                                      color: c.textSecondary,
+                                    ),
+                                  ),
                                 ),
-                              ),
-                          ]),
-                          Text(
-                            t(
-                              'Esc 关闭搜索或语法面板。编辑框内支持系统原生剪贴板与撤销操作。',
-                              'Esc closes search or syntax panel. Text fields retain native clipboard and undo shortcuts.',
-                            ),
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: c.textSecondary,
-                            ),
+                              ] else if (editor.settingsPage == 3) ...[
+                                AboutSettings(zh: _zh),
+                              ],
+                            ],
                           ),
-                        ],
-                      ],
-                    ),
-                  ),
+                        ),
                 ),
               ],
             ),
@@ -1400,15 +1448,17 @@ class _MarkerHomeState extends ConsumerState<MarkerHome> with WindowListener {
 
   @override
   Widget build(BuildContext context) {
-    ref.watch(editorProvider);
+    final editorState = ref.watch(editorProvider);
     final workspace = ref.watch(workspaceProvider);
+    final exporting = ref.watch(exportControllerProvider).isLoading;
     final c = Theme.of(context).extension<MarkerColors>()!;
     final offset = _controller.selection.isValid
         ? _controller.selection.extentOffset
         : 0;
-    final before = _controller.text.substring(0, offset);
-    final line = '\n'.allMatches(before).length + 1;
-    final column = before.length - before.lastIndexOf('\n');
+    _lineIndex.update(_controller.text);
+    final lineIndex = _lineIndex.lineAt(offset);
+    final line = lineIndex + 1;
+    final column = offset - _lineIndex.start(lineIndex) + 1;
     Widget button(IconData icon, String label, VoidCallback action) => Tooltip(
       message: label,
       child: SizedBox(
@@ -1422,6 +1472,10 @@ class _MarkerHomeState extends ConsumerState<MarkerHome> with WindowListener {
         ),
       ),
     );
+    _controller.searchQuery = editorState.searchVisible
+        ? editorState.searchQuery
+        : '';
+    _controller.searchCaseSensitive = editorState.searchCaseSensitive;
     _controller.colors = c;
     _controller.highlightStyle = ref.watch(themeProvider).highlightStyle;
     _controller.highlightEnabled = ref.watch(themeProvider).highlightEnabled;
@@ -1454,7 +1508,7 @@ class _MarkerHomeState extends ConsumerState<MarkerHome> with WindowListener {
         TargetPlatform.linux => 'JetBrains Mono',
         _ => 'Menlo',
       },
-      fontFamilyFallback: const ['Consolas', 'monospace'],
+      fontFamilyFallback: const ['Consolas', 'monospace', 'Noto Sans SC'],
       fontSize: _fontSize,
       height: 1.6,
       color: c.textPrimary,
@@ -1465,11 +1519,7 @@ class _MarkerHomeState extends ConsumerState<MarkerHome> with WindowListener {
         color: c.bgEditor,
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final digits = _controller.text
-                .split('\n')
-                .length
-                .toString()
-                .length;
+            final digits = _lineIndex.length.toString().length;
             final numberMeasure = TextPainter(
               text: TextSpan(text: '9' * digits, style: editorStyle),
               textDirection: TextDirection.ltr,
@@ -1485,10 +1535,8 @@ class _MarkerHomeState extends ConsumerState<MarkerHome> with WindowListener {
                   controller: _controller,
                   scrollController: _editorScroll,
                   style: editorStyle,
-                  textWidth: (constraints.maxWidth - gutterWidth - 8).clamp(
-                    1,
-                    double.infinity,
-                  ),
+                  index: _lineIndex,
+                  editable: _editable,
                   color: c.textTertiary,
                   width: gutterWidth,
                 ),
@@ -1521,117 +1569,144 @@ class _MarkerHomeState extends ConsumerState<MarkerHome> with WindowListener {
         ),
       ),
     );
-    final preview = ColoredBox(
-      color: c.bgPreview,
-      child: SizedBox.expand(
-        child: Markdown(
-          key: const Key('preview'),
-          extensionSet: md.ExtensionSet.gitHubFlavored,
-          controller: _previewScroll,
-          blockSyntaxes: [MermaidSyntax(), MathBlockSyntax()],
-          inlineSyntaxes: [TextColorSyntax(), MathInlineSyntax()],
-          builders: {
-            'text-color': TextColorBuilder(),
-            'math-inline': MathBuilder(),
-            'math-block': MathBuilder(block: true),
-            'mermaid': MermaidBuilder(
-              enabled: ref.watch(mermaidPreviewEnabledProvider),
-            ),
-          },
-          onTapLink: (text, href, title) async {
-            if (href == null) return;
-            try {
-              if (href.startsWith('#')) {
-                if (_previewScroll.hasClients) {
-                  await _previewScroll.animateTo(
-                    href.startsWith('#fnref')
-                        ? 0
-                        : _previewScroll.position.maxScrollExtent,
-                    duration: const Duration(milliseconds: 200),
-                    curve: Curves.easeOut,
+    final previewSignature = (
+      _controller.text,
+      _path,
+      _serif,
+      _imageEpoch,
+      Theme.of(context),
+      Localizations.localeOf(context),
+      ref.watch(mermaidPreviewEnabledProvider),
+    );
+    if (_previewSignature != previewSignature) {
+      _previewSignature = previewSignature;
+      _previewCache = RepaintBoundary(
+        child: ColoredBox(
+          color: c.bgPreview,
+          child: SizedBox.expand(
+            child: Markdown(
+              key: const Key('preview'),
+              extensionSet: md.ExtensionSet.gitHubFlavored,
+              controller: _previewScroll,
+              blockSyntaxes: [MermaidSyntax(), MathBlockSyntax()],
+              inlineSyntaxes: [TextColorSyntax(), MathInlineSyntax()],
+              builders: {
+                'text-color': TextColorBuilder(),
+                'math-inline': MathBuilder(),
+                'math-block': MathBuilder(block: true),
+                'mermaid': MermaidBuilder(
+                  enabled: ref.watch(mermaidPreviewEnabledProvider),
+                ),
+              },
+              onTapLink: (text, href, title) async {
+                if (href == null) return;
+                try {
+                  if (href.startsWith('#')) {
+                    if (_previewScroll.hasClients) {
+                      await _previewScroll.animateTo(
+                        href.startsWith('#fnref')
+                            ? 0
+                            : _previewScroll.position.maxScrollExtent,
+                        duration: const Duration(milliseconds: 200),
+                        curve: Curves.easeOut,
+                      );
+                    }
+                    return;
+                  }
+                  final uri = resolveDocumentUri(href, _path);
+                  if (![
+                    'http',
+                    'https',
+                    'mailto',
+                    'file',
+                  ].contains(uri.scheme)) {
+                    _toast(t('不支持此链接类型', 'Unsupported link type'));
+                    return;
+                  }
+                  if (!await launchUrl(
+                    uri,
+                    mode: LaunchMode.externalApplication,
+                  )) {
+                    throw StateError('无法打开链接');
+                  }
+                } catch (e) {
+                  _error(e);
+                }
+              },
+              sizedImageBuilder: (config) {
+                final uri = config.uri;
+                final alt = config.alt;
+                final resolved = resolveDocumentUri(uri.toString(), _path);
+                Widget failure(
+                  BuildContext context,
+                  Object error,
+                  StackTrace? stack,
+                ) => Text(
+                  '${alt ?? ''} · ${t('图片无法加载', 'Image unavailable')}',
+                  style: TextStyle(color: c.textSecondary),
+                );
+                if (resolved.scheme == 'file') {
+                  return Image.file(
+                    File.fromUri(resolved),
+                    key: ValueKey((resolved.toString(), _imageEpoch)),
+                    width: config.width,
+                    height: config.height,
+                    errorBuilder: (context, error, stack) => Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        failure(context, error, stack),
+                        CupertinoButton(
+                          onPressed: () => _action(() async {
+                            final directory = await getDirectoryPath(
+                              confirmButtonText: t(
+                                '允许访问图片目录',
+                                'Allow image folder',
+                              ),
+                            );
+                            if (directory != null) {
+                              await FileImage(File.fromUri(resolved)).evict();
+                              _imageEpoch++;
+                            }
+                          }),
+                          child: Text(
+                            t('授权图片所在目录并重试', 'Allow image folder and retry'),
+                          ),
+                        ),
+                      ],
+                    ),
                   );
                 }
-                return;
-              }
-              final uri = resolveDocumentUri(href, _path);
-              if (!['http', 'https', 'mailto', 'file'].contains(uri.scheme)) {
-                _toast(t('不支持此链接类型', 'Unsupported link type'));
-                return;
-              }
-              if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
-                throw StateError('无法打开链接');
-              }
-            } catch (e) {
-              _error(e);
-            }
-          },
-          sizedImageBuilder: (config) {
-            final uri = config.uri;
-            final alt = config.alt;
-            final resolved = resolveDocumentUri(uri.toString(), _path);
-            Widget failure(
-              BuildContext context,
-              Object error,
-              StackTrace? stack,
-            ) => Text(
-              '${alt ?? ''} · ${t('图片无法加载', 'Image unavailable')}',
-              style: TextStyle(color: c.textSecondary),
-            );
-            if (resolved.scheme == 'file') {
-              return Image.file(
-                File.fromUri(resolved),
-                key: UniqueKey(),
-                width: config.width,
-                height: config.height,
-                errorBuilder: (context, error, stack) => Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    failure(context, error, stack),
-                    CupertinoButton(
-                      onPressed: () => _action(() async {
-                        final directory = await getDirectoryPath(
-                          confirmButtonText: t(
-                            '允许访问图片目录',
-                            'Allow image folder',
-                          ),
-                        );
-                        if (directory != null) {
-                          await FileImage(File.fromUri(resolved)).evict();
-                        }
-                      }),
-                      child: Text(
-                        t('授权图片所在目录并重试', 'Allow image folder and retry'),
-                      ),
-                    ),
-                  ],
+                if (['http', 'https'].contains(resolved.scheme)) {
+                  return Image.network(
+                    resolved.toString(),
+                    errorBuilder: failure,
+                  );
+                }
+                return Text(
+                  t(
+                    '请先保存文档以加载相对路径图片',
+                    'Save the document to resolve relative images',
+                  ),
+                );
+              },
+              data: _controller.text,
+              selectable: true,
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+              styleSheet: MarkerMarkdownStyle.build(context).copyWith(
+                p: TextStyle(
+                  fontFamily: _serif ? 'New York' : null,
+                  fontFamilyFallback: const ['Georgia', 'Noto Sans SC'],
+                  fontSize: 15,
+                  height: 1.7,
+                  color: c.textPrimary,
                 ),
-              );
-            }
-            if (['http', 'https'].contains(resolved.scheme)) {
-              return Image.network(resolved.toString(), errorBuilder: failure);
-            }
-            return Text(
-              t(
-                '请先保存文档以加载相对路径图片',
-                'Save the document to resolve relative images',
               ),
-            );
-          },
-          data: _controller.text,
-          selectable: true,
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-          styleSheet: MarkerMarkdownStyle.build(context).copyWith(
-            p: TextStyle(
-              fontFamily: _serif ? 'New York' : null,
-              fontFamilyFallback: const ['Georgia'],
-              fontSize: 15,
-              height: 1.7,
-              color: c.textPrimary,
             ),
           ),
         ),
-      ),
-    );
+      );
+    }
+    final preview = _previewCache!;
     return CallbackShortcuts(
       bindings: _shortcutBindings(),
       child: Focus(
@@ -1858,6 +1933,12 @@ class _MarkerHomeState extends ConsumerState<MarkerHome> with WindowListener {
                                     await _save(as: true);
                                   }),
                                 ),
+                                if (documentExportEnabled)
+                                  button(
+                                    CupertinoIcons.square_arrow_up,
+                                    t('导出', 'Export'),
+                                    _exportDocument,
+                                  ),
                                 button(
                                   CupertinoIcons.arrow_uturn_left,
                                   t('撤销', 'Undo'),
@@ -2196,7 +2277,9 @@ class _MarkerHomeState extends ConsumerState<MarkerHome> with WindowListener {
                                   ),
                                   const Spacer(),
                                   Text(
-                                    '${_controller.text.runes.length} ${t('字符', 'characters')} · UTF-8 · Markdown',
+                                    exporting
+                                        ? t('正在导出文档…', 'Exporting document…')
+                                        : '${_lineIndex.characters} ${t('字符', 'characters')} · UTF-8 · Markdown',
                                     style: const TextStyle(fontSize: 11),
                                   ),
                                 ],
