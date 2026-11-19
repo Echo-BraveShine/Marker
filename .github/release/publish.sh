@@ -10,7 +10,18 @@ packages=()
 for file in "${files[@]}"; do
   if [[ "${file##*/}" != SHA256SUMS.txt ]]; then packages+=("$file"); fi
 done
-(( ${#packages[@]} == 6 )) && test -s dist/SHA256SUMS.txt
+(( ${#packages[@]} == 15 )) && test -s dist/SHA256SUMS.txt
+# Reject a complete-looking count containing a missing target or stale package.
+expected=(
+  Marker-macos.zip Marker-macos-arm64.dmg Marker-macos-x86_64.dmg
+  Marker-Windows-x64-Setup.exe Marker-windows-x64.zip Marker-Windows-x64.msi Marker-Windows-x64-zh-CN.msi
+  Marker-linux-x64.tar.gz Marker-linux-amd64.deb
+  Marker-linux-x86_64.AppImage Marker-linux-x86_64.rpm
+  Marker-linux-arm64.tar.gz Marker-linux-arm64.deb
+  Marker-linux-aarch64.AppImage Marker-linux-aarch64.rpm
+)
+diff -u <(printf '%s\n' "${expected[@]}" | sort) <(printf '%s\n' "${packages[@]##*/}" | sort)
+diff -u <(printf '%s\n' "${expected[@]}" | sort) <(awk '{print $2}' dist/SHA256SUMS.txt | sort)
 (cd dist && sha256sum --check SHA256SUMS.txt)
 make_latest=true
 if latest=$(gh release view --json tagName --jq '.tagName' 2>/dev/null); then

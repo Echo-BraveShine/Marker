@@ -18,6 +18,8 @@ def main():
     version, build = match.groups()
     if any(int(number) > 65535 for number in version.split('.') + [build]):
         raise SystemExit('Windows version components must be <= 65535')
+    if any(int(number) > 255 for number in version.split('.')[:2]):
+        raise SystemExit('MSI major and minor version components must be <= 255')
     values = f'version={version}\nbuild={build}\n'
     print(values, end='')
     if output := os.environ.get('GITHUB_OUTPUT'):

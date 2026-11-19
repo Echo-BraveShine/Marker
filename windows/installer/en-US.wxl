@@ -1,0 +1,6 @@
+<WixLocalization xmlns="http://wixtoolset.org/schemas/v4/wxl" Culture="en-US" Codepage="1252">
+  <String Id="Language" Value="1033" />
+  <String Id="DowngradeError" Value="A newer version of Marker is already installed." />
+  <String Id="FeatureTitle" Value="Marker" />
+  <String Id="DocumentType" Value="Markdown document" />
+</WixLocalization>

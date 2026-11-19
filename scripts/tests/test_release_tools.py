@@ -32,7 +32,9 @@ class ReleaseToolsTests(unittest.TestCase):
 
     def test_mismatch_and_out_of_range_build_are_rejected(self):
         for content, tag in [('version: 0.0.1+1', 'v0.0.2'),
-                             ('version: 0.0.1+65536', 'v0.0.1')]:
+                             ('version: 0.0.1+65536', 'v0.0.1'),
+                             ('version: 256.0.1+1', 'v256.0.1'),
+                             ('version: 0.256.1+1', 'v0.256.1')]:
             (self.project / 'pubspec.yaml').write_text(content, encoding='utf-8')
             result = self.run_tool('release_version.py', '--tag', tag)
             self.assertNotEqual(result.returncode, 0)
@@ -50,9 +52,9 @@ class ReleaseToolsTests(unittest.TestCase):
 
     def test_complete_packages_have_correct_checksums_on_all_platforms(self):
         expected = {
-            'macos': ['Marker-macos-universal.dmg', 'Marker-macos-universal.zip'],
-            'windows': ['Marker-Windows-x64-Setup.exe', 'Marker-windows-x64.zip'],
-            'linux': ['Marker-linux-amd64.deb', 'Marker-linux-x64.tar.gz'],
+            'macos': ['Marker-macos.zip', 'Marker-macos-arm64.dmg', 'Marker-macos-x86_64.dmg'],
+            'windows': ['Marker-Windows-x64-Setup.exe', 'Marker-windows-x64.zip', 'Marker-Windows-x64.msi', 'Marker-Windows-x64-zh-CN.msi'],
+            'linux': ['Marker-linux-amd64.deb', 'Marker-linux-x64.tar.gz', 'Marker-linux-x86_64.AppImage', 'Marker-linux-x86_64.rpm'],
         }
         folder = self.project / 'dist'
         folder.mkdir()
@@ -61,9 +63,30 @@ class ReleaseToolsTests(unittest.TestCase):
                 (folder / name).write_bytes(name.encode('utf-8'))
             result = self.run_tool('release_checksums.py', '--platform', platform)
             self.assertEqual(result.returncode, 0, result.stderr)
-            text = (folder / f'SHA256SUMS-{platform}.txt').read_text(encoding='utf-8')
+            text = (folder / (f'SHA256SUMS-{platform}-' + ('universal' if platform == 'macos' else 'x64') + '.txt')).read_text(encoding='utf-8')
+            self.assertNotIn(b'\r', (folder / (f'SHA256SUMS-{platform}-' + ('universal' if platform == 'macos' else 'x64') + '.txt')).read_bytes())
             self.assertEqual(text, ''.join(
                 f'{hashlib.sha256(name.encode("utf-8")).hexdigest()}  {name}\n' for name in sorted(names)))
+
+    def test_linux_arm64_checksums_are_separate_and_require_all_formats(self):
+        folder = self.project / 'dist'
+        folder.mkdir()
+        names = ['Marker-linux-arm64.tar.gz', 'Marker-linux-arm64.deb',
+                 'Marker-linux-aarch64.AppImage', 'Marker-linux-aarch64.rpm']
+        for name in names:
+            (folder / name).write_bytes(name.encode('utf-8'))
+        result = self.run_tool('release_checksums.py', '--platform', 'linux', '--architecture', 'arm64')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        text = (folder / 'SHA256SUMS-linux-arm64.txt').read_text(encoding='utf-8')
+        self.assertEqual(len(text.splitlines()), 4)
+        self.assertFalse((folder / 'SHA256SUMS-linux-x64.txt').exists())
+        (folder / names[-1]).unlink()
+        self.assertNotEqual(self.run_tool('release_checksums.py', '--platform', 'linux',
+                                         '--architecture', 'arm64').returncode, 0)
+
+    def test_unsupported_architecture_is_rejected(self):
+        result = self.run_tool('release_checksums.py', '--platform', 'windows', '--architecture', 'arm64')
+        self.assertNotEqual(result.returncode, 0)
 
 
 if __name__ == '__main__':

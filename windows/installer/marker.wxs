@@ -1,0 +1,56 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+  <Package Name="Marker" Manufacturer="Marker" Version="$(var.AppVersion)"
+           ProductCode="$(var.ProductCode)" Language="!(loc.Language)"
+           UpgradeCode="D8F9D98D-357E-42DB-A4D5-CB861F4D9D52" Scope="perMachine">
+    <MajorUpgrade DowngradeErrorMessage="!(loc.DowngradeError)"
+                  Schedule="afterInstallInitialize" IgnoreLanguage="yes" />
+    <MediaTemplate EmbedCab="yes" />
+    <ui:WixUI Id="WixUI_InstallDir" InstallDirectory="INSTALLFOLDER" />
+    <UIRef Id="WixUI_ErrorProgressText" />
+    <WixVariable Id="WixUIBannerBmp" Value="wizard-banner.bmp" />
+    <WixVariable Id="WixUIDialogBmp" Value="wizard-dialog.bmp" />
+    <!-- No project license agreement exists; do not display a placeholder EULA. -->
+    <UI>
+      <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog"
+               Value="InstallDirDlg" Order="2" Condition="NOT Installed" />
+      <Publish Dialog="InstallDirDlg" Control="Back" Event="NewDialog"
+               Value="WelcomeDlg" Order="2" />
+    </UI>
+    <Property Id="MARKER_BUILD_NUMBER" Value="$(var.BuildNumber)" />
+    <Icon Id="MarkerIcon" SourceFile="../runner/resources/app_icon.ico" />
+    <Property Id="ARPPRODUCTICON" Value="MarkerIcon" />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="Marker" />
+    </StandardDirectory>
+    <StandardDirectory Id="ProgramMenuFolder" />
+
+    <Feature Id="Main" Title="!(loc.FeatureTitle)" Level="1">
+      <Files Directory="INSTALLFOLDER" Include="$(var.BundleDir)\**">
+        <Exclude Files="$(var.BundleDir)\marker.exe" />
+      </Files>
+      <Component Directory="INSTALLFOLDER">
+        <File Id="MarkerExe" Source="$(var.BundleDir)\marker.exe" KeyPath="yes">
+          <Shortcut Id="MarkerStartMenu" Directory="ProgramMenuFolder" Name="Marker"
+                    WorkingDirectory="INSTALLFOLDER" Advertise="yes" />
+        </File>
+        <RegistryKey Root="HKLM" Key="Software\Classes\.md\OpenWithProgids">
+          <RegistryValue Name="dev.ekko.marker.Markdown" Type="string" Value="" />
+        </RegistryKey>
+        <RegistryKey Root="HKLM" Key="Software\Classes\.markdown\OpenWithProgids">
+          <RegistryValue Name="dev.ekko.marker.Markdown" Type="string" Value="" />
+        </RegistryKey>
+        <RegistryKey Root="HKLM" Key="Software\Classes\dev.ekko.marker.Markdown">
+          <RegistryValue Type="string" Value="!(loc.DocumentType)" />
+          <RegistryKey Key="DefaultIcon">
+            <RegistryValue Type="string" Value="&quot;[#MarkerExe]&quot;,0" />
+          </RegistryKey>
+          <RegistryKey Key="shell\open\command">
+            <RegistryValue Type="string" Value="&quot;[#MarkerExe]&quot; &quot;%1&quot;" />
+          </RegistryKey>
+        </RegistryKey>
+      </Component>
+    </Feature>
+  </Package>
+</Wix>

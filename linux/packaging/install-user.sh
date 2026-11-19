@@ -1,7 +1,32 @@
 #!/usr/bin/env bash
 set -euo pipefail
-bundle="${1:?Usage: install-user.sh /path/to/flutter/release/bundle}"
-[[ -x "$bundle/marker" ]] || { echo 'Marker executable not found in bundle.' >&2; exit 1; }
+language="${MARKER_INSTALLER_LANGUAGE:-${LC_ALL:-${LANGUAGE:-${LC_MESSAGES:-${LANG:-en}}}}}"
+case "$language" in zh*) zh=1 ;; *) zh=0 ;; esac
+if (( zh )); then
+  printf '\n  Marker · 让灵感，自在落笔。\n\n'
+else
+  printf '\n  Marker · Make room for words.\n\n'
+fi
+if [[ "${1:-}" == --gui ]]; then
+  bundle="$(cd -- "${2:-.}" && pwd)"
+  if ! python3 -c 'import gi; gi.require_version("Gtk", "3.0")' >/dev/null 2>&1; then
+    if (( zh )); then echo '图形安装需要 python3-gi 和 GTK 3。也可运行：bash install-user.sh .' >&2
+    else echo 'The graphical installer requires python3-gi and GTK 3. Or run: bash install-user.sh .' >&2; fi
+    exit 1
+  fi
+  exec python3 "$bundle/installer.py" "$bundle"
+fi
+bundle="${1:-}"
+if [[ -z "$bundle" ]]; then
+  if (( zh )); then echo '用法：bash install-user.sh 安装包所在目录，或 bash install-user.sh --gui 安装包所在目录' >&2
+  else echo 'Usage: bash install-user.sh /path/to/bundle, or bash install-user.sh --gui /path/to/bundle' >&2; fi
+  exit 1
+fi
+if [[ ! -x "$bundle/marker" ]]; then
+  if (( zh )); then echo '安装目录中未找到 Marker 程序。' >&2
+  else echo 'Marker executable not found in bundle.' >&2; fi
+  exit 1
+fi
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 app_dir="$HOME/.local/share/marker"
 applications_dir="$HOME/.local/share/applications"
@@ -13,7 +38,7 @@ python3 - "$script_dir/dev.ekko.marker.desktop" "$applications_dir/dev.ekko.mark
 import pathlib, sys
 source, target, executable = sys.argv[1:]
 quoted = executable.replace('\\', '\\\\').replace('"', '\\"').replace('`', '\\`').replace('$', '\\$').replace('%', '%%')
-pathlib.Path(target).write_text(pathlib.Path(source).read_text().replace('Exec=marker %F', f'Exec="{quoted}" %F'))
+pathlib.Path(target).write_text(pathlib.Path(source).read_text(encoding='utf-8').replace('Exec=marker %F', f'Exec="{quoted}" %F'), encoding='utf-8')
 PY
 icon_source="$app_dir/share/icons/hicolor"
 if [[ -d "$icon_source" ]]; then
@@ -25,4 +50,8 @@ if [[ -d "$icon_source" ]]; then
 fi
 if command -v update-mime-database >/dev/null; then update-mime-database "$mime_dir"; fi
 if command -v update-desktop-database >/dev/null; then update-desktop-database "$applications_dir"; fi
-echo 'Marker installed for this user. Choose Marker from Open With for Markdown files.'
+if (( zh )); then
+  echo 'Marker 已为当前用户安装。可在 Markdown 文档的「打开方式」中选择 Marker。'
+else
+  echo 'Marker installed for this user. Choose Marker from Open With for Markdown files.'
+fi

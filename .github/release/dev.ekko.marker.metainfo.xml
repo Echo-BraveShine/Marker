@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>dev.ekko.marker</id>
+  <name>Marker</name>
+  <summary>Markdown editor</summary>
+  <summary xml:lang="zh-CN">Markdown 编辑器</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <description>
+    <p>Write Markdown with live preview, math and Mermaid support.</p>
+    <p xml:lang="zh-CN">在本地编辑和预览 Markdown、数学公式和 Mermaid 图表。</p>
+  </description>
+  <launchable type="desktop-id">dev.ekko.marker.desktop</launchable>
+  <icon type="stock">marker</icon>
+  <url type="homepage">https://github.com/Echo-BraveShine/Marker</url>
+</component>

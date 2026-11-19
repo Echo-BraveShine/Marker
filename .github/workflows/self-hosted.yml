@@ -34,11 +34,19 @@ jobs:
       FLUTTER_SUPPRESS_ANALYTICS: 'true'
       CMAKE_BUILD_PARALLEL_LEVEL: '1'
       INNO_SETUP_COMPILER: C:\MarkerValidation\InnoSetup6\ISCC.exe
+      DOTNET_INSTALL_DIR: C:\MarkerRunner\_tool\dotnet
+      MARKER_VERIFY_MSI_INSTALL: '0'
     steps:
       - uses: actions/checkout@v6
         with:
           ref: ${{ inputs.ref }}
           persist-credentials: false
+      - uses: nuget/setup-nuget@v3
+        with:
+          nuget-version: '6.14.0'
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '8.0.x'
       - name: Use preinstalled x64 Flutter and Python
         run: |
           'C:\MarkerValidation\flutter-x64\bin' | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
@@ -94,6 +102,12 @@ jobs:
         with:
           ref: ${{ inputs.ref }}
           persist-credentials: false
+      - name: Check preinstalled packaging dependencies
+        if: inputs.package
+        run: |
+          for tool in rpmbuild rpm patchelf xvfb-run xauth xdotool; do
+            command -v "$tool" || { echo "::error::Preinstall $tool in the VM as administrator"; exit 1; }
+          done
       - name: Use preinstalled Flutter
         run: echo '/opt/marker-ci/flutter/bin' >> "$GITHUB_PATH"
       - name: Verify SDK version and architecture

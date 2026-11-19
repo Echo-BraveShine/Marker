@@ -1,6 +1,13 @@
 $ErrorActionPreference = 'Stop'
 $toolsRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 $bundle = (Resolve-Path 'build/windows/x64/runner/Release').Path
+# A compiled runner alone is not a distributable Flutter application.
+foreach ($required in 'flutter_windows.dll', 'data/icudtl.dat', 'data/app.so', 'data/flutter_assets/AssetManifest.bin') {
+  $path = Join-Path $bundle $required
+  if (-not (Test-Path $path -PathType Leaf) -or (Get-Item $path).Length -eq 0) {
+    throw "Incomplete Flutter bundle: missing $required"
+  }
+}
 $exe = Get-Item "$bundle/marker.exe"
 $numeric = "$($exe.VersionInfo.ProductMajorPart).$($exe.VersionInfo.ProductMinorPart).$($exe.VersionInfo.ProductBuildPart).$($exe.VersionInfo.ProductPrivatePart)"
 if ($numeric -ne "$env:EXPECTED_VERSION.$env:EXPECTED_BUILD" -or
@@ -43,3 +50,5 @@ if ($installerNumeric -ne "$env:EXPECTED_VERSION.$env:EXPECTED_BUILD" -or
     $version.ProductVersion.TrimEnd() -ne "$env:EXPECTED_VERSION+$env:EXPECTED_BUILD") {
   throw "Unexpected installer version: $installerNumeric / $($version.ProductVersion)"
 }
+
+& (Join-Path $PSScriptRoot 'windows-msi.ps1') -BundleDir $bundle -InstallerDir (Join-Path $toolsRoot 'windows/installer') -InstallTest:($env:MARKER_VERIFY_MSI_INSTALL -eq '1')

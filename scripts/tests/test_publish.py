@@ -9,9 +9,14 @@ import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
-NAMES = ['Marker-macos-universal.zip', 'Marker-macos-universal.dmg',
-         'Marker-Windows-x64-Setup.exe', 'Marker-windows-x64.zip',
-         'Marker-linux-x64.tar.gz', 'Marker-linux-amd64.deb']
+NAMES = [
+    'Marker-macos.zip', 'Marker-macos-arm64.dmg', 'Marker-macos-x86_64.dmg',
+    'Marker-Windows-x64-Setup.exe', 'Marker-windows-x64.zip', 'Marker-Windows-x64.msi', 'Marker-Windows-x64-zh-CN.msi',
+    'Marker-linux-x64.tar.gz', 'Marker-linux-amd64.deb',
+    'Marker-linux-x86_64.AppImage', 'Marker-linux-x86_64.rpm',
+    'Marker-linux-arm64.tar.gz', 'Marker-linux-arm64.deb',
+    'Marker-linux-aarch64.AppImage', 'Marker-linux-aarch64.rpm',
+]
 
 FAKE_GH = r'''
 import json, os, pathlib, shutil, sys
@@ -84,7 +89,7 @@ class PublishTests(unittest.TestCase):
         self.state(exists=False)
         result = self.publish()
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(len(list(self.assets.iterdir())), 7)
+        self.assertEqual(len(list(self.assets.iterdir())), 16)
 
     def test_resumes_partial_draft_without_overwriting_original_package(self):
         self.state(draft=True)
@@ -93,7 +98,7 @@ class PublishTests(unittest.TestCase):
         result = self.publish()
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(original.read_bytes(), b'original published package')
-        self.assertEqual(len(list(self.assets.iterdir())), 7)
+        self.assertEqual(len(list(self.assets.iterdir())), 16)
         self.assertIn(hashlib.sha256(original.read_bytes()).hexdigest(),
                       (self.assets / 'SHA256SUMS.txt').read_text(encoding='utf-8'))
         self.assertFalse(json.loads((self.remote / 'state.json').read_text(encoding='utf-8'))['draft'])
@@ -107,6 +112,20 @@ class PublishTests(unittest.TestCase):
         result = self.publish()
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(before, {p.name: p.read_bytes() for p in self.assets.iterdir()})
+
+    def test_missing_architecture_blocks_release(self):
+        self.state(exists=False)
+        (self.dist / 'Marker-linux-aarch64.rpm').unlink()
+        result = self.publish()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(list(self.assets.iterdir()), [])
+
+    def test_stale_format_cannot_replace_a_required_package(self):
+        self.state(exists=False)
+        (self.dist / 'Marker-macos-x86_64.dmg').rename(self.dist / 'Marker-macos-universal.dmg')
+        result = self.publish()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(list(self.assets.iterdir()), [])
 
     def test_existing_checksum_contract_rejects_inconsistent_rebuild(self):
         self.state()

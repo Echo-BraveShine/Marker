@@ -1,0 +1,12 @@
+files = [defines['app']]
+symlinks = {'Applications': '/Applications'}
+background = defines['background']
+format = 'UDZO'
+window_rect = ((160, 160), (660, 452))
+icon_size = 96
+text_size = 14
+icon_locations = {'Marker.app': (180, 228), 'Applications': (480, 228), '.background.png': (1000, 1000)}
+show_status_bar = False
+show_tab_view = False
+show_toolbar = False
+show_pathbar = False
