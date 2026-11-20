@@ -8,6 +8,7 @@
 #include <propkey.h>
 #include <propvarutil.h>
 #include "resource.h"
+#include "resource_operations.h"
 
 #include "flutter/generated_plugin_registrant.h"
 
@@ -41,21 +42,47 @@ bool FlutterWindow::OnCreate() {
     if (call.method_name() != "setDark") { result->NotImplemented(); return; }
     const auto* dark = call.arguments() ? std::get_if<bool>(call.arguments()) : nullptr;
     if (!dark) { result->Error("invalid-arguments", "Expected dark appearance boolean"); return; }
-    const BOOL use_dark = *dark ? TRUE : FALSE;
-    // The plugin gates this on the OS theme; app appearance must be independent.
-    if (FAILED(DwmSetWindowAttribute(GetHandle(), 20, &use_dark, sizeof(use_dark)))) {
-      DwmSetWindowAttribute(GetHandle(), 19, &use_dark, sizeof(use_dark));
-    }
+    appearance_configured_ = true;
+    ApplyWindowAppearance(*dark);
     SetWindowPos(GetHandle(), nullptr, 0, 0, 0, 0,
         SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
     if (!ApplyAppearanceIcon(*dark)) { result->Error("missing-icon", "Appearance icon resource not found"); return; }
     result->Success();
   });
 
+  resource_channel_ = std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
+      flutter_controller_->engine()->messenger(), "marker/resources", &flutter::StandardMethodCodec::GetInstance());
+  resource_channel_->SetMethodCallHandler([this](const auto& call, auto result) {
+    if (call.method_name() != "trash" && call.method_name() != "reveal") { result->NotImplemented(); return; }
+    const auto* path = call.arguments() ? std::get_if<std::string>(call.arguments()) : nullptr;
+    if (!path) { result->Error("invalid-path", "Expected a file path"); return; }
+    const auto wide = ResourceWidePath(*path);
+    if (wide.empty()) { result->Error("invalid-path", "Invalid UTF-8 path"); return; }
+    const HRESULT status = call.method_name() == "trash" ? RecycleResource(wide, GetHandle()) : RevealResource(wide);
+    if (FAILED(status)) result->Error("resource-operation", "The file was kept because the requested operation failed");
+    else result->Success();
+  });
+
   // Dart configures the size/theme and reveals the window after its first frame.
   flutter_controller_->ForceRedraw();
 
   return true;
+}
+
+void FlutterWindow::ApplyWindowAppearance(bool dark) {
+  const BOOL use_dark = dark ? TRUE : FALSE;
+  // App appearance must be independent of the current OS theme.
+  if (FAILED(DwmSetWindowAttribute(GetHandle(), 20, &use_dark, sizeof(use_dark)))) {
+    DwmSetWindowAttribute(GetHandle(), 19, &use_dark, sizeof(use_dark));
+  }
+  // Match MarkerColors.bgToolbar/textPrimary instead of DWM's black caption.
+  // Windows 11 attributes; older Windows retains its supported dark frame.
+  const COLORREF caption = dark ? RGB(38, 38, 40) : RGB(246, 246, 247);
+  const COLORREF text = dark ? RGB(245, 245, 247) : RGB(37, 37, 39);
+  const COLORREF border = dark ? RGB(59, 59, 62) : RGB(222, 222, 226);
+  DwmSetWindowAttribute(GetHandle(), 35, &caption, sizeof(caption));
+  DwmSetWindowAttribute(GetHandle(), 36, &text, sizeof(text));
+  DwmSetWindowAttribute(GetHandle(), 34, &border, sizeof(border));
 }
 
 bool FlutterWindow::ApplyAppearanceIcon(bool dark) {
@@ -116,6 +143,7 @@ bool FlutterWindow::ApplyAppearanceIcon(bool dark) {
 void FlutterWindow::OnDestroy() {
   if (appearance_large_icon_) { DestroyIcon(appearance_large_icon_); appearance_large_icon_ = nullptr; }
   if (appearance_small_icon_) { DestroyIcon(appearance_small_icon_); appearance_small_icon_ = nullptr; }
+  resource_channel_.reset();
   appearance_channel_.reset();
   if (flutter_controller_) {
     flutter_controller_ = nullptr;
@@ -129,6 +157,12 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
                               WPARAM const wparam,
                               LPARAM const lparam) noexcept {
   if (message == WM_DPICHANGED) { ApplyAppearanceIcon(dark_icon_); }
+  if (message == WM_DWMCOLORIZATIONCOLORCHANGED && appearance_configured_) {
+    // The base window would reset this to the OS theme, even with an explicit
+    // app theme. Keep the last applied appearance and coordinated caption.
+    ApplyWindowAppearance(dark_icon_);
+    return 0;
+  }
   // Give Flutter, including plugins, an opportunity to handle window messages.
   if (flutter_controller_) {
     std::optional<LRESULT> result =

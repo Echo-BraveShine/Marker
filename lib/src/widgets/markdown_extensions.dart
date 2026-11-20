@@ -1,5 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'dart:io';
+import '../resources/resource_service.dart' show resolveResourceUri;
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_math_fork/flutter_math.dart';
@@ -8,9 +8,7 @@ import 'cjk_math.dart';
 import 'package:markdown/markdown.dart' as md;
 
 Uri resolveDocumentUri(String value, String? documentPath) {
-  final uri = Uri.parse(value);
-  if (uri.hasScheme || documentPath == null) return uri;
-  return File(documentPath).absolute.uri.resolveUri(uri);
+  return resolveResourceUri(value, documentPath, preserveDecorations: true);
 }
 
 class MathInlineSyntax extends md.InlineSyntax {

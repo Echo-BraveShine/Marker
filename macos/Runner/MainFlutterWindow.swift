@@ -7,6 +7,8 @@ class MainFlutterWindow: NSWindow {
   // 启动引擎，又避免在首帧渲染前向用户露出空白窗口。
   private var hasHiddenAtLaunch = false
   private var appearanceChannel: FlutterMethodChannel?
+  private var resourceChannel: FlutterMethodChannel?
+  private var resourceGrants: [URL] = []
   private var exportChannel: FlutterMethodChannel?
   private let documentExporter = DocumentExportRenderer()
 
@@ -64,8 +66,67 @@ class MainFlutterWindow: NSWindow {
       renderer.render(call.arguments, result: result)
     }
 
+    restoreResourceGrants()
+    let resources = FlutterMethodChannel(name: "marker/resources", binaryMessenger: flutterViewController.engine.binaryMessenger)
+    resourceChannel = resources
+    resources.setMethodCallHandler { [weak self] call, result in
+      let context = call.arguments as? [String: Any]
+      guard let self = self, let path = (call.arguments as? String) ?? (context?["path"] as? String) else {
+        result(FlutterError(code: "invalid-path", message: "Expected a file path", details: nil)); return
+      }
+      let url = URL(fileURLWithPath: path)
+      switch call.method {
+      case "authorizeDirectory", "authorizeDirectoryWithContext":
+        let panel = NSOpenPanel()
+        panel.title = context?["title"] as? String ?? "Allow folder access"
+        panel.prompt = context?["prompt"] as? String ?? "Allow folder access"
+        panel.message = context?["message"] as? String ?? "Select this folder to let Marker read images and create document assets. Cancel to stop this operation.\n\(path)"
+        panel.canCreateDirectories = false
+        panel.canChooseDirectories = true; panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false; panel.directoryURL = url
+        panel.beginSheetModal(for: self) { response in
+          guard response == .OK, let selected = panel.url else { result(nil); return }
+          do {
+            _ = selected.startAccessingSecurityScopedResource()
+            self.resourceGrants.append(selected)
+            let bookmark = try selected.bookmarkData(options: .withSecurityScope, includingResourceValuesForKeys: nil, relativeTo: nil)
+            var records = UserDefaults.standard.dictionary(forKey: "marker.resourceGrants") as? [String: Data] ?? [:]
+            records[selected.path] = bookmark
+            UserDefaults.standard.set(records, forKey: "marker.resourceGrants")
+            result(selected.path)
+          } catch { result(FlutterError(code: "directory-access", message: error.localizedDescription, details: nil)) }
+        }
+      case "reveal":
+        NSWorkspace.shared.activateFileViewerSelecting([url]); result(nil)
+      case "trash":
+        DispatchQueue.global(qos: .userInitiated).async {
+          do {
+            try FileManager.default.trashItem(at: url, resultingItemURL: nil)
+            DispatchQueue.main.async { result(nil) }
+          } catch { DispatchQueue.main.async { result(FlutterError(code: "trash-unavailable", message: error.localizedDescription, details: nil)) } }
+        }
+      default: result(FlutterMethodNotImplemented)
+      }
+    }
+
     super.awakeFromNib()
   }
+  private func restoreResourceGrants() {
+    let records = UserDefaults.standard.dictionary(forKey: "marker.resourceGrants") as? [String: Data] ?? [:]
+    for (_, data) in records {
+      var stale = false
+      if let url = try? URL(resolvingBookmarkData: data, options: .withSecurityScope, relativeTo: nil, bookmarkDataIsStale: &stale),
+          url.startAccessingSecurityScopedResource() {
+        resourceGrants.append(url)
+        if stale, let renewed = try? url.bookmarkData(options: .withSecurityScope, includingResourceValuesForKeys: nil, relativeTo: nil) {
+          var updated = UserDefaults.standard.dictionary(forKey: "marker.resourceGrants") as? [String: Data] ?? [:]
+          updated[url.path] = renewed
+          UserDefaults.standard.set(updated, forKey: "marker.resourceGrants")
+        }
+      }
+    }
+  }
+
 }
 
 

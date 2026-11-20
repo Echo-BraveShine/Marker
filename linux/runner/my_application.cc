@@ -78,6 +78,35 @@ static void appearance_method_call(FlMethodChannel*, FlMethodCall* call,
   fl_method_call_respond(call, response, nullptr);
 }
 
+static void resource_method_call(FlMethodChannel*, FlMethodCall* call, gpointer user_data) {
+  const gchar* method = fl_method_call_get_name(call);
+  if (g_strcmp0(method, "trash") != 0 && g_strcmp0(method, "reveal") != 0) {
+    fl_method_call_respond_not_implemented(call, nullptr); return;
+  }
+  FlValue* arg = fl_method_call_get_args(call);
+  if (!arg || fl_value_get_type(arg) != FL_VALUE_TYPE_STRING) {
+    fl_method_call_respond_error(call, "invalid-path", "Expected a file path", nullptr, nullptr); return;
+  }
+  g_autoptr(GFile) file = g_file_new_for_path(fl_value_get_string(arg));
+  if (g_strcmp0(method, "trash") == 0) {
+    g_object_ref(call);
+    g_file_trash_async(file, G_PRIORITY_DEFAULT, nullptr, [](GObject* source, GAsyncResult* result, gpointer data) {
+      auto* pending = FL_METHOD_CALL(data);
+      g_autoptr(GError) error = nullptr;
+      if (g_file_trash_finish(G_FILE(source), result, &error)) fl_method_call_respond_success(pending, nullptr, nullptr);
+      else fl_method_call_respond_error(pending, "trash-unavailable", error ? error->message : "Trash is unavailable; file kept", nullptr, nullptr);
+      g_object_unref(pending);
+    }, call);
+  } else {
+    g_autoptr(GFile) parent = g_file_get_parent(file);
+    g_autofree gchar* uri = parent ? g_file_get_uri(parent) : nullptr;
+    g_autoptr(GError) error = nullptr;
+    if (uri && gtk_show_uri_on_window(GTK_WINDOW(user_data), uri, GDK_CURRENT_TIME, &error)) {
+      fl_method_call_respond_success(call, nullptr, nullptr);
+    } else { fl_method_call_respond_error(call, "reveal-failed", error ? error->message : "Cannot show folder", nullptr, nullptr); }
+  }
+}
+
 static void mermaid_method_call(FlMethodChannel*, FlMethodCall* call, gpointer) {
   if (g_strcmp0(fl_method_call_get_name(call), "render") != 0) {
     fl_method_call_respond_not_implemented(call, nullptr);
@@ -196,6 +225,11 @@ static void my_application_activate(GApplication* application) {
       fl_engine_get_binary_messenger(fl_view_get_engine(view)), "marker/appearance", FL_METHOD_CODEC(codec));
   fl_method_channel_set_method_call_handler(channel, appearance_method_call, window, nullptr);
   g_object_set_data_full(G_OBJECT(window), "marker-appearance-channel", g_object_ref(channel), g_object_unref);
+
+  g_autoptr(FlMethodChannel) resources = fl_method_channel_new(
+      fl_engine_get_binary_messenger(fl_view_get_engine(view)), "marker/resources", FL_METHOD_CODEC(codec));
+  fl_method_channel_set_method_call_handler(resources, resource_method_call, window, nullptr);
+  g_object_set_data_full(G_OBJECT(window), "marker-resource-channel", g_object_ref(resources), g_object_unref);
 
   g_autoptr(FlMethodChannel) mermaid = fl_method_channel_new(
       fl_engine_get_binary_messenger(fl_view_get_engine(view)), "marker/mermaid", FL_METHOD_CODEC(codec));

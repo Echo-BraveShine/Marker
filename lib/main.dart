@@ -1,3 +1,10 @@
+import 'package:desktop_drop/desktop_drop.dart';
+import 'package:pasteboard/pasteboard.dart';
+import 'package:path/path.dart' as p;
+import 'src/resources/resource_service.dart';
+import 'src/resources/resource_references.dart';
+import 'src/resources/resource_provider.dart';
+import 'src/resources/resource_sidebar.dart';
 import 'src/widgets/shortcut_settings.dart';
 import 'src/export/document_exporter.dart';
 import 'src/export/export_options_panel.dart';
@@ -11,7 +18,6 @@ import 'src/widgets/markdown_highlighter.dart';
 import 'src/theme/marker_style.dart';
 import 'src/theme/marker_fonts.dart';
 import 'package:flutter/cupertino.dart';
-import 'dart:convert';
 import 'src/widgets/desktop_startup.dart';
 import 'src/providers/external_files.dart';
 import 'src/widgets/marker_floating_surface.dart';
@@ -46,6 +52,8 @@ import 'src/providers/theme_provider.dart';
 import 'src/providers/editor_provider.dart';
 import 'src/l10n/app_localizations.dart';
 import 'src/widgets/marker_markdown_style.dart';
+
+part 'src/resources/resource_actions.dart';
 
 bool desktopWindow = false;
 
@@ -319,7 +327,7 @@ class _MarkerHomeState extends ConsumerState<MarkerHome> with WindowListener {
             ),
             top: position.dy.clamp(
               8,
-              (size.height - 108).clamp(8, double.infinity),
+              (size.height - 158).clamp(8, double.infinity),
             ),
             child: MarkerFloatingSurface(
               width: 216,
@@ -343,9 +351,11 @@ class _MarkerHomeState extends ConsumerState<MarkerHome> with WindowListener {
                         CupertinoIcons.xmark,
                       ),
                       if (document.path != null)
+                        ('rename', t('重命名…', 'Rename…'), CupertinoIcons.pencil),
+                      if (document.path != null)
                         (
                           'delete',
-                          t('删除磁盘文件…', 'Delete disk file…'),
+                          t('移到废纸篓…', 'Move to Trash…'),
                           CupertinoIcons.trash,
                         ),
                     ])
@@ -406,9 +416,14 @@ class _MarkerHomeState extends ConsumerState<MarkerHome> with WindowListener {
       ),
     );
     if (!mounted || action == null) return;
-    await _action(
-      () => _closeDocument(document.id, delete: action == 'delete'),
-    );
+    await _action(() async {
+      if (action == 'rename') {
+        await _selectDocument(document.id);
+        await _renameResourceDocument();
+      } else {
+        await _closeDocument(document.id, delete: action == 'delete');
+      }
+    });
   }
 
   Future<void> _closeDocument(String id, {bool delete = false}) async {
@@ -420,21 +435,21 @@ class _MarkerHomeState extends ConsumerState<MarkerHome> with WindowListener {
       final confirmed = await showMarkerDialog<bool>(
         context: context,
         builder: (context) => MarkerDialog(
-          title: Text(t('永久删除文件？', 'Permanently delete file?')),
+          title: Text(t('将文档移到废纸篓？', 'Move document to Trash?')),
           content: Text(
-            '${document.path}\n\n${t('磁盘文件及未保存内容都将删除，无法撤销。', 'The disk file and unsaved changes will be deleted. This cannot be undone.')}',
+            '${document.path}\n\n${t('文档文件将移到废纸篓，关联图片会保留。未保存的编辑内容将关闭。', 'The document moves to Trash; associated images are kept. Unsaved edits will be closed.')}',
           ),
           actions: [
             MarkerDialogButton(
               isDestructiveAction: true,
               onPressed: () => Navigator.pop(context, true),
-              child: Text(t('删除', 'Delete')),
+              child: Text(t('移到废纸篓', 'Move to Trash')),
             ),
           ],
         ),
       );
       if (confirmed != true) return;
-      await File(document.path!).delete();
+      await ref.read(resourcePlatformProvider).trash(document.path!);
     } else if (!await _confirm()) {
       return;
     }
@@ -542,20 +557,24 @@ class _MarkerHomeState extends ConsumerState<MarkerHome> with WindowListener {
   }
 
   Future<bool> _save({bool as = false}) async {
-    final text = _controller.text;
+    var text = _controller.text;
     try {
-      var path = _path;
+      final sourcePath = _path;
+      var path = sourcePath;
       if (as || path == null) {
         final target = await getSaveLocation(suggestedName: _name);
         if (target == null) return false;
         path = target.path;
       }
+      final targetPath = path;
       final duplicate = ref
           .read(workspaceProvider)
           .documents
           .where(
             (d) =>
-                d.path == path && d.id != ref.read(workspaceProvider).activeId,
+                d.path != null &&
+                p.equals(d.path!, targetPath) &&
+                d.id != ref.read(workspaceProvider).activeId,
           )
           .firstOrNull;
       if (duplicate != null) {
@@ -567,20 +586,84 @@ class _MarkerHomeState extends ConsumerState<MarkerHome> with WindowListener {
         );
         return false;
       }
-      await XFile.fromData(
-        Uint8List.fromList(const Utf8Codec().encode(text)),
-        mimeType: 'text/markdown',
-      ).saveTo(path);
-      if (!mounted) return true;
-      if (_workspace.active == null) {
-        _workspace.add(text: text, saved: text, path: path);
+      final copying = sourcePath != null && !p.equals(sourcePath, targetPath);
+      final references = copying
+          ? await parseResourceReferencesAsync(text)
+          : null;
+      if (copying &&
+          (references!.images.isNotEmpty ||
+              references.unsupported.isNotEmpty)) {
+        final inventory = await _resources.scan(text, sourcePath);
+        if (!mounted || !await _confirmResourceIssues(inventory)) return false;
+        var download = false;
+        if (inventory.items.any(
+          (i) => i.availability == ResourceAvailability.remote,
+        )) {
+          final decision = await _resourceCollectionChoice(
+            t('另存文档与图片', 'Save document and images as'),
+            inventory,
+            standalone: true,
+          );
+          if (decision == null) return false;
+          download = decision;
+        }
+        final result = await _retryIncomplete(
+          (allow) => _resourceWork.run(
+            t('保存文档副本', 'Saving document copy'),
+            (token, progress) => _withResourceAccess(
+              () => _resources.saveCopy(
+                text: text,
+                sourcePath: sourcePath,
+                targetPath: targetPath,
+                downloadRemote: download,
+                allowIncomplete: allow,
+                cancellation: token,
+                onProgress: progress,
+              ),
+              directory: p.dirname(targetPath),
+            ),
+          ),
+          allowIncomplete:
+              inventory.unresolved.isNotEmpty ||
+              inventory.unsupported.isNotEmpty,
+        );
+
+        text = result.text;
+        if (result.issues.isNotEmpty && mounted) {
+          await _showResourceIssues(
+            result.issues.map(_resourceIssueText).toList(),
+          );
+        }
+      } else {
+        await _withResourceAccess(
+          () => _resources.atomicWrite(File(targetPath), text),
+          directory: p.dirname(targetPath),
+        );
       }
-      _update(() {
-        _path = path;
+      if (!mounted) return true;
+      if (copying) {
+        _snapshot();
+        _workspace.add(text: text, saved: text, path: targetPath);
+        _loadActive();
+      } else {
+        if (_workspace.active == null) {
+          _workspace.add(text: text, saved: text, path: targetPath);
+        }
+        _path = targetPath;
         _saved = text;
-      });
+      }
       await _persist();
       return true;
+    } on ResourceCancelled {
+      if (mounted) {
+        _toast(
+          t(
+            '已取消保存，文档内容已保留。',
+            'Save cancelled. Your document content is preserved.',
+          ),
+        );
+      }
+      return false;
     } catch (e) {
       _error(e);
       return false;
@@ -614,6 +697,7 @@ class _MarkerHomeState extends ConsumerState<MarkerHome> with WindowListener {
                 fontFamilyFallback: MarkerFonts.fallback,
                 fontSize: 13,
                 color: colors.bgEditor,
+                decoration: TextDecoration.none,
               ),
             ),
           ),
@@ -631,7 +715,11 @@ class _MarkerHomeState extends ConsumerState<MarkerHome> with WindowListener {
 
   void _error(Object e) {
     if (mounted) {
-      _toast(t('文件操作失败：$e', 'File operation failed: $e'));
+      _toast(
+        e is ResourceFailure
+            ? t(e.zh, e.en)
+            : t('文件操作失败：$e', 'File operation failed: $e'),
+      );
     }
   }
 
@@ -702,6 +790,8 @@ class _MarkerHomeState extends ConsumerState<MarkerHome> with WindowListener {
     _update(() => _busy = true);
     try {
       await action();
+    } on ResourceCancelled {
+      if (mounted) _toast(t('已停止后续资源处理', 'Remaining work stopped'));
     } catch (e) {
       _error(e);
     } finally {
@@ -766,6 +856,18 @@ class _MarkerHomeState extends ConsumerState<MarkerHome> with WindowListener {
     if (existing != null) {
       await _selectDocument(existing.id);
       _toast(t('此文件已打开', 'This file is already open'));
+      return;
+    }
+    if (await File(location.path).exists()) {
+      await _openPath(location.path);
+      if (mounted) {
+        _toast(
+          t(
+            '已打开现有文件，未覆盖原内容。',
+            'Opened the existing file without overwriting it.',
+          ),
+        );
+      }
       return;
     }
     // Keep the current document intact until creating the selected file succeeds.
@@ -970,6 +1072,8 @@ class _MarkerHomeState extends ConsumerState<MarkerHome> with WindowListener {
       _chooseTemplate(math: false);
     } else if (command.label == '行内公式' || command.label == '块公式') {
       _chooseTemplate(math: true);
+    } else if (command.label == '图片') {
+      _importPictures();
     } else if (command.label == '文字颜色') {
       _chooseTextColor();
     } else {
@@ -1468,6 +1572,7 @@ class _MarkerHomeState extends ConsumerState<MarkerHome> with WindowListener {
   Widget build(BuildContext context) {
     final editorState = ref.watch(editorProvider);
     final workspace = ref.watch(workspaceProvider);
+    final resourceState = ref.watch(resourceUiProvider);
     final exporting = ref.watch(exportControllerProvider).isLoading;
     final c = Theme.of(context).extension<MarkerColors>()!;
     final offset = _controller.selection.isValid
@@ -1526,7 +1631,7 @@ class _MarkerHomeState extends ConsumerState<MarkerHome> with WindowListener {
       height: 1.6,
       color: c.textPrimary,
     );
-    final editor = LinkedScrollRegion(
+    final rawEditor = LinkedScrollRegion(
       link: _linkedScroll,
       controller: _editorScroll,
       child: KeyedSubtree(
@@ -1563,7 +1668,7 @@ class _MarkerHomeState extends ConsumerState<MarkerHome> with WindowListener {
                       controller: _controller,
                       undoController: _undo,
                       focusNode: _focus,
-                      readOnly: _restoring,
+                      readOnly: _restoring || resourceState.busy,
                       maxLines: null,
                       expands: true,
                       textAlignVertical: TextAlignVertical.top,
@@ -1585,6 +1690,17 @@ class _MarkerHomeState extends ConsumerState<MarkerHome> with WindowListener {
           ),
         ),
       ),
+    );
+    final editor = Actions(
+      actions: <Type, Action<Intent>>{
+        PasteTextIntent: CallbackAction<PasteTextIntent>(
+          onInvoke: (_) {
+            _pasteResourceOrText();
+            return null;
+          },
+        ),
+      },
+      child: rawEditor,
     );
     final previewSignature = (
       _controller.text,
@@ -1657,19 +1773,44 @@ class _MarkerHomeState extends ConsumerState<MarkerHome> with WindowListener {
                 sizedImageBuilder: (config) {
                   final uri = config.uri;
                   final alt = config.alt;
-                  final resolved = resolveDocumentUri(uri.toString(), _path);
+                  final resolved = resolveResourceUri(uri.toString(), _path);
                   Widget failure(
                     BuildContext context,
                     Object error,
                     StackTrace? stack,
-                  ) => Text(
-                    '${alt ?? ''} · ${t('图片无法加载', 'Image unavailable')}',
-                    style: TextStyle(color: c.textSecondary),
-                  );
+                  ) {
+                    String reason;
+                    if (resolved.scheme != 'file') {
+                      reason = t('网络图片加载失败', 'Web image could not be loaded');
+                    } else if (error is FileSystemException &&
+                        [
+                          1,
+                          13,
+                          if (Platform.isWindows) 5,
+                        ].contains(error.osError?.errorCode)) {
+                      reason = t(
+                        '无法访问图片，请授权目录',
+                        'Cannot access image; allow folder access',
+                      );
+                    } else if (error is FileSystemException &&
+                        [2, 3].contains(error.osError?.errorCode)) {
+                      reason = t('图片未找到', 'Image not found');
+                    } else {
+                      reason = t(
+                        '无法解析图片，请检查格式或文件是否损坏',
+                        'Cannot decode image; check its format or integrity',
+                      );
+                    }
+                    return Text(
+                      '${alt ?? ''} · $reason',
+                      style: TextStyle(color: c.textSecondary),
+                    );
+                  }
+
                   if (resolved.scheme == 'file') {
                     return Image.file(
                       File.fromUri(resolved),
-                      key: ValueKey((resolved.toString(), _imageEpoch)),
+                      key: ValueKey((resolved.toString(), _imageEpoch, config)),
                       width: config.width,
                       height: config.height,
                       errorBuilder: (context, error, stack) => Column(
@@ -1677,17 +1818,19 @@ class _MarkerHomeState extends ConsumerState<MarkerHome> with WindowListener {
                         children: [
                           failure(context, error, stack),
                           CupertinoButton(
+                            minimumSize: const Size(0, 28),
+                            onPressed: () => _action(
+                              () => _relocateResource(uri.toString()),
+                            ),
+                            child: Text(t('重新定位图片', 'Locate image')),
+                          ),
+                          CupertinoButton(
                             onPressed: () => _action(() async {
-                              final directory = await getDirectoryPath(
-                                confirmButtonText: t(
-                                  '允许访问图片目录',
-                                  'Allow image folder',
-                                ),
+                              await _authorizeResourceFolder(
+                                p.dirname(File.fromUri(resolved).path),
                               );
-                              if (directory != null) {
-                                await FileImage(File.fromUri(resolved)).evict();
-                                _imageEpoch++;
-                              }
+                              await FileImage(File.fromUri(resolved)).evict();
+                              _imageEpoch++;
                             }),
                             child: Text(
                               t('授权图片所在目录并重试', 'Allow image folder and retry'),
@@ -1700,7 +1843,23 @@ class _MarkerHomeState extends ConsumerState<MarkerHome> with WindowListener {
                   if (['http', 'https'].contains(resolved.scheme)) {
                     return Image.network(
                       resolved.toString(),
-                      errorBuilder: failure,
+                      key: ValueKey((resolved.toString(), _imageEpoch, config)),
+                      errorBuilder: (context, error, stack) => Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          failure(context, error, stack),
+                          CupertinoButton(
+                            minimumSize: const Size(0, 28),
+                            onPressed: () async {
+                              await NetworkImage(resolved.toString()).evict();
+                              _imageEpoch++;
+                              _previewSignature = null;
+                              _resourceWork.refresh();
+                            },
+                            child: Text(t('重新加载图片', 'Reload image')),
+                          ),
+                        ],
+                      ),
                     );
                   }
                   return Text(
@@ -1738,588 +1897,673 @@ class _MarkerHomeState extends ConsumerState<MarkerHome> with WindowListener {
       bindings: _shortcutBindings(),
       child: Focus(
         autofocus: true,
-        child: Scaffold(
-          backgroundColor: c.bgWindow,
-          body: Column(
-            children: [
-              if (desktopWindow &&
-                  defaultTargetPlatform == TargetPlatform.macOS)
-                SizedBox(
-                  height: 36,
-                  child: DragToMoveArea(
-                    child: Center(
-                      child: Text(
-                        '$_name${_dirty ? ' •' : ''}',
-                        style: TextStyle(fontSize: 12, color: c.textSecondary),
+        child: _resourceDropZone(
+          Scaffold(
+            backgroundColor: c.bgWindow,
+            body: Column(
+              children: [
+                if (desktopWindow &&
+                    defaultTargetPlatform == TargetPlatform.macOS)
+                  SizedBox(
+                    height: 36,
+                    child: DragToMoveArea(
+                      child: Center(
+                        child: Text(
+                          '$_name${_dirty ? ' •' : ''}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: c.textSecondary,
+                          ),
+                        ),
                       ),
                     ),
                   ),
-                ),
-              Expanded(
-                child: Row(
-                  children: [
-                    Container(
-                      key: const Key('document-sidebar'),
-                      width: _sidebar
-                          ? ref.watch(themeProvider).sidebarWidth
-                          : 56,
-                      clipBehavior: Clip.hardEdge,
-                      decoration: BoxDecoration(color: c.bgSidebar),
-                      child: LayoutBuilder(
-                        builder: (context, constraints) {
-                          final expanded = constraints.maxWidth >= 170;
-                          return Column(
-                            children: [
-                              SizedBox(
-                                height: 44,
-                                child: Row(
-                                  children: [
-                                    button(
-                                      CupertinoIcons.sidebar_left,
-                                      t('切换侧栏', 'Toggle sidebar'),
-                                      () => _update(() => _sidebar = !_sidebar),
-                                    ),
-                                    if (expanded)
-                                      Text(
-                                        t('文件', 'Files'),
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: c.textSecondary,
-                                        ),
+                Expanded(
+                  child: Row(
+                    children: [
+                      Container(
+                        key: const Key('document-sidebar'),
+                        width: _sidebar
+                            ? ref.watch(themeProvider).sidebarWidth
+                            : 56,
+                        clipBehavior: Clip.hardEdge,
+                        decoration: BoxDecoration(color: c.bgSidebar),
+                        child: LayoutBuilder(
+                          builder: (context, constraints) {
+                            final expanded = constraints.maxWidth >= 170;
+                            return Column(
+                              children: [
+                                SizedBox(
+                                  height: 44,
+                                  child: Row(
+                                    children: [
+                                      button(
+                                        CupertinoIcons.sidebar_left,
+                                        t('切换侧栏', 'Toggle sidebar'),
+                                        () =>
+                                            _update(() => _sidebar = !_sidebar),
                                       ),
-                                  ],
-                                ),
-                              ),
-                              Expanded(
-                                child: ListView.builder(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                  ),
-                                  itemCount: workspace.documents.length,
-                                  itemBuilder: (context, index) {
-                                    final document = workspace.documents[index];
-                                    return GestureDetector(
-                                      onSecondaryTapUp: _busy
-                                          ? null
-                                          : (details) => _documentMenu(
-                                              document,
-                                              details.globalPosition,
-                                            ),
-                                      child: Padding(
-                                        padding: const EdgeInsets.only(
-                                          bottom: 4,
-                                        ),
-                                        child: Container(
-                                          height: 32,
-                                          decoration: BoxDecoration(
-                                            color:
-                                                document.id ==
-                                                    workspace.activeId
-                                                ? c.bgSelected
-                                                : null,
-                                            borderRadius: BorderRadius.circular(
-                                              7,
+                                      if (expanded)
+                                        Expanded(
+                                          child: Text(
+                                            resourceState.showResources
+                                                ? t('资源', 'Resources')
+                                                : t('文件', 'Files'),
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: c.textSecondary,
                                             ),
                                           ),
-                                          child: Tooltip(
-                                            message:
-                                                document.path ?? document.name,
-                                            child: CupertinoButton(
-                                              key: ValueKey(
-                                                'document-${document.id}',
-                                              ),
-                                              minimumSize: Size.zero,
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 8,
-                                                  ),
-                                              onPressed: _busy
+                                        ),
+
+                                      if (expanded)
+                                        button(
+                                          resourceState.showResources
+                                              ? CupertinoIcons.doc_text
+                                              : CupertinoIcons
+                                                    .photo_on_rectangle,
+                                          resourceState.showResources
+                                              ? t('文档列表', 'Documents')
+                                              : t('文档资源', 'Document resources'),
+                                          _resourceWork.toggle,
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                                Expanded(
+                                  child: resourceState.showResources && expanded
+                                      ? ResourceSidebar(
+                                          text: _controller.text,
+                                          path: _path,
+                                          zh: _zh,
+                                          onImport: () => _importPictures(),
+                                          onMenu: _resourceMenu,
+                                          onItem: _resourceItemMenu,
+                                        )
+                                      : ListView.builder(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                          ),
+                                          itemCount: workspace.documents.length,
+                                          itemBuilder: (context, index) {
+                                            final document =
+                                                workspace.documents[index];
+                                            return GestureDetector(
+                                              onSecondaryTapUp: _busy
                                                   ? null
-                                                  : () => _action(
-                                                      () => _selectDocument(
-                                                        document.id,
-                                                      ),
+                                                  : (details) => _documentMenu(
+                                                      document,
+                                                      details.globalPosition,
                                                     ),
-                                              child: Row(
-                                                children: [
-                                                  Icon(
-                                                    CupertinoIcons.doc_text,
-                                                    size: 16,
+                                              child: Padding(
+                                                padding: const EdgeInsets.only(
+                                                  bottom: 4,
+                                                ),
+                                                child: Container(
+                                                  height: 32,
+                                                  decoration: BoxDecoration(
                                                     color:
                                                         document.id ==
                                                             workspace.activeId
-                                                        ? c.textAccent
-                                                        : c.textSecondary,
-                                                  ),
-                                                  if (expanded) ...[
-                                                    const SizedBox(width: 8),
-                                                    Expanded(
-                                                      child: Text(
-                                                        '${document.name}${document.dirty ? ' •' : ''}',
-                                                        overflow: TextOverflow
-                                                            .ellipsis,
-                                                        style: TextStyle(
-                                                          fontSize: 12,
-                                                          color: c.textPrimary,
+                                                        ? c.bgSelected
+                                                        : null,
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          7,
                                                         ),
+                                                  ),
+                                                  child: Tooltip(
+                                                    message:
+                                                        document.path ??
+                                                        document.name,
+                                                    child: CupertinoButton(
+                                                      key: ValueKey(
+                                                        'document-${document.id}',
+                                                      ),
+                                                      minimumSize: Size.zero,
+                                                      padding:
+                                                          const EdgeInsets.symmetric(
+                                                            horizontal: 8,
+                                                          ),
+                                                      onPressed: _busy
+                                                          ? null
+                                                          : () => _action(
+                                                              () =>
+                                                                  _selectDocument(
+                                                                    document.id,
+                                                                  ),
+                                                            ),
+                                                      child: Row(
+                                                        children: [
+                                                          Icon(
+                                                            CupertinoIcons
+                                                                .doc_text,
+                                                            size: 16,
+                                                            color:
+                                                                document.id ==
+                                                                    workspace
+                                                                        .activeId
+                                                                ? c.textAccent
+                                                                : c.textSecondary,
+                                                          ),
+                                                          if (expanded) ...[
+                                                            const SizedBox(
+                                                              width: 8,
+                                                            ),
+                                                            Expanded(
+                                                              child: Text(
+                                                                '${document.name}${document.dirty ? ' •' : ''}',
+                                                                overflow:
+                                                                    TextOverflow
+                                                                        .ellipsis,
+                                                                style: TextStyle(
+                                                                  fontSize: 12,
+                                                                  color: c
+                                                                      .textPrimary,
+                                                                ),
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ],
                                                       ),
                                                     ),
-                                                  ],
-                                                ],
+                                                  ),
+                                                ),
                                               ),
-                                            ),
+                                            );
+                                          },
+                                        ),
+                                ),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 12,
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      button(
+                                        CupertinoIcons.gear,
+                                        t('设置', 'Settings'),
+                                        _settings,
+                                      ),
+                                      if (expanded)
+                                        Text(
+                                          t('设置', 'Settings'),
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: c.textSecondary,
                                           ),
                                         ),
-                                      ),
-                                    );
-                                  },
+                                    ],
+                                  ),
                                 ),
-                              ),
-                              Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 12,
-                                ),
-                                child: Row(
-                                  children: [
-                                    button(
-                                      CupertinoIcons.gear,
-                                      t('设置', 'Settings'),
-                                      _settings,
-                                    ),
-                                    if (expanded)
-                                      Text(
-                                        t('设置', 'Settings'),
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: c.textSecondary,
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          );
-                        },
+                              ],
+                            );
+                          },
+                        ),
                       ),
-                    ),
-                    if (_sidebar)
-                      MouseRegion(
-                        cursor: SystemMouseCursors.resizeColumn,
-                        child: GestureDetector(
-                          key: const Key('sidebar-resize'),
-                          behavior: HitTestBehavior.opaque,
-                          onHorizontalDragUpdate: (details) => ref
-                              .read(themeProvider.notifier)
-                              .setSidebarWidth(
-                                ref.read(themeProvider).sidebarWidth +
-                                    details.delta.dx,
-                              ),
-                          onHorizontalDragEnd: (_) => ref
-                              .read(themeProvider.notifier)
-                              .persistSidebarWidth(),
-                          child: SizedBox(
-                            width: 5,
-                            child: Center(
-                              child: Container(
-                                width: 1,
-                                color: c.separatorSoft,
+                      if (_sidebar)
+                        MouseRegion(
+                          cursor: SystemMouseCursors.resizeColumn,
+                          child: GestureDetector(
+                            key: const Key('sidebar-resize'),
+                            behavior: HitTestBehavior.opaque,
+                            onHorizontalDragUpdate: (details) => ref
+                                .read(themeProvider.notifier)
+                                .setSidebarWidth(
+                                  ref.read(themeProvider).sidebarWidth +
+                                      details.delta.dx,
+                                ),
+                            onHorizontalDragEnd: (_) => ref
+                                .read(themeProvider.notifier)
+                                .persistSidebarWidth(),
+                            child: SizedBox(
+                              width: 5,
+                              child: Center(
+                                child: Container(
+                                  width: 1,
+                                  color: c.separatorSoft,
+                                ),
                               ),
                             ),
                           ),
                         ),
-                      ),
-                    Expanded(
-                      child: Column(
-                        children: [
-                          Container(
-                            height: 44,
-                            color: c.bgToolbar,
-                            child: Row(
-                              children: [
-                                button(
-                                  CupertinoIcons.doc_append,
-                                  t('新建', 'New'),
-                                  () => _action(_newFile),
-                                ),
-                                button(
-                                  CupertinoIcons.folder,
-                                  t('打开', 'Open'),
-                                  () => _action(_open),
-                                ),
-                                button(
-                                  CupertinoIcons.square_arrow_down,
-                                  t('保存', 'Save'),
-                                  () => _action(() async {
-                                    await _save();
-                                  }),
-                                ),
-                                button(
-                                  CupertinoIcons.square_arrow_down_on_square,
-                                  t('另存为', 'Save as'),
-                                  () => _action(() async {
-                                    await _save(as: true);
-                                  }),
-                                ),
-                                if (documentExportEnabled)
+                      Expanded(
+                        child: Column(
+                          children: [
+                            Container(
+                              height: 44,
+                              color: c.bgToolbar,
+                              child: Row(
+                                children: [
                                   button(
-                                    CupertinoIcons.square_arrow_up,
-                                    t('导出', 'Export'),
-                                    _exportDocument,
+                                    CupertinoIcons.doc_append,
+                                    t('新建', 'New'),
+                                    () => _action(_newFile),
                                   ),
-                                button(
-                                  CupertinoIcons.arrow_uturn_left,
-                                  t('撤销', 'Undo'),
-                                  _undo.undo,
-                                ),
-                                button(
-                                  CupertinoIcons.arrow_uturn_right,
-                                  t('重做', 'Redo'),
-                                  _undo.redo,
-                                ),
-                                button(
-                                  CupertinoIcons.search,
-                                  t('搜索替换', 'Find and replace'),
-                                  () => _openSearch(replace: true),
-                                ),
-                                Container(
-                                  width: 1,
-                                  height: 16,
-                                  margin: const EdgeInsets.symmetric(
-                                    horizontal: 5,
+                                  button(
+                                    CupertinoIcons.folder,
+                                    t('打开', 'Open'),
+                                    () => _action(_open),
                                   ),
-                                  color: c.separatorSoft,
-                                ),
-                                Expanded(
-                                  child: LayoutBuilder(
-                                    builder: (context, constraints) {
-                                      final controls = <Widget>[
-                                        for (final label in ['H1', 'H2', 'H3'])
-                                          syntaxControl(
-                                            Text(
+                                  button(
+                                    CupertinoIcons.square_arrow_down,
+                                    t('保存', 'Save'),
+                                    () => _action(() async {
+                                      await _save();
+                                    }),
+                                  ),
+                                  button(
+                                    CupertinoIcons.square_arrow_down_on_square,
+                                    t('另存为', 'Save as'),
+                                    () => _action(() async {
+                                      await _save(as: true);
+                                    }),
+                                  ),
+                                  if (documentExportEnabled)
+                                    button(
+                                      CupertinoIcons.square_arrow_up,
+                                      t('导出', 'Export'),
+                                      _exportDocument,
+                                    ),
+                                  button(
+                                    CupertinoIcons.arrow_uturn_left,
+                                    t('撤销', 'Undo'),
+                                    _undo.undo,
+                                  ),
+                                  button(
+                                    CupertinoIcons.arrow_uturn_right,
+                                    t('重做', 'Redo'),
+                                    _undo.redo,
+                                  ),
+                                  button(
+                                    CupertinoIcons.search,
+                                    t('搜索替换', 'Find and replace'),
+                                    () => _openSearch(replace: true),
+                                  ),
+                                  Container(
+                                    width: 1,
+                                    height: 16,
+                                    margin: const EdgeInsets.symmetric(
+                                      horizontal: 5,
+                                    ),
+                                    color: c.separatorSoft,
+                                  ),
+                                  Expanded(
+                                    child: LayoutBuilder(
+                                      builder: (context, constraints) {
+                                        final controls = <Widget>[
+                                          for (final label in [
+                                            'H1',
+                                            'H2',
+                                            'H3',
+                                          ])
+                                            syntaxControl(
+                                              Text(
+                                                label,
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: c.textSecondary,
+                                                ),
+                                              ),
                                               label,
-                                              style: TextStyle(
-                                                fontSize: 12,
-                                                fontWeight: FontWeight.w600,
-                                                color: c.textSecondary,
+                                              () => _runMarkdownCommand(
+                                                commandByLabel(label),
                                               ),
                                             ),
-                                            label,
-                                            () => _runMarkdownCommand(
-                                              commandByLabel(label),
+                                          for (final entry in <(String, IconData)>[
+                                            ('粗体', CupertinoIcons.bold),
+                                            ('斜体', CupertinoIcons.italic),
+                                            (
+                                              '删除线',
+                                              CupertinoIcons.strikethrough,
+                                            ),
+                                            ('链接', CupertinoIcons.link),
+                                            ('图片', CupertinoIcons.photo),
+                                            (
+                                              '无序列表',
+                                              CupertinoIcons.list_bullet,
+                                            ),
+                                            (
+                                              '有序列表',
+                                              CupertinoIcons.list_number,
+                                            ),
+                                            (
+                                              '任务列表',
+                                              CupertinoIcons.checkmark_square,
+                                            ),
+                                            ('引用', CupertinoIcons.quote_bubble),
+                                            (
+                                              '行内代码',
+                                              CupertinoIcons
+                                                  .chevron_left_slash_chevron_right,
+                                            ),
+                                            ('代码块', CupertinoIcons.doc_text),
+                                            ('表格', CupertinoIcons.table),
+                                            ('分隔线', CupertinoIcons.minus),
+                                          ])
+                                            syntaxControl(
+                                              Icon(
+                                                entry.$2,
+                                                size: 16,
+                                                color: c.textSecondary,
+                                              ),
+                                              entry.$1,
+                                              () => _runMarkdownCommand(
+                                                commandByLabel(entry.$1),
+                                              ),
+                                            ),
+                                          syntaxControl(
+                                            Column(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(
+                                                  CupertinoIcons.textformat,
+                                                  size: 15,
+                                                  color: c.textSecondary,
+                                                ),
+                                                const SizedBox(height: 2),
+                                                Container(
+                                                  width: 14,
+                                                  height: 3,
+                                                  decoration: BoxDecoration(
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          2,
+                                                        ),
+                                                    gradient:
+                                                        const LinearGradient(
+                                                          colors: [
+                                                            CupertinoColors
+                                                                .systemRed,
+                                                            CupertinoColors
+                                                                .systemYellow,
+                                                            CupertinoColors
+                                                                .systemGreen,
+                                                            CupertinoColors
+                                                                .systemBlue,
+                                                          ],
+                                                        ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            t('文字颜色', 'Text color'),
+                                            _chooseTextColor,
+                                            key: const Key(
+                                              'text-color-toolbar',
                                             ),
                                           ),
-                                        for (final entry in <(String, IconData)>[
-                                          ('粗体', CupertinoIcons.bold),
-                                          ('斜体', CupertinoIcons.italic),
-                                          ('删除线', CupertinoIcons.strikethrough),
-                                          ('链接', CupertinoIcons.link),
-                                          ('图片', CupertinoIcons.photo),
-                                          ('无序列表', CupertinoIcons.list_bullet),
-                                          ('有序列表', CupertinoIcons.list_number),
-                                          (
-                                            '任务列表',
-                                            CupertinoIcons.checkmark_square,
-                                          ),
-                                          ('引用', CupertinoIcons.quote_bubble),
-                                          (
-                                            '行内代码',
-                                            CupertinoIcons
-                                                .chevron_left_slash_chevron_right,
-                                          ),
-                                          ('代码块', CupertinoIcons.doc_text),
-                                          ('表格', CupertinoIcons.table),
-                                          ('分隔线', CupertinoIcons.minus),
-                                        ])
                                           syntaxControl(
                                             Icon(
-                                              entry.$2,
+                                              CupertinoIcons.function,
                                               size: 16,
                                               color: c.textSecondary,
                                             ),
-                                            entry.$1,
-                                            () => _runMarkdownCommand(
-                                              commandByLabel(entry.$1),
+                                            t('公式模板', 'Equation templates'),
+                                            () => _chooseTemplate(math: true),
+                                          ),
+                                          syntaxControl(
+                                            Icon(
+                                              CupertinoIcons.flowchart,
+                                              size: 16,
+                                              color: c.textSecondary,
                                             ),
-                                          ),
-                                        syntaxControl(
-                                          Column(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Icon(
-                                                CupertinoIcons.textformat,
-                                                size: 15,
-                                                color: c.textSecondary,
-                                              ),
-                                              const SizedBox(height: 2),
-                                              Container(
-                                                width: 14,
-                                                height: 3,
-                                                decoration: BoxDecoration(
-                                                  borderRadius:
-                                                      BorderRadius.circular(2),
-                                                  gradient:
-                                                      const LinearGradient(
-                                                        colors: [
-                                                          CupertinoColors
-                                                              .systemRed,
-                                                          CupertinoColors
-                                                              .systemYellow,
-                                                          CupertinoColors
-                                                              .systemGreen,
-                                                          CupertinoColors
-                                                              .systemBlue,
-                                                        ],
-                                                      ),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                          t('文字颜色', 'Text color'),
-                                          _chooseTextColor,
-                                          key: const Key('text-color-toolbar'),
-                                        ),
-                                        syntaxControl(
-                                          Icon(
-                                            CupertinoIcons.function,
-                                            size: 16,
-                                            color: c.textSecondary,
-                                          ),
-                                          t('公式模板', 'Equation templates'),
-                                          () => _chooseTemplate(math: true),
-                                        ),
-                                        syntaxControl(
-                                          Icon(
-                                            CupertinoIcons.flowchart,
-                                            size: 16,
-                                            color: c.textSecondary,
-                                          ),
-                                          t('Mermaid 模板', 'Mermaid templates'),
-                                          () => _chooseTemplate(math: false),
-                                        ),
-                                      ];
-                                      final priority = [
-                                        0,
-                                        1,
-                                        3,
-                                        4,
-                                        16,
-                                        5,
-                                        17,
-                                        18,
-                                        6,
-                                        7,
-                                        8,
-                                        9,
-                                        10,
-                                        11,
-                                        12,
-                                        13,
-                                        14,
-                                        15,
-                                        2,
-                                      ];
-                                      final count = (constraints.maxWidth / 32)
-                                          .floor()
-                                          .clamp(0, controls.length);
-                                      return Row(
-                                        children: [
-                                          for (final index in priority.take(
-                                            count,
-                                          ))
-                                            SizedBox(
-                                              width: 32,
-                                              child: controls[index],
+                                            t(
+                                              'Mermaid 模板',
+                                              'Mermaid templates',
                                             ),
-                                        ],
-                                      );
-                                    },
-                                  ),
-                                ),
-                                button(
-                                  ref.watch(editorProvider).toolbarExpanded
-                                      ? CupertinoIcons.chevron_up
-                                      : CupertinoIcons.chevron_down,
-                                  t('全部 Markdown 语法', 'All Markdown syntax'),
-                                  () => ref
-                                      .read(editorProvider.notifier)
-                                      .update(
-                                        (s) => s.copyWith(
-                                          toolbarExpanded: !s.toolbarExpanded,
-                                        ),
-                                      ),
-                                ),
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                  ),
-                                  child: CupertinoSlidingSegmentedControl<int>(
-                                    groupValue: _mode,
-                                    children: {
-                                      0: Text(
-                                        t('编辑', 'Edit'),
-                                        style: const TextStyle(fontSize: 12),
-                                      ),
-                                      1: Text(
-                                        t('分屏', 'Split'),
-                                        style: const TextStyle(fontSize: 12),
-                                      ),
-                                      2: Text(
-                                        t('预览', 'Preview'),
-                                        style: const TextStyle(fontSize: 12),
-                                      ),
-                                    },
-                                    onValueChanged: (v) {
-                                      if (v != null) _mode = v;
-                                    },
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          if (ref.watch(editorProvider).searchVisible)
-                            EditorSearchBar(
-                              editor: _controller,
-                              queryFocus: _searchFocus,
-                              onNext: () => _findMatch(),
-                              onPrevious: () => _findMatch(forward: false),
-                              onQuery: () => _findMatch(fromStart: true),
-                              onReplace: _replaceMatch,
-                              onReplaceAll: _replaceAllMatches,
-                              onClose: _closeSearch,
-                            ),
-                          Expanded(
-                            child: LayoutBuilder(
-                              builder: (context, size) {
-                                Widget buildPanes() {
-                                  if (_mode == 0) {
-                                    return SizedBox.expand(child: editor);
-                                  }
-                                  if (_mode == 2) {
-                                    return SizedBox.expand(child: preview);
-                                  }
-                                  if (size.maxWidth < 560) {
-                                    return Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.stretch,
-                                      children: [
-                                        Expanded(child: editor),
-                                        const Divider(height: 1),
-                                        Expanded(child: preview),
-                                      ],
-                                    );
-                                  }
-                                  return Row(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.stretch,
-                                    children: [
-                                      SizedBox(
-                                        width: (size.maxWidth - 8) * _ratio,
-                                        child: editor,
-                                      ),
-                                      MouseRegion(
-                                        cursor: SystemMouseCursors.resizeColumn,
-                                        child: GestureDetector(
-                                          onDoubleTap: () =>
-                                              _update(() => _ratio = .5),
-                                          onHorizontalDragUpdate: (d) =>
-                                              _update(
-                                                () => _ratio =
-                                                    (_ratio +
-                                                            d.delta.dx /
-                                                                (size.maxWidth -
-                                                                    8))
-                                                        .clamp(.2, .8),
-                                              ),
-                                          child: Container(
-                                            width: 8,
-                                            color: c.bgToolbar,
-                                            child: Center(
-                                              child: Container(
-                                                width: 1,
-                                                color: c.separator,
-                                              ),
-                                            ),
+                                            () => _chooseTemplate(math: false),
                                           ),
-                                        ),
-                                      ),
-                                      Expanded(child: preview),
-                                    ],
-                                  );
-                                }
-
-                                final rightSpace =
-                                    _mode == 1 && size.maxWidth >= 560
-                                    ? (size.maxWidth - 8) * (1 - _ratio)
-                                    : size.maxWidth;
-                                return Stack(
-                                  children: [
-                                    Positioned.fill(child: buildPanes()),
-                                    if (ref
-                                        .watch(editorProvider)
-                                        .toolbarExpanded)
-                                      Positioned(
-                                        top: 10,
-                                        bottom: 10,
-                                        right: 10,
-                                        width: (rightSpace - 20).clamp(
-                                          40.0,
-                                          340.0,
-                                        ),
-                                        child: MarkdownSyntaxPanel(
-                                          enabled: !_busy && !_restoring,
-                                          onCommand: _runMarkdownCommand,
-                                          onClose: () => ref
-                                              .read(editorProvider.notifier)
-                                              .update(
-                                                (s) => s.copyWith(
-                                                  toolbarExpanded: false,
-                                                ),
+                                        ];
+                                        final priority = [
+                                          0,
+                                          1,
+                                          3,
+                                          4,
+                                          16,
+                                          5,
+                                          17,
+                                          18,
+                                          6,
+                                          7,
+                                          8,
+                                          9,
+                                          10,
+                                          11,
+                                          12,
+                                          13,
+                                          14,
+                                          15,
+                                          2,
+                                        ];
+                                        final count =
+                                            (constraints.maxWidth / 32)
+                                                .floor()
+                                                .clamp(0, controls.length);
+                                        return Row(
+                                          children: [
+                                            for (final index in priority.take(
+                                              count,
+                                            ))
+                                              SizedBox(
+                                                width: 32,
+                                                child: controls[index],
                                               ),
-                                        ),
-                                      ),
-                                  ],
-                                );
-                              },
-                            ),
-                          ),
-                          DefaultTextStyle(
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: c.textTertiary,
-                            ),
-                            child: Container(
-                              height: 24,
-                              color: c.bgToolbar,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                              ),
-                              child: Row(
-                                children: [
-                                  Text(
-                                    t(
-                                      '行 $line，列 $column',
-                                      'Ln $line, Col $column',
+                                          ],
+                                        );
+                                      },
                                     ),
-                                    style: const TextStyle(fontSize: 11),
                                   ),
-                                  const Spacer(),
-                                  Text(
-                                    exporting
-                                        ? t('正在导出文档…', 'Exporting document…')
-                                        : '${_lineIndex.characters} ${t('字符', 'characters')} · UTF-8 · Markdown',
-                                    style: const TextStyle(fontSize: 11),
+                                  button(
+                                    ref.watch(editorProvider).toolbarExpanded
+                                        ? CupertinoIcons.chevron_up
+                                        : CupertinoIcons.chevron_down,
+                                    t('全部 Markdown 语法', 'All Markdown syntax'),
+                                    () => ref
+                                        .read(editorProvider.notifier)
+                                        .update(
+                                          (s) => s.copyWith(
+                                            toolbarExpanded: !s.toolbarExpanded,
+                                          ),
+                                        ),
+                                  ),
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                    ),
+                                    child:
+                                        CupertinoSlidingSegmentedControl<int>(
+                                          groupValue: _mode,
+                                          children: {
+                                            0: Text(
+                                              t('编辑', 'Edit'),
+                                              style: const TextStyle(
+                                                fontSize: 12,
+                                              ),
+                                            ),
+                                            1: Text(
+                                              t('分屏', 'Split'),
+                                              style: const TextStyle(
+                                                fontSize: 12,
+                                              ),
+                                            ),
+                                            2: Text(
+                                              t('预览', 'Preview'),
+                                              style: const TextStyle(
+                                                fontSize: 12,
+                                              ),
+                                            ),
+                                          },
+                                          onValueChanged: (v) {
+                                            if (v != null) _mode = v;
+                                          },
+                                        ),
                                   ),
                                 ],
                               ),
                             ),
-                          ),
-                        ],
+                            if (ref.watch(editorProvider).searchVisible)
+                              EditorSearchBar(
+                                editor: _controller,
+                                queryFocus: _searchFocus,
+                                onNext: () => _findMatch(),
+                                onPrevious: () => _findMatch(forward: false),
+                                onQuery: () => _findMatch(fromStart: true),
+                                onReplace: _replaceMatch,
+                                onReplaceAll: _replaceAllMatches,
+                                onClose: _closeSearch,
+                              ),
+                            Expanded(
+                              child: LayoutBuilder(
+                                builder: (context, size) {
+                                  Widget buildPanes() {
+                                    if (_mode == 0) {
+                                      return SizedBox.expand(child: editor);
+                                    }
+                                    if (_mode == 2) {
+                                      return SizedBox.expand(child: preview);
+                                    }
+                                    if (size.maxWidth < 560) {
+                                      return Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.stretch,
+                                        children: [
+                                          Expanded(child: editor),
+                                          const Divider(height: 1),
+                                          Expanded(child: preview),
+                                        ],
+                                      );
+                                    }
+                                    return Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.stretch,
+                                      children: [
+                                        SizedBox(
+                                          width: (size.maxWidth - 8) * _ratio,
+                                          child: editor,
+                                        ),
+                                        MouseRegion(
+                                          cursor:
+                                              SystemMouseCursors.resizeColumn,
+                                          child: GestureDetector(
+                                            onDoubleTap: () =>
+                                                _update(() => _ratio = .5),
+                                            onHorizontalDragUpdate: (d) =>
+                                                _update(
+                                                  () => _ratio =
+                                                      (_ratio +
+                                                              d.delta.dx /
+                                                                  (size.maxWidth -
+                                                                      8))
+                                                          .clamp(.2, .8),
+                                                ),
+                                            child: Container(
+                                              width: 8,
+                                              color: c.bgToolbar,
+                                              child: Center(
+                                                child: Container(
+                                                  width: 1,
+                                                  color: c.separator,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                        Expanded(child: preview),
+                                      ],
+                                    );
+                                  }
+
+                                  final rightSpace =
+                                      _mode == 1 && size.maxWidth >= 560
+                                      ? (size.maxWidth - 8) * (1 - _ratio)
+                                      : size.maxWidth;
+                                  return Stack(
+                                    children: [
+                                      Positioned.fill(child: buildPanes()),
+                                      if (ref
+                                          .watch(editorProvider)
+                                          .toolbarExpanded)
+                                        Positioned(
+                                          top: 10,
+                                          bottom: 10,
+                                          right: 10,
+                                          width: (rightSpace - 20).clamp(
+                                            40.0,
+                                            340.0,
+                                          ),
+                                          child: MarkdownSyntaxPanel(
+                                            enabled: !_busy && !_restoring,
+                                            onCommand: _runMarkdownCommand,
+                                            onClose: () => ref
+                                                .read(editorProvider.notifier)
+                                                .update(
+                                                  (s) => s.copyWith(
+                                                    toolbarExpanded: false,
+                                                  ),
+                                                ),
+                                          ),
+                                        ),
+                                    ],
+                                  );
+                                },
+                              ),
+                            ),
+                            DefaultTextStyle(
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: c.textTertiary,
+                              ),
+                              child: Container(
+                                height: 24,
+                                color: c.bgToolbar,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                ),
+                                child: Row(
+                                  children: [
+                                    Text(
+                                      t(
+                                        '行 $line，列 $column',
+                                        'Ln $line, Col $column',
+                                      ),
+                                      style: const TextStyle(fontSize: 11),
+                                    ),
+                                    const Spacer(),
+                                    Text(
+                                      resourceState.busy
+                                          ? '${resourceState.operation}${resourceState.total > 0 ? ' ${resourceState.done}/${resourceState.total}' : ''}'
+                                          : exporting
+                                          ? t('正在导出文档…', 'Exporting document…')
+                                          : '${_lineIndex.characters} ${t('字符', 'characters')} · UTF-8 · Markdown',
+                                      style: const TextStyle(fontSize: 11),
+                                    ),
+                                    if (resourceState.busy)
+                                      CupertinoButton(
+                                        key: const Key(
+                                          'stop-resource-operation',
+                                        ),
+                                        padding: const EdgeInsets.only(left: 8),
+                                        minimumSize: const Size(0, 20),
+                                        onPressed: _resourceWork.cancel,
+                                        child: Text(
+                                          t('停止', 'Stop'),
+                                          style: const TextStyle(fontSize: 11),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

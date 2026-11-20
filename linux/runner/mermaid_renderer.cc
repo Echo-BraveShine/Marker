@@ -1,4 +1,5 @@
 #include "mermaid_renderer.h"
+#include "snapshot_crop.h"
 #include <webkit2/webkit2.h>
 #include <algorithm>
 #include <memory>
@@ -19,6 +20,7 @@ struct Render {
   bool pdf = false;
   bool document = false;
   int width = 0;
+  int height = 0;
   std::string output;
   WebKitPrintOperation* print = nullptr;
   gulong print_failed = 0, print_finished = 0;
@@ -53,19 +55,13 @@ void SnapshotFinished(GObject* source, GAsyncResult* result, gpointer data) {
     task->Complete(nullptr, error ? error->message : "Snapshot failed");
     return;
   }
-  if (cairo_image_surface_get_width(surface) != task->width) {
-    const double scale = static_cast<double>(task->width) / cairo_image_surface_get_width(surface);
-    auto* scaled = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, task->width,
-        static_cast<int>(cairo_image_surface_get_height(surface) * scale));
-    auto* context = cairo_create(scaled);
-    cairo_scale(context, scale, scale);
-    cairo_set_source_surface(context, surface, 0, 0);
-    cairo_pattern_set_filter(cairo_get_source(context), CAIRO_FILTER_BEST);
-    cairo_paint(context);
-    cairo_destroy(context);
-    cairo_surface_destroy(surface);
-    surface = scaled;
-  }
+  // GTK can keep an offscreen WebView wider than the diagram's CSS bounds.
+  // Crop that viewport; scaling its full width down would shrink the diagram.
+  // Only remove the display's pixel scale, keeping one output pixel per CSS px.
+  const int allocated_width = gtk_widget_get_allocated_width(GTK_WIDGET(task->view));
+  auto* cropped = CropSnapshot(surface, allocated_width, task->width, task->height);
+  cairo_surface_destroy(surface);
+  surface = cropped;
   g_autoptr(GByteArray) png = g_byte_array_new();
   const auto status = cairo_surface_write_to_png_stream(surface, AppendPng, png);
   cairo_surface_destroy(surface);
@@ -149,7 +145,8 @@ void Message(WebKitUserContentManager*, WebKitJavascriptResult* result, gpointer
     task->Complete(nullptr, "Document is too tall for PNG; choose PDF");
     return;
   }
-  gtk_widget_set_size_request(GTK_WIDGET(task->view), -1, content_height);
+  task->height = content_height;
+  gtk_widget_set_size_request(GTK_WIDGET(task->view), task->width, content_height);
   gtk_window_resize(GTK_WINDOW(task->window), task->width, content_height);
   // Allow the GTK allocation and WebKit paint to reflect the completed diagram.
   g_timeout_add_full(G_PRIORITY_DEFAULT, 150, TakeSnapshot, new Task(task), DeleteTask);

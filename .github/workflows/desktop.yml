@@ -63,9 +63,23 @@ jobs:
       - name: Run platform-specific tests
         if: matrix.target != 'linux'
         run: flutter test --no-pub
+      - name: Verify Windows native file drops
+        if: matrix.target == 'windows'
+        shell: pwsh
+        run: ./scripts/ci/test-windows-drop.ps1
+      - name: Verify macOS early drop registration
+        if: matrix.target == 'macos'
+        run: bash scripts/ci/test-macos-drop.sh
       - name: Verify Linux offline Mermaid and launcher icons
         if: matrix.target == 'linux'
         run: |
           MARKER_MERMAID_FONT_URI="file://$GITHUB_WORKSPACE/assets/fonts/NotoSansSC.ttf" MARKER_MERMAID_FIXTURES="$RUNNER_TEMP/marker-mermaid" flutter test test/mermaid_diagram_test.dart --no-pub
           bash scripts/ci/test-linux-native.sh "$RUNNER_TEMP/marker-mermaid"
+      - name: Preserve Linux Mermaid screenshots on failure
+        if: failure() && matrix.target == 'linux'
+        uses: actions/upload-artifact@v7
+        with:
+          name: linux-mermaid-diagnostics
+          path: ${{ runner.temp }}/marker-mermaid/rendered/
+          if-no-files-found: ignore
       - run: flutter build ${{ matrix.target }} --debug --no-pub

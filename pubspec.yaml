@@ -2,7 +2,7 @@ name: marker
 description: "轻量级 Markdown 编辑预览工具"
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev.
 
-version: 0.0.3+1
+version: 0.0.4+1
 
 environment:
   sdk: ^3.12.2
@@ -35,6 +35,13 @@ dependencies:
   shared_preferences: ^2.5.6
   package_info_plus: ^10.2.2
   pub_semver: ^2.2.0
+  path: ^1.9.1
+  crypto: ^3.0.7
+  archive: ^4.7.1
+  # 0.8.4 with macOS bookmark encoding and delayed-drop position fixes.
+  desktop_drop:
+    path: third_party/desktop_drop
+  pasteboard: ^0.6.1
 
   # 桌面窗口管理
   window_manager: ^0.5.1

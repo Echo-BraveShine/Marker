@@ -91,6 +91,16 @@ void main() {
     if (directory == null) return;
     Directory(directory).createSync(recursive: true);
     Directory('$directory/windows').createSync(recursive: true);
+    // A narrow CSS document in a much wider initial GTK viewport catches
+    // accidental whole-viewport downscaling and verifies the real native path.
+    File('$directory/snapshot-narrow.html').writeAsStringSync('''
+<!doctype html><html><head><style>
+html,body{margin:0;background:#2b2b2d}
+#document{width:120px;height:240px;padding:12px;box-sizing:border-box}
+#ink{width:80px;height:200px;background:white}
+</style></head><body><div id="document"><div id="ink"></div></div>
+<script>setTimeout(()=>window.webkit.messageHandlers.marker.postMessage({width:120,height:240}),100);</script>
+</body></html>''');
     final script = await File('assets/mermaid.min.js').readAsString();
     for (final template in mermaidTemplates) {
       for (final dark in [false, true]) {

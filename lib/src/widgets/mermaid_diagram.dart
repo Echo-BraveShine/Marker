@@ -30,7 +30,14 @@ const result=await mermaid.render('markerDiagram',$encoded);
 const container=document.getElementById('document');
 container.innerHTML=result.svg;
 const svg=container.querySelector('svg');
-if(svg&&svg.viewBox&&svg.viewBox.baseVal.width>0){container.style.width=Math.min(960,Math.ceil(svg.viewBox.baseVal.width+24))+'px';}
+if(!svg||!svg.viewBox||svg.viewBox.baseVal.width<=0||svg.viewBox.baseVal.height<=0)throw Error('Diagram has no visible bounds');
+const bounds=svg.viewBox.baseVal;
+const diagramWidth=Math.min(936,bounds.width);
+// Explicit CSS geometry avoids different intrinsic SVG sizing in WebKit/Chromium.
+svg.style.width=diagramWidth+'px';
+svg.style.height=(bounds.height*diagramWidth/bounds.width)+'px';
+svg.style.display='block';
+container.style.width=Math.ceil(diagramWidth+24)+'px';
 ${fontUri == null ? '' : "await document.fonts.load('13px MarkerNoto','中文');if(!document.fonts.check('13px MarkerNoto','中文'))throw Error('Bundled CJK font failed to load');"}
 await document.fonts.ready;
 setTimeout(()=>notify({width:Math.ceil(container.getBoundingClientRect().width),height:Math.ceil(container.getBoundingClientRect().height)}),100);
