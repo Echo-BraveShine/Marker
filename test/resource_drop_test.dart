@@ -59,6 +59,19 @@ void main() {
   );
 
   test(
+    'Linux file URIs retain POSIX semantics even with a drive-shaped directory',
+    () async {
+      await native('performOperation_linux', [
+        'file:///C:/Users/RUNNER~1/Temp/%E4%B8%AD%E6%96%87%20%23%25.png',
+        [420.0, 230.0],
+      ]);
+      final drop = events.whereType<DropDoneEvent>().single;
+      expect(drop.files.single.path, '/C:/Users/RUNNER~1/Temp/中文 #%.png');
+      expect(drop.location, const Offset(420, 230));
+    },
+  );
+
+  test(
     'Windows drop uses final point and preserves long Unicode and UNC paths',
     () async {
       final paths = [

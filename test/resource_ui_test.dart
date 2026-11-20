@@ -233,7 +233,7 @@ void main() {
     variant: TargetPlatformVariant({TargetPlatform.macOS}),
   );
   testWidgets(
-    'Windows and Linux native drops reach preview and sidebar',
+    'image drops reach preview and sidebar across desktop platform layouts',
     (tester) async {
       final windows = defaultTargetPlatform == TargetPlatform.windows;
       tester.view.devicePixelRatio = windows ? 2 : 1;
@@ -264,6 +264,22 @@ void main() {
         await tester.pump();
         expect(find.byKey(const Key('resource-drop-hint')), findsOneWidget);
         if (!windows) await native('exited', null);
+        if (!windows && Platform.isWindows) {
+          // TargetPlatformVariant changes Flutter's layout, not dart:io's OS.
+          // Linux's transport correctly decodes file:///C:/... to POSIX /C:/...
+          // and cannot open that path on a Windows host. Test the decoded drop
+          // UI with the real host file; POSIX transport is tested separately in
+          // resource_drop_test.dart on every host, including Windows.
+          final zone = find.byKey(const Key('resource-drop-zone'));
+          tester.widget<DropTarget>(zone).onDragDone!(
+            DropDoneDetails(
+              files: [DropItemFile(source)],
+              localPosition: logicalPoint - tester.getTopLeft(zone),
+              globalPosition: logicalPoint,
+            ),
+          );
+          return;
+        }
         await native(
           windows ? 'performOperation_windows' : 'performOperation_linux',
           windows
