@@ -18,6 +18,7 @@ import 'package:marker/src/resources/resource_service.dart';
 import 'package:marker/src/widgets/markdown_extensions.dart';
 import 'package:marker/src/theme/marker_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'support/file_cleanup.dart';
 
 const imageData =
     'iVBORw0KGgoAAAANSUhEUgAAAAMAAAACCAIAAAASFvFNAAAAFElEQVR4nGM0qfjGAAZMEIqBgQEAHN4BptKOUnYAAAAASUVORK5CYII=';
@@ -67,7 +68,26 @@ void main() {
     final root = (await tester.runAsync(
       () => Directory.systemTemp.createTemp('marker-resource-ui-'),
     ))!;
-    addTearDown(() => root.delete(recursive: true));
+    addTearDown(() async {
+      try {
+        // Also runs when an assertion fails before the test's own unmount.
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pump();
+      } finally {
+        // FileImage uses native file-backed buffers. Unmounting alone leaves
+        // cached codecs alive, which can block deletion on Windows.
+        tester.binding.imageCache.clear();
+        tester.binding.imageCache.clearLiveImages();
+        // Cache eviction releases keep-alive handles in a post-frame callback.
+        // Run that frame before attempting to remove the backing files.
+        await tester.pump();
+        await tester.runAsync(
+          () => withWindowsFileLockRetry(() async {
+            if (await root.exists()) await root.delete(recursive: true);
+          }),
+        );
+      }
+    });
     final doc = '${root.path}/文档.md';
     await tester.runAsync(() => File(doc).writeAsString('原始内容'));
     SharedPreferences.setMockInitialValues({
