@@ -153,6 +153,39 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('editor')), findsOneWidget);
   });
+  testWidgets('syntax toolbar adds commands on resize and fills wide windows', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1000, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [mermaidPreviewEnabledProvider.overrideWithValue(false)],
+        child: const MarkerApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final row = find.byKey(const Key('markdown-toolbar-syntax'));
+    Finder controls() =>
+        find.descendant(of: row, matching: find.byType(CupertinoButton));
+    final narrowCount = controls().evaluate().length;
+    await tester.binding.setSurfaceSize(const Size(2800, 800));
+    await tester.pumpAndSettle();
+    expect(controls().evaluate().length, greaterThan(narrowCount));
+    expect(find.descendant(of: row, matching: find.text('H6')), findsOneWidget);
+    expect(
+      tester.getRect(controls().last).right,
+      closeTo(tester.getRect(row).right, .1),
+    );
+    await tester.binding.setSurfaceSize(const Size(3600, 800));
+    await tester.pumpAndSettle();
+    expect(
+      tester.getRect(controls().last).right,
+      closeTo(tester.getRect(row).right, .1),
+    );
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+  });
   testWidgets('expanded toolbar exposes syntax insertion commands', (
     tester,
   ) async {
@@ -184,6 +217,13 @@ void main() {
     );
     expect(editor.controller!.text, contains('## 二级标题'));
     expect(find.byKey(const ValueKey('md-command-Mermaid')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('editor')));
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('syntax-floating-panel')), findsNothing);
+    expect(editor.controller!.text, contains('## 二级标题'));
+    await tester.tap(find.byIcon(CupertinoIcons.chevron_down));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('syntax-panel-close')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('syntax-floating-panel')), findsNothing);

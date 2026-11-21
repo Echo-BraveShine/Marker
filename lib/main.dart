@@ -217,6 +217,7 @@ class _MarkerHomeState extends ConsumerState<MarkerHome> with WindowListener {
   void initState() {
     super.initState();
     _controller.addListener(_changed);
+    FocusManager.instance.addEarlyKeyEventHandler(_handleSyntaxEscape);
     _linkedScroll = LinkedScroll(
       _editorScroll,
       _previewScroll,
@@ -228,6 +229,20 @@ class _MarkerHomeState extends ConsumerState<MarkerHome> with WindowListener {
     if (desktopWindow) windowManager.addListener(this);
     _restore();
     _connectExternalFiles();
+  }
+
+  KeyEventResult _handleSyntaxEscape(KeyEvent event) {
+    if (mounted &&
+        event is KeyDownEvent &&
+        event.logicalKey == LogicalKeyboardKey.escape &&
+        (ModalRoute.of(context)?.isCurrent ?? true) &&
+        ref.read(editorProvider).toolbarExpanded) {
+      ref
+          .read(editorProvider.notifier)
+          .update((s) => s.copyWith(toolbarExpanded: false));
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
   }
 
   void _update(VoidCallback change) => change();
@@ -538,6 +553,7 @@ class _MarkerHomeState extends ConsumerState<MarkerHome> with WindowListener {
 
   @override
   void dispose() {
+    FocusManager.instance.removeEarlyKeyEventHandler(_handleSyntaxEscape);
     _draftTimer?.cancel();
     if (desktopWindow && defaultTargetPlatform == TargetPlatform.macOS) {
       _filesChannel.setMethodCallHandler(null);
@@ -1613,7 +1629,7 @@ class _MarkerHomeState extends ConsumerState<MarkerHome> with WindowListener {
     }) => Tooltip(
       message: label,
       child: SizedBox(
-        width: 30,
+        width: double.infinity,
         height: 28,
         child: CupertinoButton(
           key: key,
@@ -2316,6 +2332,70 @@ class _MarkerHomeState extends ConsumerState<MarkerHome> with WindowListener {
                                             () => _chooseTemplate(math: false),
                                           ),
                                         ];
+                                        const represented = {
+                                          'H1',
+                                          'H2',
+                                          'H3',
+                                          '粗体',
+                                          '斜体',
+                                          '删除线',
+                                          '链接',
+                                          '图片',
+                                          '无序列表',
+                                          '有序列表',
+                                          '任务列表',
+                                          '引用',
+                                          '行内代码',
+                                          '代码块',
+                                          '表格',
+                                          '分隔线',
+                                          '文字颜色',
+                                          '行内公式',
+                                          '块公式',
+                                          'Mermaid',
+                                        };
+                                        const labels = {
+                                          'Setext H1': 'S1',
+                                          'Setext H2': 'S2',
+                                          '粗斜体': 'BI',
+                                          '换行': '↵',
+                                          '段落': '¶',
+                                          '转义': '\\',
+                                          '已完成': '✓',
+                                          '嵌套列表': '嵌套',
+                                          '嵌套引用': '双引',
+                                          '缩进代码': '缩进',
+                                          '引用式链接': '引用链',
+                                          '自动链接': '自动',
+                                          '邮件': '@',
+                                          '脚注': '[^]',
+                                        };
+                                        for (final command
+                                            in markdownCommandGroups.values
+                                                .expand((items) => items)
+                                                .where(
+                                                  (command) => !represented
+                                                      .contains(command.label),
+                                                )) {
+                                          controls.add(
+                                            syntaxControl(
+                                              Text(
+                                                labels[command.label] ??
+                                                    command.label,
+                                                maxLines: 1,
+                                                overflow: TextOverflow.fade,
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: c.textSecondary,
+                                                ),
+                                              ),
+                                              command.label,
+                                              () =>
+                                                  _runMarkdownCommand(command),
+                                            ),
+                                          );
+                                        }
                                         final priority = [
                                           0,
                                           1,
@@ -2336,20 +2416,26 @@ class _MarkerHomeState extends ConsumerState<MarkerHome> with WindowListener {
                                           14,
                                           15,
                                           2,
+                                          for (
+                                            var i = 19;
+                                            i < controls.length;
+                                            i++
+                                          )
+                                            i,
                                         ];
                                         final count =
                                             (constraints.maxWidth / 32)
                                                 .floor()
                                                 .clamp(0, controls.length);
                                         return Row(
+                                          key: const Key(
+                                            'markdown-toolbar-syntax',
+                                          ),
                                           children: [
                                             for (final index in priority.take(
                                               count,
                                             ))
-                                              SizedBox(
-                                                width: 32,
-                                                child: controls[index],
-                                              ),
+                                              Expanded(child: controls[index]),
                                           ],
                                         );
                                       },

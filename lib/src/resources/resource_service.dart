@@ -731,37 +731,109 @@ class DocumentResourceService {
         'The source document is unavailable.',
       );
     }
-    final directory = await resourceDirectory(sourcePath);
-    final manifest = await _readManifest(directory);
-    final original = await File(sourcePath).readAsString();
-    var published = false;
-    try {
-      await atomicWrite(File(targetPath), text);
-      published = true;
-      if (manifest?['owner'] == p.basename(sourcePath)) {
-        await atomicWrite(
-          File(p.join(directory.path, _manifestName)),
-          jsonEncode({...manifest!, 'owner': p.basename(targetPath)}),
+    final parent = p.dirname(p.absolute(sourcePath));
+    final conventional = p.join(parent, '${_stem(sourcePath)}.assets');
+    final owned = <({Directory directory, Map<String, dynamic>? manifest})>[];
+    await for (final entity in Directory(parent).list(followLinks: false)) {
+      if (entity is! Directory) continue;
+      final record = await _readManifest(entity);
+      if (record?['owner'] == p.basename(sourcePath) ||
+          (p.equals(entity.path, conventional) &&
+              record == null &&
+              !await File(p.join(entity.path, _manifestName)).exists())) {
+        owned.add((directory: entity, manifest: record));
+      }
+    }
+    owned.sort((a, b) {
+      if (p.equals(a.directory.path, conventional)) return -1;
+      if (p.equals(b.directory.path, conventional)) return 1;
+      return a.directory.path.compareTo(b.directory.path);
+    });
+    final moves =
+        <
+          ({Directory source, Directory target, Map<String, dynamic>? manifest})
+        >[];
+    for (var i = 0; i < owned.length; i++) {
+      final destination = Directory(
+        p.join(
+          parent,
+          '${_stem(targetPath)}.assets${i == 0 ? '' : '-${i + 1}'}',
+        ),
+      );
+      if (!p.equals(owned[i].directory.path, destination.path) &&
+          await FileSystemEntity.type(destination.path, followLinks: false) !=
+              FileSystemEntityType.notFound) {
+        throw const ResourceFailure(
+          '同名资源目录已存在，未执行重命名。',
+          'An asset folder with the new name already exists. Nothing was renamed.',
         );
       }
-      await File(sourcePath).delete();
-      return text;
-    } catch (_) {
-      if (published) {
-        if (!await File(sourcePath).exists()) {
-          await atomicWrite(File(sourcePath), original);
+      moves.add((
+        source: owned[i].directory,
+        target: destination,
+        manifest: owned[i].manifest,
+      ));
+    }
+    final references = await parseResourceReferencesAsync(text);
+    final replacements = <String, String>{};
+    for (final image in references.images) {
+      final uri = resolveResourceUri(image.source, sourcePath);
+      if (uri.scheme != 'file') continue;
+      final imagePath = p.absolute(File.fromUri(uri).path);
+      for (final move in moves) {
+        if (p.isWithin(move.source.absolute.path, imagePath)) {
+          replacements[image.source] = resourceReference(
+            p.join(
+              move.target.path,
+              p.relative(imagePath, from: move.source.absolute.path),
+            ),
+            targetPath,
+          );
+          break;
         }
-        if (await File(targetPath).exists() &&
-            await File(targetPath).readAsString() == text) {
-          await File(targetPath).delete();
+      }
+    }
+    final updated = references.rewrite(text, replacements);
+    final moved = <int>[];
+    var published = false;
+    try {
+      for (var i = 0; i < moves.length; i++) {
+        final move = moves[i];
+        if (!p.equals(move.source.path, move.target.path)) {
+          await move.source.rename(move.target.path);
         }
-        if (manifest != null) {
+        moved.add(i);
+        if (move.manifest != null) {
           await atomicWrite(
-            File(p.join(directory.path, _manifestName)),
-            jsonEncode(manifest),
+            File(p.join(move.target.path, _manifestName)),
+            jsonEncode({...move.manifest!, 'owner': p.basename(targetPath)}),
           );
         }
       }
+      await atomicWrite(File(targetPath), updated);
+      published = true;
+      await File(sourcePath).delete();
+      _directoryCache.clear();
+      return updated;
+    } catch (_) {
+      if (published &&
+          await File(targetPath).exists() &&
+          await File(targetPath).readAsString() == updated) {
+        await File(targetPath).delete();
+      }
+      for (final index in moved.reversed) {
+        final move = moves[index];
+        if (move.manifest != null) {
+          await atomicWrite(
+            File(p.join(move.target.path, _manifestName)),
+            jsonEncode(move.manifest),
+          );
+        }
+        if (!p.equals(move.source.path, move.target.path)) {
+          await move.target.rename(move.source.path);
+        }
+      }
+      _directoryCache.clear();
       rethrow;
     }
   }

@@ -67,6 +67,13 @@ jobs:
         if: matrix.target == 'windows'
         shell: pwsh
         run: ./scripts/ci/test-windows-drop.ps1
+      - name: Preserve Windows drop test logs on failure
+        if: failure() && matrix.target == 'windows'
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-drop-diagnostics
+          path: ${{ runner.temp }}/marker-windows-drop/
+          if-no-files-found: ignore
       - name: Verify macOS early drop registration
         if: matrix.target == 'macos'
         run: bash scripts/ci/test-macos-drop.sh

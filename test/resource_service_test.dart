@@ -245,22 +245,24 @@ void main() {
       final text = imageMarkdown('a', image.reference);
       await File(document).writeAsString(text);
       final renamed = p.join(folder.path, 'renamed.md');
-      await service.renameDocument(
+      final updated = await service.renameDocument(
         sourcePath: document,
         targetPath: renamed,
         text: text,
       );
       expect(await File(document).exists(), isFalse);
-      expect(await File(renamed).readAsString(), text);
-      final scan = await service.scan(text, renamed);
+      expect(await File(renamed).readAsString(), updated);
+      expect(updated, contains('renamed.assets/'));
+      expect(await Directory(p.dirname(image.path)).exists(), isFalse);
+      final scan = await service.scan(updated, renamed);
       expect(scan.items.single.managed, isTrue);
       final extra = await service.importImage(
         renamed,
         ResourceInput(name: 'extra.png', bytes: png(1)),
       );
-      expect(p.dirname(extra.path), p.dirname(image.path));
+      expect(p.basename(p.dirname(extra.path)), 'renamed.assets');
       expect(
-        await service.unused(renamed, [ResourceDraft(renamed, text)]),
+        await service.unused(renamed, [ResourceDraft(renamed, updated)]),
         hasLength(1),
       );
       final existing = File(p.join(folder.path, 'existing.md'));
@@ -275,6 +277,83 @@ void main() {
       );
       expect(await existing.readAsString(), 'keep');
       expect(await File(renamed).exists(), isTrue);
+    },
+  );
+  test(
+    'asset name conflict leaves document and original images unchanged',
+    () async {
+      final image = await service.importImage(
+        document,
+        ResourceInput(name: 'a.png', bytes: png()),
+      );
+      final text = imageMarkdown('a', image.reference);
+      await File(document).writeAsString(text);
+      final target = p.join(folder.path, 'new.md');
+      final conflict = Directory(p.join(folder.path, 'new.assets'));
+      await conflict.create();
+      await expectLater(
+        service.renameDocument(
+          sourcePath: document,
+          targetPath: target,
+          text: text,
+        ),
+        throwsA(isA<ResourceFailure>()),
+      );
+      expect(await File(document).readAsString(), text);
+      expect(await File(image.path).exists(), isTrue);
+      expect(await File(target).exists(), isFalse);
+    },
+  );
+  test(
+    'failed publication rolls moved assets and management records back',
+    () async {
+      final image = await service.importImage(
+        document,
+        ResourceInput(name: 'a.png', bytes: png()),
+      );
+      final text = imageMarkdown('a', image.reference);
+      await File(document).writeAsString(text);
+      final target = p.join(folder.path, 'new.md');
+      await expectLater(
+        _RenameFailure(
+          target,
+        ).renameDocument(sourcePath: document, targetPath: target, text: text),
+        throwsA(isA<FileSystemException>()),
+      );
+      expect(await File(document).readAsString(), text);
+      expect(await File(image.path).exists(), isTrue);
+      expect(
+        await Directory(p.join(folder.path, 'new.assets')).exists(),
+        isFalse,
+      );
+      expect((await service.scan(text, document)).items.single.managed, isTrue);
+    },
+  );
+  test(
+    'conventional untracked assets rename without creating a management record',
+    () async {
+      final old = Directory(p.join(folder.path, '中文 文档.assets'));
+      await old.create();
+      final image = File(p.join(old.path, '图 #%.png'));
+      await image.writeAsBytes(png());
+      final text = imageMarkdown('a', resourceReference(image.path, document));
+      final target = p.join(folder.path, '新名字.md');
+      final updated = await service.renameDocument(
+        sourcePath: document,
+        targetPath: target,
+        text: text,
+      );
+      expect(await old.exists(), isFalse);
+      expect(
+        (await service.scan(updated, target)).items.single.availability,
+        ResourceAvailability.local,
+      );
+      expect(
+        await File(
+          p.join(folder.path, '新名字.assets', '.marker-resources.json'),
+        ).exists(),
+        isFalse,
+      );
     },
   );
   test(
@@ -503,5 +582,17 @@ class _FailingWriter extends DocumentResourceService {
       throw FileSystemException('Simulated publication failure', target.path);
     }
     return super.atomicWrite(target, text);
+  }
+}
+
+class _RenameFailure extends DocumentResourceService {
+  _RenameFailure(this.target);
+  final String target;
+  @override
+  Future<void> atomicWrite(File file, String text) {
+    if (file.path == target) {
+      throw FileSystemException('Publication failed', target);
+    }
+    return super.atomicWrite(file, text);
   }
 }

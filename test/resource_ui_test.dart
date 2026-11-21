@@ -175,6 +175,12 @@ void main() {
       await native('entered', [preview.dx, preview.dy]);
       await tester.pump();
       expect(find.byKey(const Key('resource-drop-hint')), findsOneWidget);
+      expect(
+        DefaultTextStyle.of(
+          tester.element(find.text('松开以导入图片')),
+        ).style.decoration,
+        TextDecoration.none,
+      );
       // macOS file promises may complete after native drag-exit clears the hover.
       await native('exited', null);
       await native('performOperation_macos', [

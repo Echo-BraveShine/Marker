@@ -1,4 +1,5 @@
 #include "../third_party/desktop_drop/windows/drop_paths.h"
+#include <shlobj.h>
 #include <algorithm>
 #include <cassert>
 #include <cstdio>

@@ -34,34 +34,40 @@ extension _ResourceActions on _MarkerHomeState {
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: colors.textAccent, width: 2),
                   ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        CupertinoIcons.photo_on_rectangle,
-                        size: 32,
-                        color: colors.textAccent,
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        t('松开以导入图片', 'Drop to import images'),
-                        style: TextStyle(
-                          color: colors.textPrimary,
-                          fontSize: 16,
+                  child: DefaultTextStyle.merge(
+                    style: TextStyle(
+                      fontFamily: MarkerFonts.ui,
+                      decoration: TextDecoration.none,
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          CupertinoIcons.photo_on_rectangle,
+                          size: 32,
+                          color: colors.textAccent,
                         ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        t(
-                          '复制到文档资源目录，保留原图',
-                          'Copy to document assets. Originals are kept.',
+                        const SizedBox(height: 12),
+                        Text(
+                          t('松开以导入图片', 'Drop to import images'),
+                          style: TextStyle(
+                            color: colors.textPrimary,
+                            fontSize: 16,
+                          ),
                         ),
-                        style: TextStyle(
-                          color: colors.textSecondary,
-                          fontSize: 12,
+                        const SizedBox(height: 6),
+                        Text(
+                          t(
+                            '复制到文档资源目录，保留原图',
+                            'Copy to document assets. Originals are kept.',
+                          ),
+                          style: TextStyle(
+                            color: colors.textSecondary,
+                            fontSize: 12,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -1126,8 +1132,8 @@ extension _ResourceActions on _MarkerHomeState {
         title: Text(t('保存并重命名？', 'Save and rename?')),
         content: Text(
           t(
-            '将保存当前内容并重命名文档。为兼容其他工具的引用，资源目录保留原名称。',
-            'Current content will be saved. The asset folder keeps its name to preserve references from other tools.',
+            '将保存当前内容并重命名文档。同时重命名资源目录并更新本文中的图片引用。其他文档如引用此资源目录，需要同步修改。',
+            'Current content will be saved. The asset folder and image references in this document will also be renamed. References from other documents need updating separately.',
           ),
         ),
         actions: [
