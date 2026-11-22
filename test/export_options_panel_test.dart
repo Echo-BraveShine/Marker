@@ -1,3 +1,5 @@
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:marker/src/l10n/app_localizations.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/material.dart';
@@ -19,6 +21,14 @@ void main() {
         await tester.pumpWidget(
           ProviderScope(
             child: MaterialApp(
+              locale: const Locale('zh', 'CN'),
+              supportedLocales: const [Locale('zh', 'CN'), Locale('en', 'US')],
+              localizationsDelegates: const [
+                AppLocalizations.delegate,
+                GlobalMaterialLocalizations.delegate,
+                GlobalWidgetsLocalizations.delegate,
+                GlobalCupertinoLocalizations.delegate,
+              ],
               theme: dark ? MarkerAppTheme().dark() : MarkerAppTheme().light(),
               home: Builder(
                 builder: (context) => CupertinoButton(
@@ -34,6 +44,7 @@ void main() {
             ),
           ),
         );
+        await tester.pumpAndSettle();
         await tester.tap(find.text('Open'));
         await tester.pumpAndSettle();
         expect(find.byType(MarkerFloatingSurface), findsOneWidget);

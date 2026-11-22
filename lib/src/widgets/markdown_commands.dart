@@ -10,6 +10,19 @@ class MarkdownCommand {
   });
   final String label, before, after, placeholder;
   final bool block;
+
+  String labelFor(bool zh) => zh ? label : _englishSyntaxText[label] ?? label;
+
+  /// Keep the command identity stable for image/color/template dispatch.
+  MarkdownCommand forLanguage(bool zh) => zh
+      ? this
+      : MarkdownCommand(
+          label,
+          _englishSyntaxText[before] ?? before,
+          _englishSyntaxText[after] ?? after,
+          _englishSyntaxText[placeholder] ?? placeholder,
+          block: block,
+        );
   TextEditingValue apply(TextEditingValue value) {
     final selection = value.selection;
     final start = selection.isValid ? selection.start : value.text.length;
@@ -105,4 +118,68 @@ const markdownCommandGroups = <String, List<MarkdownCommand>>{
     ),
     MarkdownCommand('脚注', '', '[^note]\n\n[^note]: 脚注内容', '正文', block: true),
   ],
+};
+
+String markdownGroupLabel(String label, bool zh) => zh
+    ? label
+    : switch (label) {
+        '标题' => 'Headings',
+        '文本' => 'Text',
+        '列表与块' => 'Lists and blocks',
+        '链接与扩展' => 'Links and extensions',
+        _ => label,
+      };
+
+const _englishSyntaxText = <String, String>{
+  '文字颜色': 'Text color',
+  '彩色文字': 'Colored text',
+  '粗体': 'Bold',
+  '斜体': 'Italic',
+  '粗斜体': 'Bold italic',
+  '删除线': 'Strikethrough',
+  '行内代码': 'Inline code',
+  '换行': 'Line break',
+  '段落': 'Paragraph',
+  '转义': 'Escape',
+  '文本': 'Text',
+  '一级标题': 'Heading 1',
+  '二级标题': 'Heading 2',
+  '三级标题': 'Heading 3',
+  '四级标题': 'Heading 4',
+  '五级标题': 'Heading 5',
+  '六级标题': 'Heading 6',
+  '标题': 'Heading',
+  '无序列表': 'Bullet list',
+  '有序列表': 'Numbered list',
+  '任务列表': 'Task list',
+  '已完成': 'Completed task',
+  '嵌套列表': 'Nested list',
+  '列表项': 'List item',
+  '待办事项': 'Task',
+  '已完成事项': 'Completed task',
+  '子项': 'Child item',
+  '引用': 'Blockquote',
+  '嵌套引用': 'Nested blockquote',
+  '分隔线': 'Horizontal rule',
+  '代码块': 'Code block',
+  '缩进代码': 'Indented code',
+  '表格': 'Table',
+  '内容': 'Content',
+  '链接': 'Link',
+  '图片': 'Image',
+  '引用式链接': 'Reference link',
+  '自动链接': 'Autolink',
+  '邮件': 'Email',
+  '链接文字': 'Link text',
+  '图片说明': 'Image description',
+  '行内公式': 'Inline math',
+  '块公式': 'Block math',
+  '脚注': 'Footnote',
+  '正文': 'Text',
+  '- 父项\n  - ': '- Parent item\n  - ',
+  '> 引用\n>> ': '> Quote\n>> ',
+  '| 列一 | 列二 |\n| :--- | ---: |\n| ':
+      '| Column 1 | Column 2 |\n| :--- | ---: |\n| ',
+  ' | 内容 |': ' | Content |',
+  '[^note]\n\n[^note]: 脚注内容': '[^note]\n\n[^note]: Footnote content',
 };

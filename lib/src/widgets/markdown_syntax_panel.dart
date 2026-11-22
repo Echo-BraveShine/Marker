@@ -69,7 +69,7 @@ class MarkdownSyntaxPanel extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            group.key,
+                            markdownGroupLabel(group.key, zh),
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w600,
@@ -100,10 +100,12 @@ class MarkdownSyntaxPanel extends StatelessWidget {
                                       color: c.bgEditor,
                                       borderRadius: BorderRadius.circular(7),
                                       onPressed: enabled
-                                          ? () => onCommand(command)
+                                          ? () => onCommand(
+                                              command.forLanguage(zh),
+                                            )
                                           : null,
                                       child: Text(
-                                        command.label,
+                                        command.labelFor(zh),
                                         style: TextStyle(
                                           fontSize: 12,
                                           color: c.textPrimary,

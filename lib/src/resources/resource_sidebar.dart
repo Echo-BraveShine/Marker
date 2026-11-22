@@ -1,9 +1,10 @@
 import 'dart:io';
 import 'package:flutter/cupertino.dart';
+export 'resource_text_dialog.dart';
 import 'package:flutter/material.dart' show Theme;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../theme/marker_colors.dart';
-import '../widgets/marker_dialog.dart';
+import '../l10n/app_localizations.dart';
 import 'resource_provider.dart';
 import 'resource_service.dart';
 
@@ -22,9 +23,9 @@ class ResourceSidebar extends ConsumerWidget {
   final bool zh;
   final VoidCallback onImport, onMenu;
   final void Function(ResourceItem) onItem;
-  String t(String cn, String en) => zh ? cn : en;
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
     final c = Theme.of(context).extension<MarkerColors>()!;
     final work = ref.watch(resourceUiProvider);
     final data = ref.watch(
@@ -47,7 +48,7 @@ class ResourceSidebar extends ConsumerWidget {
                   padding: EdgeInsets.zero,
                   onPressed: work.busy ? null : onImport,
                   child: Text(
-                    t('导入图片', 'Import images'),
+                    l10n.importImages,
                     style: const TextStyle(fontSize: 12),
                   ),
                 ),
@@ -81,7 +82,7 @@ class ResourceSidebar extends ConsumerWidget {
                   padding: EdgeInsets.zero,
                   onPressed: ref.read(resourceUiProvider.notifier).cancel,
                   child: Text(
-                    t('停止后续处理', 'Stop remaining work'),
+                    l10n.stopRemainingWork,
                     style: const TextStyle(fontSize: 11),
                   ),
                 ),
@@ -95,10 +96,7 @@ class ResourceSidebar extends ConsumerWidget {
               child: Padding(
                 padding: const EdgeInsets.all(12),
                 child: Text(
-                  t(
-                    '无法读取图片，请检查目录权限。',
-                    'Cannot read images. Check folder access.',
-                  ),
+                  l10n.cannotReadImages,
                   style: TextStyle(fontSize: 12, color: c.textSecondary),
                 ),
               ),
@@ -109,10 +107,7 @@ class ResourceSidebar extends ConsumerWidget {
                   child: Padding(
                     padding: const EdgeInsets.all(16),
                     child: Text(
-                      t(
-                        '导入图片或将截图粘贴到编辑区。\n原图会保留，资源目录按需创建。',
-                        'Import images or paste a screenshot.\nOriginals are kept; the asset folder is created as needed.',
-                      ),
+                      l10n.importOrPasteImages,
                       style: TextStyle(
                         fontSize: 12,
                         height: 1.6,
@@ -129,7 +124,7 @@ class ResourceSidebar extends ConsumerWidget {
                     Padding(
                       padding: const EdgeInsets.all(8),
                       child: Text(
-                        t('部分特殊语法保持原样', 'Some custom syntax is left unchanged'),
+                        l10n.customSyntaxUnchanged,
                         style: TextStyle(fontSize: 11, color: c.textSecondary),
                       ),
                     ),
@@ -147,15 +142,9 @@ class ResourceSidebar extends ConsumerWidget {
                         padding: const EdgeInsets.fromLTRB(8, 10, 8, 5),
                         child: Text(
                           switch (status) {
-                            ResourceAvailability.local => t(
-                              '本地图片',
-                              'Local images',
-                            ),
-                            ResourceAvailability.remote => t(
-                              '网络图片',
-                              'Web images',
-                            ),
-                            _ => t('需要处理', 'Needs attention'),
+                            ResourceAvailability.local => l10n.localImages,
+                            ResourceAvailability.remote => l10n.webImages,
+                            _ => l10n.needsAttention,
                           },
                           style: TextStyle(
                             fontSize: 11,
@@ -227,11 +216,11 @@ class ResourceSidebar extends ConsumerWidget {
                                     Text(
                                       item.availability ==
                                               ResourceAvailability.local
-                                          ? '${(item.size / 1024).ceil()} KB${item.managed ? ' · ${t('已管理', 'Managed')}' : ''}'
+                                          ? '${(item.size / 1024).ceil()} KB${item.managed ? ' · ${l10n.managed}' : ''}'
                                           : item.availability ==
                                                 ResourceAvailability.remote
-                                          ? t('保留网址', 'Linked URL')
-                                          : t('点击修复', 'Click to repair'),
+                                          ? l10n.linkedUrl
+                                          : l10n.clickToRepair,
                                       style: TextStyle(
                                         fontSize: 10,
                                         color: c.textSecondary,
@@ -252,52 +241,4 @@ class ResourceSidebar extends ConsumerWidget {
       ],
     );
   }
-}
-
-class ResourceTextDialog extends StatefulWidget {
-  const ResourceTextDialog({
-    super.key,
-    required this.title,
-    required this.placeholder,
-    required this.initial,
-    required this.confirm,
-  });
-  final String title, placeholder, initial, confirm;
-  @override
-  State<ResourceTextDialog> createState() => _ResourceTextDialogState();
-}
-
-class _ResourceTextDialogState extends State<ResourceTextDialog> {
-  late final _controller = TextEditingController(text: widget.initial);
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  void _submit() {
-    if (_controller.text.trim().isNotEmpty) {
-      Navigator.pop(context, _controller.text.trim());
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) => MarkerDialog(
-    width: 440,
-    title: Text(widget.title),
-    content: CupertinoTextField(
-      key: const Key('resource-text-input'),
-      controller: _controller,
-      autofocus: true,
-      placeholder: widget.placeholder,
-      onSubmitted: (_) => _submit(),
-    ),
-    actions: [
-      MarkerDialogButton(
-        primary: true,
-        onPressed: _submit,
-        child: Text(widget.confirm),
-      ),
-    ],
-  );
 }

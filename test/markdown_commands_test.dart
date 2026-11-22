@@ -34,4 +34,41 @@ void main() {
       'prefix**text**',
     );
   });
+  test('all syntax groups, labels and inserted templates support English', () {
+    final chinese = RegExp(r'[\u3400-\u9fff]');
+    for (final group in markdownCommandGroups.entries) {
+      expect(chinese.hasMatch(markdownGroupLabel(group.key, false)), isFalse);
+      expect(markdownGroupLabel(group.key, true), group.key);
+      for (final command in group.value) {
+        final english = command.forLanguage(false);
+        expect(
+          chinese.hasMatch(command.labelFor(false)),
+          isFalse,
+          reason: command.label,
+        );
+        expect(
+          chinese.hasMatch(
+            '${english.before}${english.after}${english.placeholder}',
+          ),
+          isFalse,
+          reason: command.label,
+        );
+        expect(english.label, command.label); // Dispatch identity stays stable.
+        expect(identical(command.forLanguage(true), command), isTrue);
+        final selected = english.apply(
+          const TextEditingValue(
+            text: '中文原文',
+            selection: TextSelection(baseOffset: 0, extentOffset: 4),
+          ),
+        );
+        expect(
+          selected.text.substring(
+            selected.selection.start,
+            selected.selection.end,
+          ),
+          '中文原文',
+        );
+      }
+    }
+  });
 }

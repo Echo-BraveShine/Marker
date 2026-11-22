@@ -6,54 +6,30 @@ import '../providers/update_provider.dart';
 import '../providers/release_updates.dart';
 import '../theme/marker_colors.dart';
 import '../theme/marker_style.dart';
+import '../l10n/app_localizations.dart';
 import 'marker_logo.dart';
 
 class AboutSettings extends ConsumerWidget {
   const AboutSettings({super.key, required this.zh});
   final bool zh;
-  String t(String chinese, String english) => zh ? chinese : english;
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
     final c = Theme.of(context).extension<MarkerColors>()!;
     final info = ref.watch(packageInfoProvider);
     final update = ref.watch(updateProvider);
     final message = switch (update.status) {
-      ReleaseStatus.idle => t(
-        '手动检查 GitHub 上的最新公开版本。',
-        'Check the latest public release on GitHub.',
-      ),
-      ReleaseStatus.checking => t('正在检查更新…', 'Checking for updates…'),
-      ReleaseStatus.noRelease => t(
-        '暂未找到公开发布版本。',
-        'No public release was found.',
-      ),
-      ReleaseStatus.current => t('当前已是最新版本。', 'You are up to date.'),
-      ReleaseStatus.available => t(
-        '发现新版本 ${update.latest}',
-        'Version ${update.latest} is available',
-      ),
+      ReleaseStatus.idle => l10n.manualCheckForUpdates,
+      ReleaseStatus.checking => l10n.checkingForUpdates,
+      ReleaseStatus.noRelease => l10n.noPublicRelease,
+      ReleaseStatus.current => l10n.currentVersion,
+      ReleaseStatus.available => l10n.versionAvailableStr(update.latest ?? ''),
       ReleaseStatus.error => switch (update.error) {
-        UpdateError.restricted => t(
-          '请求受限，请稍后重试。',
-          'Request limited. Try again later.',
-        ),
-        UpdateError.network => t(
-          '无法连接，请检查网络后重试。',
-          'Cannot connect. Check your connection and retry.',
-        ),
-        UpdateError.version => t(
-          '无法读取当前版本信息，请重试。',
-          'Cannot read the installed version. Please retry.',
-        ),
-        UpdateError.invalidData => t(
-          '版本信息格式异常，请稍后重试。',
-          'Invalid release information. Try again later.',
-        ),
-        _ => t(
-          '检查失败，请重试或查看发布页面。',
-          'Check failed. Retry or visit the releases page.',
-        ),
+        UpdateError.restricted => l10n.requestLimited,
+        UpdateError.network => l10n.cannotConnect,
+        UpdateError.version => l10n.cannotReadVersion,
+        UpdateError.invalidData => l10n.invalidReleaseInfo,
+        _ => l10n.checkFailed,
       },
     };
     return Container(
@@ -79,9 +55,9 @@ class AboutSettings extends ConsumerWidget {
                     Text(
                       info.when(
                         data: (value) =>
-                            '${t('版本', 'Version')} ${value.version}${value.buildNumber.isEmpty ? '' : ' (${value.buildNumber})'}',
-                        loading: () => t('读取版本中…', 'Loading version…'),
-                        error: (_, _) => t('版本信息暂不可用', 'Version unavailable'),
+                            '${l10n.version} ${value.version}${value.buildNumber.isEmpty ? '' : ' (${value.buildNumber})'}',
+                        loading: () => l10n.loadingVersion,
+                        error: (_, _) => l10n.versionUnavailable,
                       ),
                     ),
                   ],
@@ -90,13 +66,7 @@ class AboutSettings extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 16),
-          Text(
-            t(
-              '专注 Markdown 写作与即时预览。',
-              'Focused Markdown writing and live preview.',
-            ),
-            style: TextStyle(color: c.textSecondary),
-          ),
+          Text(l10n.focusedMarkdown, style: TextStyle(color: c.textSecondary)),
           const SizedBox(height: 16),
           Text(
             message,
@@ -119,7 +89,7 @@ class AboutSettings extends ConsumerWidget {
                     ? null
                     : () => ref.read(updateProvider.notifier).check(),
                 child: Text(
-                  t('检查更新', 'Check for updates'),
+                  l10n.checkForUpdates,
                   style: const TextStyle(fontSize: 12),
                 ),
               ),
@@ -136,7 +106,7 @@ class AboutSettings extends ConsumerWidget {
                     mode: LaunchMode.externalApplication,
                   ),
                   child: Text(
-                    t('查看并下载', 'View and download'),
+                    l10n.viewAndDownload,
                     style: const TextStyle(fontSize: 12),
                   ),
                 ),
@@ -152,7 +122,7 @@ class AboutSettings extends ConsumerWidget {
                   mode: LaunchMode.externalApplication,
                 ),
                 child: Text(
-                  t('发布页面', 'Releases'),
+                  l10n.releases,
                   style: const TextStyle(fontSize: 12),
                 ),
               ),

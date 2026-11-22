@@ -1,17 +1,18 @@
 import 'package:flutter/cupertino.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/material.dart' show Theme;
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../theme/marker_colors.dart';
 import '../theme/marker_style.dart';
 import '../widgets/marker_dialog.dart';
+import '../l10n/app_localizations.dart';
 import 'document_exporter.dart';
 
 class ExportOptionsPanel extends ConsumerWidget {
   const ExportOptionsPanel({super.key, required this.zh});
   final bool zh;
-  String t(String zh, String en) => this.zh ? zh : en;
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
     final options = ref.watch(documentExportOptionsProvider);
     void update(DocumentExportOptions Function(DocumentExportOptions) change) =>
         ref.read(documentExportOptionsProvider.notifier).update(change);
@@ -28,13 +29,13 @@ class ExportOptionsPanel extends ConsumerWidget {
     );
     return MarkerDialog(
       width: 440,
-      title: Text(t('导出文档', 'Export document')),
+      title: Text(l10n.exportDocument),
       content: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            t('格式', 'Format'),
+            l10n.format,
             style: TextStyle(fontSize: 12, color: c.textSecondary),
           ),
           const SizedBox(height: 10),
@@ -60,10 +61,7 @@ class ExportOptionsPanel extends ConsumerWidget {
           const SizedBox(height: 16),
           if (options.format == DocumentExportFormat.pdf)
             Text(
-              t(
-                'A4 自动分页，文字可选择与复制。包含公式、Mermaid 与图片。',
-                'A4 pages with selectable, copyable text, including equations, Mermaid and images.',
-              ),
+              l10n.exportA4Info,
               style: TextStyle(fontSize: 13, color: c.textSecondary),
             )
           else ...[
@@ -71,7 +69,7 @@ class ExportOptionsPanel extends ConsumerWidget {
               children: [
                 Expanded(
                   child: Text(
-                    t('跟随应用深浅主题', 'Use app appearance'),
+                    l10n.useAppAppearance,
                     style: const TextStyle(fontSize: 13),
                   ),
                 ),
@@ -85,7 +83,7 @@ class ExportOptionsPanel extends ConsumerWidget {
             if (options.format == DocumentExportFormat.png) ...[
               const SizedBox(height: 16),
               Text(
-                t('图片宽度（px）', 'Image width (px)'),
+                l10n.imageWidth,
                 style: TextStyle(fontSize: 12, color: c.textSecondary),
               ),
               const SizedBox(height: 8),
@@ -108,10 +106,7 @@ class ExportOptionsPanel extends ConsumerWidget {
             ] else ...[
               const SizedBox(height: 12),
               Text(
-                t(
-                  '独立 HTML，包含图片与图表，可离线查看。',
-                  'Self-contained HTML with embedded images and diagrams, available offline.',
-                ),
+                l10n.selfContainedHtml,
                 style: TextStyle(fontSize: 13, color: c.textSecondary),
               ),
             ],
@@ -123,7 +118,7 @@ class ExportOptionsPanel extends ConsumerWidget {
           primary: true,
           onPressed: () =>
               Navigator.pop(context, ref.read(documentExportOptionsProvider)),
-          child: Text(t('导出', 'Export')),
+          child: Text(l10n.exportButton),
         ),
       ],
     );
