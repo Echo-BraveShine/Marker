@@ -1,9 +1,28 @@
+import 'dart:async';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:flutter/widgets.dart';
 import 'package:flutter/scheduler.dart';
 
-/// Only the driving pane can publish progress, including across layout frames.
+class _ScrollMapping {
+  const _ScrollMapping(
+    this.source,
+    this.target,
+    this.sourceAnchor,
+    this.targetAnchor,
+    this.ratio,
+    this.sourceViewport,
+    this.targetViewport,
+  );
+  final ScrollPosition source, target;
+  final double sourceAnchor,
+      targetAnchor,
+      ratio,
+      sourceViewport,
+      targetViewport;
+}
+
+/// A gesture owns both its driving pane and its local offset mapping.
 class LinkedScroll {
   LinkedScroll(this.editor, this.preview, {required this.enabled}) {
     editor.addListener(_fromEditor);
@@ -11,60 +30,119 @@ class LinkedScroll {
   }
   final ScrollController editor, preview;
   final bool Function() enabled;
-  bool _updating = false;
+  bool _updating = false, _disposed = false;
   int? _frame;
+  Timer? _idleTimer;
   ScrollController? _leader, _source, _target;
+  _ScrollMapping? _mapping;
 
-  /// Explicit user input, editing or link navigation transfers scroll ownership.
-  void takeControl(ScrollController controller) {
-    if (_leader == controller) return;
-    reset();
-    _leader = controller;
+  void takeControl(ScrollController controller, {bool newGesture = false}) {
+    if (_updating || _disposed) return;
+    if (_leader != controller || newGesture) {
+      reset();
+      _leader = controller;
+    }
+    final target = controller == editor ? preview : editor;
+    if (_mapping == null) _capture(controller, target);
+    _rearmIdleTimer();
   }
+
+  void takeEditorControl() => takeControl(editor, newGesture: true);
 
   void reset() {
     if (_frame != null) {
       SchedulerBinding.instance.cancelFrameCallbackWithId(_frame!);
       _frame = null;
     }
+    _idleTimer?.cancel();
+    _idleTimer = null;
+    _mapping = null;
     _leader = _source = _target = null;
   }
 
   void _fromEditor() => _sync(editor, preview);
   void _fromPreview() => _sync(preview, editor);
+
+  void _capture(
+    ScrollController source,
+    ScrollController target, {
+    bool implicit = false,
+  }) {
+    if (source.positions.length != 1 || target.positions.length != 1) return;
+    final a = source.position, b = target.position;
+    if (!a.hasContentDimensions || !b.hasContentDimensions) return;
+    final extentA = a.maxScrollExtent - a.minScrollExtent;
+    final extentB = b.maxScrollExtent - b.minScrollExtent;
+    if (!extentA.isFinite ||
+        !extentB.isFinite ||
+        extentA <= 0 ||
+        extentB <= 0) {
+      return;
+    }
+    _mapping = _ScrollMapping(
+      a,
+      b,
+      implicit ? a.minScrollExtent : a.pixels,
+      implicit ? b.minScrollExtent : b.pixels,
+      extentB / extentA,
+      a.viewportDimension,
+      b.viewportDimension,
+    );
+  }
+
   void _sync(ScrollController source, ScrollController target) {
-    if (_updating || !enabled()) return;
+    if (_updating || _disposed) return;
+    if (!enabled()) {
+      reset();
+      return;
+    }
     _leader ??= source;
-    // jumpTo can trigger another frame of extent/caret correction. That must
-    // never feed back into the pane under the user's pointer or cancel its fling.
     if (_leader != source) return;
+    if (_mapping == null) _capture(source, target, implicit: true);
     _source = source;
     _target = target;
+    _rearmIdleTimer();
     _frame ??= SchedulerBinding.instance.scheduleFrameCallback((_) {
       _frame = null;
-      if (_source == _leader) _apply(_source!, _target!);
+      if (!_disposed &&
+          _source != null &&
+          _source == _leader &&
+          _target != null) {
+        _apply(_source!, _target!);
+      }
     });
   }
 
   void _apply(ScrollController source, ScrollController target) {
-    if (_updating ||
-        !enabled() ||
-        source.positions.length != 1 ||
-        target.positions.length != 1) {
+    if (_updating || _disposed) return;
+    if (!enabled()) {
+      reset();
       return;
     }
-    final a = source.position;
-    final b = target.position;
+    if (source.positions.length != 1 || target.positions.length != 1) return;
+    final a = source.position, b = target.position;
     if (!a.hasContentDimensions || !b.hasContentDimensions) return;
-    final sourceExtent = a.maxScrollExtent - a.minScrollExtent;
-    final targetExtent = b.maxScrollExtent - b.minScrollExtent;
-    if (sourceExtent <= 0 || targetExtent <= 0) return;
-    final progress = ((a.pixels - a.minScrollExtent) / sourceExtent).clamp(
-      0.0,
-      1.0,
-    );
-    final offset = b.minScrollExtent + progress * targetExtent;
-    if ((offset - b.pixels).abs() < .5) return;
+    final mapping = _mapping;
+    if (mapping == null) {
+      _capture(source, target, implicit: true);
+    } else if (!identical(a, mapping.source) ||
+        !identical(b, mapping.target) ||
+        a.viewportDimension != mapping.sourceViewport ||
+        b.viewportDimension != mapping.targetViewport) {
+      _capture(source, target);
+    }
+    final current = _mapping;
+    if (current == null) return;
+    // Content extents can change as images/lazy blocks lay out. Keep the gesture's
+    // captured ratio and anchors; only clamp against the current destination.
+    var offset =
+        (current.targetAnchor +
+                (a.pixels - current.sourceAnchor) * current.ratio)
+            .clamp(b.minScrollExtent, b.maxScrollExtent)
+            .toDouble();
+    if (a.pixels <= a.minScrollExtent) offset = b.minScrollExtent;
+    if (a.pixels >= a.maxScrollExtent) offset = b.maxScrollExtent;
+    if (!offset.isFinite || (offset - b.pixels).abs() < .5) return;
     _updating = true;
     try {
       target.jumpTo(offset);
@@ -73,7 +151,28 @@ class LinkedScroll {
     }
   }
 
+  void _rearmIdleTimer() {
+    _idleTimer?.cancel();
+    _idleTimer = Timer(const Duration(milliseconds: 150), () {
+      _idleTimer = null;
+      if (_disposed) return;
+      final leader = _leader;
+      if (_frame != null ||
+          (leader != null &&
+              leader.positions.length == 1 &&
+              leader.position.isScrollingNotifier.value)) {
+        _rearmIdleTimer();
+      } else {
+        // Keep ownership so delayed follower corrections still cannot feed back.
+        // Fresh user input will capture current extents and offset anchors.
+        _mapping = null;
+      }
+    });
+  }
+
   void dispose() {
+    if (_disposed) return;
+    _disposed = true;
     reset();
     editor.removeListener(_fromEditor);
     preview.removeListener(_fromPreview);
@@ -94,8 +193,9 @@ class LinkedScrollRegion extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Listener(
-    onPointerDown: (_) => link.takeControl(controller),
-    onPointerPanZoomStart: (_) => link.takeControl(controller),
+    onPointerDown: (_) => link.takeControl(controller, newGesture: true),
+    onPointerPanZoomStart: (_) =>
+        link.takeControl(controller, newGesture: true),
     onPointerSignal: (event) {
       if (event is PointerScrollEvent && event.scrollDelta.dy != 0) {
         link.takeControl(controller);

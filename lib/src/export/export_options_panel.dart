@@ -1,24 +1,20 @@
 import 'package:flutter/cupertino.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/material.dart' show Theme;
 import '../theme/marker_colors.dart';
 import '../theme/marker_style.dart';
 import '../widgets/marker_dialog.dart';
 import 'document_exporter.dart';
 
-class ExportOptionsPanel extends StatefulWidget {
+class ExportOptionsPanel extends ConsumerWidget {
   const ExportOptionsPanel({super.key, required this.zh});
   final bool zh;
+  String t(String zh, String en) => this.zh ? zh : en;
   @override
-  State<ExportOptionsPanel> createState() => _ExportOptionsPanelState();
-}
-
-class _ExportOptionsPanelState extends State<ExportOptionsPanel> {
-  DocumentExportFormat _format = DocumentExportFormat.pdf;
-  bool _followTheme = false;
-  int _width = 1280;
-  String t(String zh, String en) => widget.zh ? zh : en;
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final options = ref.watch(documentExportOptionsProvider);
+    void update(DocumentExportOptions Function(DocumentExportOptions) change) =>
+        ref.read(documentExportOptionsProvider.notifier).update(change);
     final c = Theme.of(context).extension<MarkerColors>()!;
     Widget group(Widget child) => Container(
       width: double.infinity,
@@ -48,19 +44,21 @@ class _ExportOptionsPanelState extends State<ExportOptionsPanel> {
               thumbColor: Theme.of(context).brightness == Brightness.dark
                   ? c.separator
                   : c.bgEditor,
-              groupValue: _format,
+              groupValue: options.format,
               children: const {
                 DocumentExportFormat.pdf: Text('PDF'),
                 DocumentExportFormat.png: Text('PNG'),
                 DocumentExportFormat.html: Text('HTML'),
               },
               onValueChanged: (value) {
-                if (value != null) setState(() => _format = value);
+                if (value != null) {
+                  update((state) => state.copyWith(format: value));
+                }
               },
             ),
           ),
           const SizedBox(height: 16),
-          if (_format == DocumentExportFormat.pdf)
+          if (options.format == DocumentExportFormat.pdf)
             Text(
               t(
                 'A4 自动分页，文字可选择与复制。包含公式、Mermaid 与图片。',
@@ -78,12 +76,13 @@ class _ExportOptionsPanelState extends State<ExportOptionsPanel> {
                   ),
                 ),
                 CupertinoSwitch(
-                  value: _followTheme,
-                  onChanged: (value) => setState(() => _followTheme = value),
+                  value: options.followTheme,
+                  onChanged: (value) =>
+                      update((state) => state.copyWith(followTheme: value)),
                 ),
               ],
             ),
-            if (_format == DocumentExportFormat.png) ...[
+            if (options.format == DocumentExportFormat.png) ...[
               const SizedBox(height: 16),
               Text(
                 t('图片宽度（px）', 'Image width (px)'),
@@ -93,14 +92,16 @@ class _ExportOptionsPanelState extends State<ExportOptionsPanel> {
               SizedBox(
                 width: double.infinity,
                 child: CupertinoSlidingSegmentedControl<int>(
-                  groupValue: _width,
+                  groupValue: options.width,
                   children: const {
                     960: Text('960'),
                     1280: Text('1280'),
                     1600: Text('1600'),
                   },
                   onValueChanged: (value) {
-                    if (value != null) setState(() => _width = value);
+                    if (value != null) {
+                      update((state) => state.copyWith(width: value));
+                    }
                   },
                 ),
               ),
@@ -120,14 +121,8 @@ class _ExportOptionsPanelState extends State<ExportOptionsPanel> {
       actions: [
         MarkerDialogButton(
           primary: true,
-          onPressed: () => Navigator.pop(
-            context,
-            DocumentExportOptions(
-              format: _format,
-              followTheme: _followTheme,
-              width: _width,
-            ),
-          ),
+          onPressed: () =>
+              Navigator.pop(context, ref.read(documentExportOptionsProvider)),
           child: Text(t('导出', 'Export')),
         ),
       ],

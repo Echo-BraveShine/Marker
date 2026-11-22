@@ -753,7 +753,7 @@ extension _ResourceActions on _MarkerHomeState {
       ('folder', t('新建文档文件夹…', 'New document folder…'), CupertinoIcons.folder),
       if (_path != null)
         ('rename', t('重命名文档…', 'Rename document…'), CupertinoIcons.pencil),
-      if (documentExportEnabled)
+      if (resourcePackageExportEnabled)
         (
           'package',
           t('打包文档与图片…', 'Package document and images…'),

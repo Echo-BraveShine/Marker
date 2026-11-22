@@ -1,8 +1,9 @@
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
-// Keep export entry points hidden until the feature is ready to release.
-const documentExportEnabled = false;
+// Document export and resource packaging are released independently.
+const documentExportEnabled = true;
+const resourcePackageExportEnabled = false;
 
 class AppShortcut {
   const AppShortcut(

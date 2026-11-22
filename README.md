@@ -31,7 +31,7 @@ flutter build macos --debug
 
 ## 当前限制
 
-已实现桌面关闭保护、macOS 退出保护和草稿自动恢复（编辑后约 350ms 缓存）。草稿缓存不能替代文件保存。已支持多文档恢复、分屏滚动联动及可选的编辑器语法高亮。导出与资源打包入口暂时隐藏。资源管理涉及的原生拖放、剪贴板和废纸篓需要分别在对应桌面系统验收。
+已实现桌面关闭保护、macOS 退出保护和草稿自动恢复（编辑后约 350ms 缓存）。草稿缓存不能替代文件保存。已支持多文档恢复、分屏滚动联动及可选的编辑器语法高亮。支持 PDF、PNG 长图与独立 HTML 导出；资源打包入口暂时隐藏。资源管理涉及的原生拖放、剪贴板和废纸篓需要分别在对应桌面系统验收。
 
 ## 界面
 
@@ -89,3 +89,19 @@ Markdown 的“打开方式”关联和三端窗口核对详见 [桌面集成说
 本项目绑定 [Echo-BraveShine/Marker](https://github.com/Echo-BraveShine/Marker)。GitHub Actions 提供三端构建检查及基于版本标签的安装包发布。设置 → 关于可查看实际版本、手动检查 GitHub 更新。
 
 详见 [发布说明](docs/RELEASING.md)，包括版本标签、安装包格式、签名现状及本地验证方式。
+
+## 文档导出 / Document export
+
+工具栏点击「导出」，或使用 **⌘⇧E（macOS）/ Ctrl+Shift+E（Windows、Linux）**。在设置的快捷键分类中也可查看。
+
+- **PDF**：浅色 A4 排版，长文自动分页，文字可选择与复制。脚注保留在文末；能容纳一页的段落、代码块、表格与图表尽量整体分页，超长内容按行或表格行拆分。
+- **PNG**：导出全文长图，可选择 960 / 1280 / 1600 px 宽度和跟随应用深浅主题。跟随主题选项在关闭弹窗、重启应用后保留。
+- **HTML**：独立离线文件，内嵌图片、字体、公式与 Mermaid 渲染资源。
+
+导出使用点击入口时的文档快照，包含未保存的编辑。文档中的本地图片按 Markdown 所在目录解析，网络图片会先下载并内嵌；缺失图片会提示失败；PDF、PNG 渲染时也会检查公式与图表语法。macOS 如提示目录授权，请选择相应的图片目录或导出目录。取消不会修改原文或现有输出；导出目标不能是 Markdown 文件。
+
+PDF、PNG 中的 GIF、WebP 和 APNG 动图按首帧导出；HTML 保留动图。PNG 高度最多 32768 px，超长文档请选择 PDF。单张图片最多约 25 MB，内嵌图片总量最多 128 MB。Windows 需要 Microsoft Edge WebView2 Runtime。
+
+Use **Export** in the toolbar or **⌘⇧E / Ctrl+Shift+E**. PDF uses light A4 pages with selectable text and endnotes, keeping fitting content blocks together and splitting oversized content at lines or table rows; PNG exports the full document at a chosen width and appearance; HTML embeds offline rendering resources. The app appearance export preference survives dialog dismissal and app restarts. Export captures unsaved content when opened. Local images resolve relative to the Markdown file; remote images are downloaded and embedded. Missing assets or invalid equations/diagrams report an error. On macOS, grant access to the relevant image or output folder when asked. Cancellation preserves existing files. PNG height is limited to 32768 px; use PDF for longer documents. Images are limited to approximately 25 MB each and 128 MB total when embedded. Windows requires Edge WebView2 Runtime.
+
+macOS 原生导出回归：`bash scripts/ci/test-macos-export.sh`，检查脚注、可复制文字、完整分页及深浅主题 PNG；桌面 CI 自动运行此检查。

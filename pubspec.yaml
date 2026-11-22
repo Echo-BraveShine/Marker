@@ -2,7 +2,7 @@ name: marker
 description: "轻量级 Markdown 编辑预览工具"
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev.
 
-version: 0.0.5+1
+version: 0.0.6+1
 
 environment:
   sdk: ^3.12.2

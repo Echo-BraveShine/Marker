@@ -1,6 +1,8 @@
 import 'package:flutter/cupertino.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:marker/src/export/document_exporter.dart';
 import 'package:marker/src/export/export_options_panel.dart';
 import 'package:marker/src/theme/marker_app_theme.dart';
@@ -8,23 +10,26 @@ import 'package:marker/src/widgets/marker_dialog.dart';
 import 'package:marker/src/widgets/marker_floating_surface.dart';
 
 void main() {
+  setUp(() => SharedPreferences.setMockInitialValues({}));
   for (final dark in [false, true]) {
     testWidgets(
       'export panel shares app chrome and controls (${dark ? 'dark' : 'light'})',
       (tester) async {
         DocumentExportOptions? result;
         await tester.pumpWidget(
-          MaterialApp(
-            theme: dark ? MarkerAppTheme().dark() : MarkerAppTheme().light(),
-            home: Builder(
-              builder: (context) => CupertinoButton(
-                onPressed: () async {
-                  result = await showMarkerDialog<DocumentExportOptions>(
-                    context: context,
-                    builder: (_) => const ExportOptionsPanel(zh: true),
-                  );
-                },
-                child: const Text('Open'),
+          ProviderScope(
+            child: MaterialApp(
+              theme: dark ? MarkerAppTheme().dark() : MarkerAppTheme().light(),
+              home: Builder(
+                builder: (context) => CupertinoButton(
+                  onPressed: () async {
+                    result = await showMarkerDialog<DocumentExportOptions>(
+                      context: context,
+                      builder: (_) => const ExportOptionsPanel(zh: true),
+                    );
+                  },
+                  child: const Text('Open'),
+                ),
               ),
             ),
           ),

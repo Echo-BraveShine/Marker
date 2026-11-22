@@ -114,30 +114,32 @@ class OfflineHtmlRenderer {
       },
     );
     try {
-      await view.run();
+      await view.run().timeout(const Duration(seconds: 30));
       final controller = await ready.future.timeout(
         const Duration(seconds: 75),
       );
       dynamic result;
       if (pdf) {
-        result = await controller.callDevToolsProtocolMethod(
-          methodName: 'Page.printToPDF',
-          parameters: {
-            'printBackground': true,
-            'displayHeaderFooter': false,
-            'preferCSSPageSize': true,
-            'paperWidth': 8.2677165354,
-            'paperHeight': 11.6929133858,
-            'marginTop': .70866,
-            'marginBottom': .70866,
-            'marginLeft': .70866,
-            'marginRight': .70866,
-          },
-        );
+        result = await controller
+            .callDevToolsProtocolMethod(
+              methodName: 'Page.printToPDF',
+              parameters: {
+                'printBackground': true,
+                'displayHeaderFooter': false,
+                'preferCSSPageSize': true,
+                'paperWidth': 8.2677165354,
+                'paperHeight': 11.6929133858,
+                'marginTop': .70866,
+                'marginBottom': .70866,
+                'marginLeft': .70866,
+                'marginRight': .70866,
+              },
+            )
+            .timeout(const Duration(seconds: 30));
       } else {
         final value = await controller.evaluateJavascript(
           source:
-              '({width:Math.ceil(document.getElementById("document").getBoundingClientRect().width),height:Math.ceil(document.getElementById("document").getBoundingClientRect().height)})',
+              '({width:Math.ceil(window.markerExport.width||document.getElementById("document").getBoundingClientRect().width),height:Math.ceil(document.getElementById("document").getBoundingClientRect().height)})',
         );
         final height = ((value as Map)['height'] as num).ceil();
         final imageWidth = (value['width'] as num).ceil().clamp(1, width);
@@ -146,25 +148,29 @@ class OfflineHtmlRenderer {
             '文档过长，请选择 PDF / Document is too tall for PNG; choose PDF',
           );
         }
-        result = await controller.callDevToolsProtocolMethod(
-          methodName: 'Page.captureScreenshot',
-          parameters: {
-            'format': 'png',
-            'captureBeyondViewport': true,
-            'clip': {
-              'x': 0,
-              'y': 0,
-              'width': imageWidth,
-              'height': height,
-              'scale': 1,
-            },
-          },
-        );
+        result = await controller
+            .callDevToolsProtocolMethod(
+              methodName: 'Page.captureScreenshot',
+              parameters: {
+                'format': 'png',
+                'captureBeyondViewport': true,
+                'clip': {
+                  'x': 0,
+                  'y': 0,
+                  'width': imageWidth,
+                  'height': height,
+                  'scale': 1,
+                },
+              },
+            )
+            .timeout(const Duration(seconds: 30));
       }
       if (result is! Map || result['data'] is! String) {
         throw StateError('Export data missing');
       }
-      return base64Decode(result['data'] as String);
+      final bytes = base64Decode(result['data'] as String);
+      if (bytes.isEmpty) throw StateError('Empty export result');
+      return bytes;
     } finally {
       closed = true;
       await view.dispose();

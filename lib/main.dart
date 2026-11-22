@@ -7,6 +7,7 @@ import 'src/resources/resource_provider.dart';
 import 'src/resources/resource_sidebar.dart';
 import 'src/widgets/shortcut_settings.dart';
 import 'src/export/document_exporter.dart';
+import 'src/export/export_destination.dart';
 import 'src/export/export_options_panel.dart';
 import 'package:flutter/rendering.dart' show RenderEditable;
 import 'src/widgets/about_settings.dart';
@@ -201,8 +202,14 @@ class _MarkerHomeState extends ConsumerState<MarkerHome> with WindowListener {
   set _serif(bool value) =>
       ref.read(editorProvider.notifier).update((s) => s.copyWith(serif: value));
   int get _mode => ref.read(editorProvider).mode;
-  set _mode(int value) =>
-      ref.read(editorProvider.notifier).update((s) => s.copyWith(mode: value));
+  set _mode(int value) {
+    if (_mode != value) {
+      // Reset linked scroll when mode changes to prevent stale sync
+      _linkedScroll.reset();
+    }
+    ref.read(editorProvider.notifier).update((s) => s.copyWith(mode: value));
+  }
+
   double get _ratio => ref.read(editorProvider).ratio;
   set _ratio(double value) =>
       ref.read(editorProvider.notifier).update((s) => s.copyWith(ratio: value));
@@ -218,6 +225,7 @@ class _MarkerHomeState extends ConsumerState<MarkerHome> with WindowListener {
     super.initState();
     _controller.addListener(_changed);
     FocusManager.instance.addEarlyKeyEventHandler(_handleSyntaxEscape);
+    FocusManager.instance.addEarlyKeyEventHandler(_handleNavigationKey);
     _linkedScroll = LinkedScroll(
       _editorScroll,
       _previewScroll,
@@ -241,6 +249,40 @@ class _MarkerHomeState extends ConsumerState<MarkerHome> with WindowListener {
           .read(editorProvider.notifier)
           .update((s) => s.copyWith(toolbarExpanded: false));
       return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
+  }
+
+  // Handles intentional navigation keys (arrows, Home/End, PageUp/Down) that
+  // should transfer ownership from preview to editor before caret reveal.
+  // This prevents leadership theft during split-scroll gestures while still
+  // allowing cursor movement to work correctly.
+  KeyEventResult _handleNavigationKey(KeyEvent event) {
+    if (!mounted) return KeyEventResult.ignored;
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
+      return KeyEventResult.ignored;
+    }
+    if (!_focus.hasFocus || !(ModalRoute.of(context)?.isCurrent ?? true)) {
+      return KeyEventResult.ignored;
+    }
+
+    // Map intentional navigation keys - transfer ownership for editor caret movement
+    const navigationKeys = <LogicalKeyboardKey>[
+      LogicalKeyboardKey.arrowUp,
+      LogicalKeyboardKey.arrowDown,
+      LogicalKeyboardKey.arrowLeft,
+      LogicalKeyboardKey.arrowRight,
+      LogicalKeyboardKey.home,
+      LogicalKeyboardKey.end,
+      LogicalKeyboardKey.pageUp,
+      LogicalKeyboardKey.pageDown,
+    ];
+
+    if (navigationKeys.contains(event.logicalKey)) {
+      // Transfer control to editor for this intentional navigation gesture
+      _linkedScroll.takeEditorControl();
+      // Observe navigation without consuming the key intended for EditableText.
+      return KeyEventResult.ignored;
     }
     return KeyEventResult.ignored;
   }
@@ -522,23 +564,32 @@ class _MarkerHomeState extends ConsumerState<MarkerHome> with WindowListener {
 
   void _changed() {
     if (!mounted || _switchingDocument) return;
-    _linkedScroll.takeControl(_editorScroll);
+    final previous = ref.read(editorProvider);
+    final text = _controller.text;
+    final textChanged = previous.markdown != text;
+    if (textChanged) _linkedScroll.takeEditorControl();
     final offset = _controller.selection.isValid
         ? _controller.selection.extentOffset
         : 0;
-    _lineIndex.update(_controller.text);
+    _lineIndex.update(text);
     final lineIndex = _lineIndex.lineAt(offset);
-    ref
-        .read(editorProvider.notifier)
-        .update(
-          (state) => state.copyWith(
-            markdown: _controller.text,
-            cursorLine: lineIndex + 1,
-            cursorColumn: offset - _lineIndex.start(lineIndex) + 1,
-          ),
-        );
-    if (_restoring || _lastDraftText == _controller.text) return;
-    _lastDraftText = _controller.text;
+    final line = lineIndex + 1;
+    final column = offset - _lineIndex.start(lineIndex) + 1;
+    if (textChanged ||
+        previous.cursorLine != line ||
+        previous.cursorColumn != column) {
+      ref
+          .read(editorProvider.notifier)
+          .update(
+            (state) => state.copyWith(
+              markdown: text,
+              cursorLine: line,
+              cursorColumn: column,
+            ),
+          );
+    }
+    if (_restoring || _lastDraftText == text) return;
+    _lastDraftText = text;
     _snapshot();
     _draftTimer?.cancel();
     _draftTimer = Timer(const Duration(milliseconds: 350), () async {
@@ -554,6 +605,7 @@ class _MarkerHomeState extends ConsumerState<MarkerHome> with WindowListener {
   @override
   void dispose() {
     FocusManager.instance.removeEarlyKeyEventHandler(_handleSyntaxEscape);
+    FocusManager.instance.removeEarlyKeyEventHandler(_handleNavigationKey);
     _draftTimer?.cancel();
     if (desktopWindow && defaultTargetPlatform == TargetPlatform.macOS) {
       _filesChannel.setMethodCallHandler(null);
@@ -764,39 +816,75 @@ class _MarkerHomeState extends ConsumerState<MarkerHome> with WindowListener {
 
   Future<void> _exportDocument() async {
     if (_busy || _restoring) return;
-    final options = await showMarkerDialog<DocumentExportOptions>(
-      context: context,
-      builder: (context) => ExportOptionsPanel(zh: _zh),
-    );
-    if (options == null || !mounted) return;
-    // Export a stable snapshot while allowing the editor to remain responsive.
+    // Capture the unsaved document before either asynchronous dialog opens.
     final source = _controller.text, documentPath = _path, title = _name;
     final dark = Theme.of(context).brightness == Brightness.dark;
     await _action(() async {
-      final basename = title.replaceFirst(
-        RegExp(r'\.(md|markdown)$', caseSensitive: false),
-        '',
-      );
-      final extension = options.format.name;
-      final target = await getSaveLocation(
-        suggestedName: '$basename.$extension',
-        acceptedTypeGroups: [
-          XTypeGroup(label: extension.toUpperCase(), extensions: [extension]),
-        ],
-      );
-      if (target == null) return;
-      final bytes = await ref
-          .read(exportControllerProvider.notifier)
-          .export(
-            source: source,
-            title: title,
-            documentPath: documentPath,
-            options: options,
-            dark: dark,
-          );
-      await XFile.fromData(bytes).saveTo(target.path);
-      if (mounted) {
-        _toast(t('已导出到 ${target.path}', 'Exported to ${target.path}'));
+      try {
+        await ref.read(exportAppearanceProvider.notifier).ready;
+        if (!mounted) return;
+        final options = await showMarkerDialog<DocumentExportOptions>(
+          context: context,
+          builder: (context) => ExportOptionsPanel(zh: _zh),
+        );
+        if (options == null || !mounted) return;
+        final basename = title.replaceFirst(
+          RegExp(r'\.(md|markdown)$', caseSensitive: false),
+          '',
+        );
+        final extension = options.format.name;
+        final target = await getSaveLocation(
+          suggestedName: '$basename.$extension',
+          acceptedTypeGroups: [
+            XTypeGroup(label: extension.toUpperCase(), extensions: [extension]),
+          ],
+        );
+        if (target == null || !mounted) return;
+        final writer = ExportDestinationWriter();
+        // Reject unsafe destinations before the expensive renderer starts.
+        final destination = writer.resolvePath(
+          target.path,
+          extension: extension,
+          sourcePath: documentPath,
+        );
+        Future<Uint8List> render() => ref
+            .read(exportControllerProvider.notifier)
+            .export(
+              source: source,
+              title: title,
+              documentPath: documentPath,
+              options: options,
+              dark: dark,
+            );
+        final bytes = documentPath == null
+            ? await render()
+            : await _withResourceAccess(
+                render,
+                directory: p.dirname(documentPath),
+              );
+        if (!mounted) return;
+        final savedPath = await _withResourceAccess(
+          () => writer.write(
+            bytes,
+            selectedPath: target.path,
+            extension: extension,
+            sourcePath: documentPath,
+          ),
+          directory: p.dirname(destination),
+        );
+        if (mounted) _toast(t('已导出到 $savedPath', 'Exported to $savedPath'));
+      } on ResourceCancelled {
+        // Cancelling source-folder authorization leaves the destination intact.
+        return;
+      } catch (error) {
+        if (!mounted) return;
+        await showMarkerDialog<void>(
+          context: context,
+          builder: (_) => MarkerDialog(
+            title: Text(t('无法导出文档', 'Unable to export document')),
+            content: Text(exportFailureMessage(error, chinese: _zh)),
+          ),
+        );
       }
     });
   }
@@ -971,6 +1059,7 @@ class _MarkerHomeState extends ConsumerState<MarkerHome> with WindowListener {
         : forward
         ? matches.where((m) => m.start >= position).firstOrNull ?? matches.first
         : matches.where((m) => m.end <= position).lastOrNull ?? matches.last;
+    _linkedScroll.takeEditorControl();
     _controller.selection = TextSelection(
       baseOffset: match.start,
       extentOffset: match.end,

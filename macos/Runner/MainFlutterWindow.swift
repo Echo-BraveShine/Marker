@@ -210,7 +210,7 @@ private final class DocumentExportJob: NSObject, WKNavigationDelegate {
     window.setContentSize(NSSize(width: contentWidth, height: 800))
     // Match screen and PDF geometry before measuring line boundaries.
     let prepare = """
-    const pageStyle=document.createElement('style');pageStyle.textContent='@page{size:auto!important;margin:0!important}article{padding:0!important;max-width:none!important}body{font-size:11.5pt!important}pre{border:1px solid #ddd}.mermaid svg{max-height:240mm}';document.head.appendChild(pageStyle);
+    const pageStyle=document.createElement('style');pageStyle.textContent='@page{size:auto!important;margin:0!important}article{padding:0!important;max-width:none!important}body{font-size:11.5pt!important}pre{border:1px solid #ddd}img{max-height:240mm;object-fit:contain}.mermaid svg{max-height:240mm}';document.head.appendChild(pageStyle);
     ({cuts:window.markerExportBreaks(\(pageHeight)),links:Array.from(document.querySelectorAll('#document a[href]')).flatMap(a=>Array.from(a.getClientRects()).map(r=>({href:a.getAttribute('href'),x:r.left,y:r.top,w:r.width,h:r.height}))),anchors:Array.from(document.querySelectorAll('#document [id]')).map(a=>({id:a.id,y:a.getBoundingClientRect().top}))});
     """
     view.evaluateJavaScript(prepare) { [weak self] value, error in
@@ -219,6 +219,10 @@ private final class DocumentExportJob: NSObject, WKNavigationDelegate {
         self.finish(nil, error?.localizedDescription ?? "Cannot measure PDF pages"); return
       }
       let cuts = numbers.map { $0.doubleValue }
+      guard cuts.allSatisfy({ $0.isFinite }), cuts.first == 0,
+            zip(cuts, cuts.dropFirst()).allSatisfy({ $0.1 - $0.0 >= 1 && $0.1 - $0.0 <= pageHeight + 1 }) else {
+        self.finish(nil, "Invalid PDF page geometry"); return
+      }
       let links = geometry["links"] as? [[String: Any]] ?? []
       let anchors = geometry["anchors"] as? [[String: Any]] ?? []
       func number(_ values: [String: Any], _ key: String) -> Double { (values[key] as? NSNumber)?.doubleValue ?? 0 }
@@ -243,6 +247,9 @@ private final class DocumentExportJob: NSObject, WKNavigationDelegate {
               context.closePDF(); self.finish(nil, "Cannot read vector PDF page"); return
             }
             let source = page.getBoxRect(.mediaBox)
+            guard source.width > 0 && source.height > 0 else {
+              context.closePDF(); self.finish(nil, "Invalid captured PDF geometry"); return
+            }
             let actualScale = (paperWidth - margin * 2) / source.width
             let used = source.height * actualScale
             context.beginPDFPage(nil)
@@ -309,6 +316,9 @@ private final class DocumentExportJob: NSObject, WKNavigationDelegate {
     deadline?.cancel(); deadline = nil
     view?.stopLoading(); window?.close(); view = nil; window = nil
     completion(data, error)
+  }
+  func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+    finish(nil, "Export renderer terminated. Try reducing image sizes or diagram complexity.")
   }
   func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) { finish(nil, error.localizedDescription) }
   func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) { finish(nil, error.localizedDescription) }

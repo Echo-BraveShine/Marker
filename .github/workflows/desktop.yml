@@ -77,6 +77,9 @@ jobs:
       - name: Verify macOS early drop registration
         if: matrix.target == 'macos'
         run: bash scripts/ci/test-macos-drop.sh
+      - name: Verify macOS document export and pagination
+        if: matrix.target == 'macos'
+        run: bash scripts/ci/test-macos-export.sh
       - name: Verify Linux offline Mermaid and launcher icons
         if: matrix.target == 'linux'
         run: |
