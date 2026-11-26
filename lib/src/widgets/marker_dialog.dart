@@ -60,80 +60,86 @@ class MarkerDialog extends StatelessWidget {
           48,
     );
     final body = Padding(padding: contentPadding, child: content);
-    return CupertinoTheme(
-      data: CupertinoThemeData(
-        textTheme: MarkerFonts.cupertino,
-        brightness: Theme.of(context).brightness,
-        primaryColor: colors.textAccent,
-      ),
-      child: SafeArea(
-        minimum: const EdgeInsets.all(24),
-        child: Center(
-          child: ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: width, maxHeight: available),
-            child: MarkerFloatingSurface(
-              width: width,
-              height: height == null ? null : math.min(height!, available),
-              child: DefaultTextStyle(
-                style: TextStyle(
-                  fontFamily: MarkerFonts.ui,
-                  fontFamilyFallback: MarkerFonts.fallback,
-                  fontSize: 13,
-                  height: 1.38,
-                  color: colors.textPrimary,
-                ),
-                child: Column(
-                  mainAxisSize: height == null
-                      ? MainAxisSize.min
-                      : MainAxisSize.max,
-                  children: [
-                    Container(
-                      color: colors.bgToolbar,
-                      padding: const EdgeInsets.fromLTRB(20, 16, 12, 12),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: DefaultTextStyle.merge(
-                              style: const TextStyle(
-                                fontSize: 17,
-                                fontWeight: FontWeight.w600,
-                              ),
-                              child: title,
-                            ),
-                          ),
-                          CupertinoButton(
-                            key: const Key('dialog-close'),
-                            minimumSize: Size.zero,
-                            padding: const EdgeInsets.all(6),
-                            onPressed: () => Navigator.pop(context),
-                            child: Icon(
-                              CupertinoIcons.xmark,
-                              size: 13,
-                              color: colors.textSecondary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Flexible(
-                      fit: height == null ? FlexFit.loose : FlexFit.tight,
-                      child: scrollable
-                          ? SingleChildScrollView(child: body)
-                          : body,
-                    ),
-                    if (actions.isNotEmpty)
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+      child: CupertinoTheme(
+        data: CupertinoThemeData(
+          textTheme: MarkerFonts.cupertino,
+          brightness: Theme.of(context).brightness,
+          primaryColor: colors.textAccent,
+        ),
+        child: SafeArea(
+          minimum: const EdgeInsets.all(24),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: width,
+                maxHeight: available,
+              ),
+              child: MarkerFloatingSurface(
+                width: width,
+                height: height == null ? null : math.min(height!, available),
+                child: DefaultTextStyle(
+                  style: TextStyle(
+                    fontFamily: MarkerFonts.ui,
+                    fontFamilyFallback: MarkerFonts.fallback,
+                    fontSize: 13,
+                    height: 1.38,
+                    color: colors.textPrimary,
+                  ),
+                  child: Column(
+                    mainAxisSize: height == null
+                        ? MainAxisSize.min
+                        : MainAxisSize.max,
+                    children: [
                       Container(
-                        width: double.infinity,
                         color: colors.bgToolbar,
-                        padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
-                        child: Wrap(
-                          alignment: WrapAlignment.end,
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: actions,
+                        padding: const EdgeInsets.fromLTRB(20, 16, 12, 12),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: DefaultTextStyle.merge(
+                                style: const TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                child: title,
+                              ),
+                            ),
+                            CupertinoButton(
+                              key: const Key('dialog-close'),
+                              minimumSize: Size.zero,
+                              padding: const EdgeInsets.all(6),
+                              onPressed: () => Navigator.pop(context),
+                              child: Icon(
+                                CupertinoIcons.xmark,
+                                size: 13,
+                                color: colors.textSecondary,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                  ],
+                      Flexible(
+                        fit: height == null ? FlexFit.loose : FlexFit.tight,
+                        child: scrollable
+                            ? SingleChildScrollView(child: body)
+                            : body,
+                      ),
+                      if (actions.isNotEmpty)
+                        Container(
+                          width: double.infinity,
+                          color: colors.bgToolbar,
+                          padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
+                          child: Wrap(
+                            alignment: WrapAlignment.end,
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: actions,
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
               ),
             ),

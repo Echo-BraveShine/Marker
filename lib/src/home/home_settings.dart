@@ -8,6 +8,9 @@ extension _HomeSettings on _MarkerHomeState {
       builder: (context) => Consumer(
         builder: (context, ref, child) {
           final editor = ref.watch(editorProvider);
+          final page = _isMobile && editor.settingsPage == 2
+              ? 0
+              : editor.settingsPage;
           final settings = ref.watch(themeProvider);
           final c = Theme.of(context).extension<MarkerColors>()!;
           final labels = [
@@ -99,60 +102,59 @@ extension _HomeSettings on _MarkerHomeState {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       for (var i = 0; i < labels.length; i++)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 4),
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: editor.settingsPage == i
-                                  ? c.bgSelected
-                                  : null,
-                              borderRadius: BorderRadius.circular(
-                                MarkerStyle.controlRadius,
+                        if (!_isMobile || i != 2)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 4),
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: page == i ? c.bgSelected : null,
+                                borderRadius: BorderRadius.circular(
+                                  MarkerStyle.controlRadius,
+                                ),
                               ),
-                            ),
-                            child: CupertinoButton(
-                              alignment: Alignment.centerLeft,
-                              minimumSize: Size.zero,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 10,
-                              ),
-                              onPressed: () => ref
-                                  .read(editorProvider.notifier)
-                                  .update((s) => s.copyWith(settingsPage: i)),
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    i == 0
-                                        ? CupertinoIcons.slider_horizontal_3
-                                        : i == 1
-                                        ? CupertinoIcons.textformat
-                                        : i == 2
-                                        ? CupertinoIcons.keyboard
-                                        : CupertinoIcons.info_circle,
-                                    size: 16,
-                                    color: editor.settingsPage == i
-                                        ? c.textAccent
-                                        : c.textSecondary,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      labels[i],
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: editor.settingsPage == i
-                                            ? FontWeight.w600
-                                            : FontWeight.w400,
-                                        color: c.textPrimary,
+                              child: CupertinoButton(
+                                alignment: Alignment.centerLeft,
+                                minimumSize: Size.zero,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 10,
+                                ),
+                                onPressed: () => ref
+                                    .read(editorProvider.notifier)
+                                    .update((s) => s.copyWith(settingsPage: i)),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      i == 0
+                                          ? CupertinoIcons.slider_horizontal_3
+                                          : i == 1
+                                          ? CupertinoIcons.textformat
+                                          : i == 2
+                                          ? CupertinoIcons.keyboard
+                                          : CupertinoIcons.info_circle,
+                                      size: 16,
+                                      color: page == i
+                                          ? c.textAccent
+                                          : c.textSecondary,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        labels[i],
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: page == i
+                                              ? FontWeight.w600
+                                              : FontWeight.w400,
+                                          color: c.textPrimary,
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
                             ),
                           ),
-                        ),
                     ],
                   ),
                 ),
@@ -160,22 +162,17 @@ extension _HomeSettings on _MarkerHomeState {
                 Container(width: 1, color: c.separatorSoft),
                 const SizedBox(width: 16),
                 Expanded(
-                  child: editor.settingsPage == 2
+                  child: page == 2
                       ? ShortcutSettings(zh: _zh)
                       : SingleChildScrollView(
-                          key: PageStorageKey(
-                            'settings-content-${editor.settingsPage}',
-                          ),
+                          key: PageStorageKey('settings-content-$page'),
                           padding: EdgeInsets.zero,
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                labels[editor.settingsPage],
-                                style: MarkerStyle.heading,
-                              ),
+                              Text(labels[page], style: MarkerStyle.heading),
                               const SizedBox(height: 12),
-                              if (editor.settingsPage == 0) ...[
+                              if (page == 0) ...[
                                 group(t('外观', 'Appearance'), [
                                   row(
                                     CupertinoIcons.circle_lefthalf_fill,
@@ -262,7 +259,7 @@ extension _HomeSettings on _MarkerHomeState {
                                     ),
                                   ),
                                 ]),
-                              ] else if (editor.settingsPage == 1) ...[
+                              ] else if (page == 1) ...[
                                 group(t('语法高亮', 'Syntax highlighting'), [
                                   row(
                                     CupertinoIcons.textformat,
@@ -371,8 +368,23 @@ extension _HomeSettings on _MarkerHomeState {
                                     ),
                                   ),
                                 ),
-                              ] else if (editor.settingsPage == 3) ...[
-                                AboutSettings(zh: _zh),
+                              ] else if (page == 3) ...[
+                                AboutSettings(
+                                  zh: _zh,
+                                  onOpenExample: () {
+                                    Navigator.of(context).pop();
+                                    _action(() async {
+                                      final store = ref.read(
+                                        sampleDocumentStoreProvider,
+                                      );
+                                      if (store == null) return;
+                                      final path = await store.open(
+                                        defaultMarkdown,
+                                      );
+                                      if (mounted) await _openPath(path);
+                                    });
+                                  },
+                                ),
                               ],
                             ],
                           ),

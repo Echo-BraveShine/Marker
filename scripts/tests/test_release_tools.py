@@ -52,6 +52,7 @@ class ReleaseToolsTests(unittest.TestCase):
 
     def test_complete_packages_have_correct_checksums_on_all_platforms(self):
         expected = {
+            'android': ['Marker-android-universal.apk'],
             'macos': ['Marker-macos.zip', 'Marker-macos-arm64.dmg', 'Marker-macos-x86_64.dmg'],
             'windows': ['Marker-Windows-x64-Setup.exe', 'Marker-windows-x64.zip', 'Marker-Windows-x64.msi', 'Marker-Windows-x64-zh-CN.msi'],
             'linux': ['Marker-linux-amd64.deb', 'Marker-linux-x64.tar.gz', 'Marker-linux-x86_64.AppImage', 'Marker-linux-x86_64.rpm'],
@@ -63,8 +64,8 @@ class ReleaseToolsTests(unittest.TestCase):
                 (folder / name).write_bytes(name.encode('utf-8'))
             result = self.run_tool('release_checksums.py', '--platform', platform)
             self.assertEqual(result.returncode, 0, result.stderr)
-            text = (folder / (f'SHA256SUMS-{platform}-' + ('universal' if platform == 'macos' else 'x64') + '.txt')).read_text(encoding='utf-8')
-            self.assertNotIn(b'\r', (folder / (f'SHA256SUMS-{platform}-' + ('universal' if platform == 'macos' else 'x64') + '.txt')).read_bytes())
+            text = (folder / (f'SHA256SUMS-{platform}-' + ('universal' if platform in ('macos', 'android') else 'x64') + '.txt')).read_text(encoding='utf-8')
+            self.assertNotIn(b'\r', (folder / (f'SHA256SUMS-{platform}-' + ('universal' if platform in ('macos', 'android') else 'x64') + '.txt')).read_bytes())
             self.assertEqual(text, ''.join(
                 f'{hashlib.sha256(name.encode("utf-8")).hexdigest()}  {name}\n' for name in sorted(names)))
 

@@ -10,9 +10,10 @@ packages=()
 for file in "${files[@]}"; do
   if [[ "${file##*/}" != SHA256SUMS.txt ]]; then packages+=("$file"); fi
 done
-(( ${#packages[@]} == 15 )) && test -s dist/SHA256SUMS.txt
+(( ${#packages[@]} == 16 )) && test -s dist/SHA256SUMS.txt
 # Reject a complete-looking count containing a missing target or stale package.
 expected=(
+  Marker-android-universal.apk
   Marker-macos.zip Marker-macos-arm64.dmg Marker-macos-x86_64.dmg
   Marker-Windows-x64-Setup.exe Marker-windows-x64.zip Marker-Windows-x64.msi Marker-Windows-x64-zh-CN.msi
   Marker-linux-x64.tar.gz Marker-linux-amd64.deb

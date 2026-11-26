@@ -2,12 +2,61 @@ part of '../../main.dart';
 
 extension _HomeFileActions on _MarkerHomeState {
   Future<bool> _save({bool as = false}) async {
+    if (as) await ref.read(autosaveProvider.notifier).flush(force: true);
+    final activeId = _workspace.active?.id;
+    await _syncDeletedDocuments(duringSave: true);
+    if (!mounted || _workspace.active?.id != activeId) return false;
     var text = _controller.text;
+    if (!as && _path != null && activeId != null) {
+      await ref.read(autosaveProvider.notifier).flush(force: true);
+      final status = ref.read(autosaveProvider)[activeId];
+      if (status == SaveStatus.conflict) return _resolveSaveConflict(activeId);
+      ref.read(autosaveProvider.notifier).retry(activeId);
+      var saved = await ref
+          .read(autosaveProvider.notifier)
+          .saveDocument(activeId);
+      if (!saved &&
+          mounted &&
+          ref.read(autosaveProvider)[activeId] == SaveStatus.conflict) {
+        return _resolveSaveConflict(activeId);
+      }
+      final error = ref.read(autosaveProvider.notifier).errorFor(activeId);
+      if (!saved &&
+          mounted &&
+          defaultTargetPlatform == TargetPlatform.macOS &&
+          error is FileSystemException &&
+          [1, 13].contains(error.osError?.errorCode)) {
+        await _authorizeResourceFolder(p.dirname(_path!));
+        saved = await ref
+            .read(autosaveProvider.notifier)
+            .saveDocument(activeId);
+      }
+      if (saved) {
+        await _persist();
+        return true;
+      }
+      if (!mounted) return false;
+      final choice = await _resourceChoice(
+        t('保存失败', 'Save failed'),
+        [
+          ('retry', t('重试', 'Retry'), CupertinoIcons.arrow_clockwise),
+          ('copy', _l10n.saveAs, CupertinoIcons.doc_on_doc),
+        ],
+        description: t(
+          '编辑已保留为草稿。请检查目录权限和可用空间。',
+          'Your edits are kept as a draft. Check folder access and free space.',
+        ),
+      );
+      if (!mounted) return false;
+      if (choice == 'copy') return _save(as: true);
+      if (choice == 'retry') return _save();
+      return false;
+    }
     try {
       final sourcePath = _path;
       var path = sourcePath;
       if (as || path == null) {
-        final target = await getSaveLocation(suggestedName: _name);
+        final target = await _chooseSaveLocation(suggestedName: _name);
         if (target == null) return false;
         path = target.path;
       }
@@ -27,13 +76,13 @@ extension _HomeFileActions on _MarkerHomeState {
         return false;
       }
       final copying = sourcePath != null && !p.equals(sourcePath, targetPath);
-      final references = copying
+      final references = (copying || sourcePath == null)
           ? await parseResourceReferencesAsync(text)
           : null;
-      if (copying &&
+      if ((copying || sourcePath == null) &&
           (references!.images.isNotEmpty ||
               references.unsupported.isNotEmpty)) {
-        final inventory = await _resources.scan(text, sourcePath);
+        final inventory = await _resources.scan(text, sourcePath ?? targetPath);
         if (!mounted || !await _confirmResourceIssues(inventory)) return false;
         var download = false;
         if (inventory.items.any(
@@ -53,7 +102,7 @@ extension _HomeFileActions on _MarkerHomeState {
             (token, progress) => _withResourceAccess(
               () => _resources.saveCopy(
                 text: text,
-                sourcePath: sourcePath,
+                sourcePath: sourcePath ?? targetPath,
                 targetPath: targetPath,
                 downloadRemote: download,
                 allowIncomplete: allow,
@@ -91,6 +140,12 @@ extension _HomeFileActions on _MarkerHomeState {
         }
         _path = targetPath;
         _saved = text;
+        if (_controller.text != text) {
+          _switchingDocument = true;
+          _controller.text = text;
+          _switchingDocument = false;
+          _changed();
+        }
       }
       await _persist();
       return true;
@@ -121,15 +176,42 @@ extension _HomeFileActions on _MarkerHomeState {
         if (!mounted) return;
         final options = await showMarkerDialog<DocumentExportOptions>(
           context: context,
-          builder: (context) => ExportOptionsPanel(zh: _zh),
+          builder: (context) => ExportOptionsPanel(zh: _zh, mobile: _isMobile),
         );
         if (options == null || !mounted) return;
         final basename = title.replaceFirst(
           RegExp(r'\.(md|markdown)$', caseSensitive: false),
           '',
         );
+        if (_isMobile) {
+          final split =
+              options.format == DocumentExportFormat.png && options.splitPng;
+          final extension = split ? 'zip' : options.format.name;
+          final bytes = await ref
+              .read(exportControllerProvider.notifier)
+              .export(
+                source: source,
+                title: title,
+                documentPath: documentPath,
+                options: options,
+                dark: dark,
+              );
+          final saved = await FilePicker.saveFile(
+            fileName: split ? '$basename-images.zip' : '$basename.$extension',
+            bytes: bytes,
+            mimeType: split
+                ? 'application/zip'
+                : switch (options.format) {
+                    DocumentExportFormat.pdf => 'application/pdf',
+                    DocumentExportFormat.png => 'image/png',
+                    DocumentExportFormat.html => 'text/html',
+                  },
+          );
+          if (mounted && saved != null) _toast(t('导出完成。', 'Export complete.'));
+          return;
+        }
         final extension = options.format.name;
-        final target = await getSaveLocation(
+        final target = await _chooseSaveLocation(
           suggestedName: '$basename.$extension',
           acceptedTypeGroups: [
             XTypeGroup(label: extension.toUpperCase(), extensions: [extension]),
@@ -189,6 +271,8 @@ extension _HomeFileActions on _MarkerHomeState {
     if (_busy || _restoring) return;
     _update(() => _busy = true);
     try {
+      await ref.read(autosaveProvider.notifier).waitForIdle();
+      if (!mounted) return;
       await action();
     } on ResourceCancelled {
       if (mounted) _toast(t('已停止后续资源处理', 'Remaining work stopped'));
@@ -197,7 +281,12 @@ extension _HomeFileActions on _MarkerHomeState {
     } finally {
       if (mounted) {
         _update(() => _busy = false);
-        _drainExternalFiles();
+        if (_closeRequested && desktopWindow) {
+          _closeRequested = false;
+          scheduleMicrotask(onWindowClose);
+        } else {
+          _drainExternalFiles();
+        }
       }
     }
   }
@@ -242,12 +331,14 @@ extension _HomeFileActions on _MarkerHomeState {
   }
 
   Future<void> _newFile() async {
-    final location = await getSaveLocation(
-      suggestedName: 'Untitled.md',
-      acceptedTypeGroups: [
-        const XTypeGroup(label: 'Markdown', extensions: ['md']),
-      ],
-    );
+    final location = _isMobile
+        ? FileSaveLocation(await MobileDocumentStore().newDocumentPath())
+        : await _chooseSaveLocation(
+            suggestedName: 'Untitled.md',
+            acceptedTypeGroups: [
+              const XTypeGroup(label: 'Markdown', extensions: ['md']),
+            ],
+          );
     if (location == null || !mounted) return;
     final existing = ref
         .read(workspaceProvider)
@@ -272,10 +363,10 @@ extension _HomeFileActions on _MarkerHomeState {
       return;
     }
     // Keep the current document intact until creating the selected file succeeds.
-    await XFile.fromData(
-      Uint8List(0),
-      mimeType: 'text/markdown',
-    ).saveTo(location.path);
+    await _withResourceAccess(
+      () => _resources.atomicWrite(File(location.path), ''),
+      directory: p.dirname(location.path),
+    );
     if (!mounted) return;
     _snapshot();
     _workspace.add(text: '', saved: '', path: location.path);
@@ -288,14 +379,30 @@ extension _HomeFileActions on _MarkerHomeState {
   Future<void> _open() async {
     final file = await openFile(
       acceptedTypeGroups: [
-        const XTypeGroup(
+        XTypeGroup(
           label: 'Markdown',
-          extensions: ['md', 'markdown', 'txt'],
+          extensions: ['md', 'markdown', 'txt', if (_isMobile) 'zip'],
+          uniformTypeIdentifiers: const [
+            'public.text',
+            'net.daringfireball.markdown',
+            'public.zip-archive',
+          ],
         ),
       ],
     );
     if (file == null) return;
-    await _openPath(file.path);
+    final path = _isMobile
+        ? await MobileDocumentStore().importDocument(file)
+        : file.path;
+    await _openPath(path);
+    if (_isMobile && mounted) {
+      _toast(
+        t(
+          '已导入文档副本，编辑不会修改原文件。',
+          'Imported a copy. Edits will not change the original file.',
+        ),
+      );
+    }
   }
 
   Future<void> _openPath(String input) async {

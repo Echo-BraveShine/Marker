@@ -202,7 +202,11 @@ void _registerResourceUiDropsCases() {
             rawText: 'portal-transfer-key',
           ),
         );
-        await tester.pump();
+        await ioFrames(
+          tester,
+          () =>
+              find.text('系统未能提供拖入文件的访问权限，请使用“导入图片”选择文件。').evaluate().isNotEmpty,
+        );
         expect(find.text('系统未能提供拖入文件的访问权限，请使用“导入图片”选择文件。'), findsOneWidget);
         expect(editor(tester).controller!.text, before);
       }

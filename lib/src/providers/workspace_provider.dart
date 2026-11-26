@@ -1,5 +1,9 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:path/path.dart' as p;
+import '../mobile/mobile_path_restore.dart';
+import '../resources/resource_references.dart';
+import '../resources/resource_service.dart' show resolveResourceUri;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -42,11 +46,21 @@ class WorkspaceNotifier extends Notifier<WorkspaceState> {
     final raw = prefs.getString('workspaceV1');
     if (raw == null) return false;
     final data = jsonDecode(raw) as Map<String, dynamic>;
+    final root = await ref.read(mobileDocumentsRootProvider);
+    if (!ref.mounted) return true;
+    final paths = MobilePathRestore(
+      root,
+      data['mobileDocumentsRoot'] as String?,
+    );
     final documents = <OpenDocument>[];
     for (final item in data['documents'] as List) {
+      final oldPath = item['path'] as String?;
       var doc = OpenDocument(
         id: item['id'] as String,
-        path: item['path'] as String?,
+        path: paths.restore(
+          oldPath,
+          relative: item['mobileRelativePath'] as String?,
+        ),
         text: item['text'] as String,
         saved: item['saved'] as String,
         lastEdited: (item['lastEdited'] as num?)?.toInt() ?? 0,
@@ -54,11 +68,15 @@ class WorkspaceNotifier extends Notifier<WorkspaceState> {
       if (!doc.dirty && doc.path != null) {
         try {
           final text = await File(doc.path!).readAsString();
-          doc = doc.copyWith(text: text, saved: text);
+          doc = doc.copyWith(
+            text: await paths.images(text, oldPath, doc.path),
+            saved: text,
+          );
         } catch (_) {
           /* Keep cached content if the file is missing or inaccessible. */
         }
       }
+      doc = doc.copyWith(text: await paths.images(doc.text, oldPath, doc.path));
       documents.add(doc);
     }
     if (!ref.mounted) return true;
@@ -69,7 +87,63 @@ class WorkspaceNotifier extends Notifier<WorkspaceState> {
           ? requested
           : documents.firstOrNull?.id,
     );
+    await syncDeletedFiles();
     return true;
+  }
+
+  /// Only confirmed missing paths count as deletion; access errors keep tabs open.
+  static Future<bool> isDeleted(String path) async {
+    try {
+      await File(path).length();
+      return false;
+    } on FileSystemException catch (error) {
+      return error.osError?.errorCode == 2 || error.osError?.errorCode == 3;
+    }
+  }
+
+  Future<bool> syncDeletedFiles({bool Function()? canApply}) async {
+    var changed = false;
+    for (final candidate in state.documents.toList()) {
+      if (candidate.path == null || !await isDeleted(candidate.path!)) continue;
+      if (!ref.mounted || canApply?.call() == false) return changed;
+      final current = state.documents
+          .where((d) => d.id == candidate.id)
+          .firstOrNull;
+      if (current == null || current.path != candidate.path) continue;
+      if (!current.dirty) {
+        remove(current.id);
+      } else {
+        // A detached draft must keep resolving surviving images at their old location.
+        final refs = await parseResourceReferencesAsync(current.text);
+        final replacements = <String, String>{};
+        for (final image in refs.images) {
+          try {
+            final uri = resolveResourceUri(image.source, current.path);
+            if (uri.scheme == 'file') {
+              replacements[image.source] = uri.toString();
+            }
+          } catch (_) {
+            /* Keep unsupported references unchanged. */
+          }
+        }
+        if (!ref.mounted || canApply?.call() == false) return changed;
+        final latest = state.documents
+            .where((d) => d.id == current.id)
+            .firstOrNull;
+        if (latest != current) continue;
+        state = state.copyWith(
+          documents: [
+            for (final d in state.documents)
+              if (d.id == current.id)
+                d.copyWith(path: null, text: refs.rewrite(d.text, replacements))
+              else
+                d,
+          ],
+        );
+      }
+      changed = true;
+    }
+    return changed;
   }
 
   int _timestamp() {
@@ -128,6 +202,35 @@ class WorkspaceNotifier extends Notifier<WorkspaceState> {
     );
   }
 
+  bool refreshSaved(String id, String path, String baseline, String disk) {
+    var changed = false;
+    final documents = [
+      for (final d in state.documents)
+        if (d.id == id &&
+            d.path == path &&
+            !d.dirty &&
+            d.saved == baseline &&
+            d.text != disk)
+          (() {
+            changed = true;
+            return d.copyWith(text: disk, saved: disk);
+          })()
+        else
+          d,
+    ];
+    if (changed) state = state.copyWith(documents: documents);
+    return changed;
+  }
+
+  void acknowledgeSaved(String id, String path, String text) {
+    state = state.copyWith(
+      documents: [
+        for (final d in state.documents)
+          if (d.id == id && d.path == path) d.copyWith(saved: text) else d,
+      ],
+    );
+  }
+
   void remove(String id) {
     final index = state.documents.indexWhere((d) => d.id == id);
     final documents = state.documents.where((d) => d.id != id).toList();
@@ -155,9 +258,21 @@ class WorkspaceNotifier extends Notifier<WorkspaceState> {
           },
       ],
     });
+    final rootFuture = ref.read(mobileDocumentsRootProvider);
     return _pending = _pending.catchError((Object _) {}).then((_) async {
+      final root = await rootFuture;
+      final data = jsonDecode(raw) as Map<String, dynamic>;
+      if (root != null) {
+        data['mobileDocumentsRoot'] = root;
+        for (final item in data['documents'] as List) {
+          final path = item['path'] as String?;
+          if (path != null && p.isWithin(root, path)) {
+            item['mobileRelativePath'] = p.relative(path, from: root);
+          }
+        }
+      }
       final prefs = await SharedPreferences.getInstance();
-      if (!await prefs.setString('workspaceV1', raw)) {
+      if (!await prefs.setString('workspaceV1', jsonEncode(data))) {
         throw StateError('无法保存文档列表');
       }
     });

@@ -8,8 +8,9 @@ import '../l10n/app_localizations.dart';
 import 'document_exporter.dart';
 
 class ExportOptionsPanel extends ConsumerWidget {
-  const ExportOptionsPanel({super.key, required this.zh});
+  const ExportOptionsPanel({super.key, required this.zh, this.mobile = false});
   final bool zh;
+  final bool mobile;
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
@@ -80,6 +81,21 @@ class ExportOptionsPanel extends ConsumerWidget {
                 ),
               ],
             ),
+            if (mobile && options.format == DocumentExportFormat.png) ...[
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(zh ? '分图导出（ZIP）' : 'Split images (ZIP)'),
+                  ),
+                  CupertinoSwitch(
+                    value: options.splitPng,
+                    onChanged: (value) =>
+                        update((s) => s.copyWith(splitPng: value)),
+                  ),
+                ],
+              ),
+            ],
             if (options.format == DocumentExportFormat.png) ...[
               const SizedBox(height: 16),
               Text(

@@ -6,10 +6,16 @@ class MarkerHome extends ConsumerStatefulWidget {
   ConsumerState<MarkerHome> createState() => _MarkerHomeState();
 }
 
-class _MarkerHomeState extends ConsumerState<MarkerHome> with WindowListener {
+class _MarkerHomeState extends ConsumerState<MarkerHome>
+    with WindowListener, WidgetsBindingObserver {
   final _drafts = DraftStore();
 
   Timer? _draftTimer;
+
+  Timer? _diskTimer;
+  bool _syncingDisk = false;
+  bool _closeRequested = false;
+  Completer<void>? _diskSyncCompletion;
 
   Timer? _toastTimer;
 
@@ -104,6 +110,8 @@ class _MarkerHomeState extends ConsumerState<MarkerHome> with WindowListener {
   set _busy(bool value) =>
       ref.read(editorProvider.notifier).update((s) => s.copyWith(busy: value));
 
+  bool get _isMobile => mobileWindow;
+
   bool get _zh => _l10n.locale.languageCode == 'zh';
 
   bool get _dirty => _controller.text != _saved;
@@ -117,6 +125,17 @@ class _MarkerHomeState extends ConsumerState<MarkerHome> with WindowListener {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    ref.read(autosaveProvider);
+    ref.listenManual(workspaceProvider, (previous, next) {
+      if (!mounted) return;
+      final active = next.documents
+          .where((d) => d.id == next.activeId)
+          .firstOrNull;
+      if (active != null && active.path == _path && active.saved != _saved) {
+        _saved = active.saved;
+      }
+    });
     _controller.addListener(_changed);
     FocusManager.instance.addEarlyKeyEventHandler(_handleSyntaxEscape);
     FocusManager.instance.addEarlyKeyEventHandler(_handleNavigationKey);
@@ -125,12 +144,15 @@ class _MarkerHomeState extends ConsumerState<MarkerHome> with WindowListener {
       _previewScroll,
       enabled: () => mounted && _mode == 1,
     );
-    if (!desktopWindow) {
+    if (!desktopWindow && !mobileWindow) {
       Future.microtask(() => ref.read(themeProvider.notifier).init());
     }
     if (desktopWindow) windowManager.addListener(this);
     _restore();
     _connectExternalFiles();
+    _diskTimer = Timer.periodic(const Duration(seconds: 3), (_) {
+      unawaited(_syncDeletedDocuments());
+    });
   }
 
   KeyEventResult _handleSyntaxEscape(KeyEvent event) {
@@ -187,13 +209,51 @@ class _MarkerHomeState extends ConsumerState<MarkerHome> with WindowListener {
         final draft = await _drafts.read();
         if (!mounted) return;
         if (draft != null && draft['text'] != draft['saved']) {
+          final root = await ref.read(mobileDocumentsRootProvider);
+          if (!mounted) return;
+          final paths = MobilePathRestore(
+            root,
+            draft['mobileDocumentsRoot'] as String?,
+          );
+          final oldPath = draft['path'] as String?;
+          final restoredPath = paths.restore(oldPath);
+          final restoredText = await paths.images(
+            draft['text'] as String,
+            oldPath,
+            restoredPath,
+          );
+          if (!mounted) return;
           _workspace.add(
-            text: draft['text'] as String,
+            text: restoredText,
             saved: draft['saved'] as String,
-            path: draft['path'] as String?,
+            path: restoredPath,
           );
         } else {
-          _workspace.add(text: defaultMarkdown, saved: defaultMarkdown);
+          final store = ref.read(sampleDocumentStoreProvider);
+          final path = await store?.initialize(defaultMarkdown);
+          if (!mounted) return;
+          if (path != null) {
+            final text = await File(path).readAsString();
+            if (!mounted) return;
+            _workspace.add(text: text, saved: text, path: path);
+          } else if (store == null) {
+            _workspace.add(text: defaultMarkdown, saved: defaultMarkdown);
+          }
+        }
+      }
+      final store = ref.read(sampleDocumentStoreProvider);
+      final legacy = _workspace.active;
+      if (restored &&
+          store != null &&
+          legacy?.path == null &&
+          legacy?.text == defaultMarkdown &&
+          legacy?.saved == defaultMarkdown) {
+        final path = await store.initialize(defaultMarkdown);
+        if (!mounted) return;
+        if (path != null) {
+          final text = await File(path).readAsString();
+          if (!mounted) return;
+          _workspace.snapshot(text, text, path);
         }
       }
       _loadActive();
@@ -201,7 +261,7 @@ class _MarkerHomeState extends ConsumerState<MarkerHome> with WindowListener {
       if (mounted &&
           ref.read(workspaceProvider).documents.any((d) => d.dirty)) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) _toast(_l10n.undo);
+          if (mounted) _toast(t('已恢复未保存的草稿。', 'Unsaved drafts restored.'));
         });
       }
     } catch (e) {
@@ -257,7 +317,16 @@ class _MarkerHomeState extends ConsumerState<MarkerHome> with WindowListener {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) =>
+      _handleAutosaveLifecycle(state);
+
+  @override
   void onWindowClose() {
+    if (_busy) {
+      _closeRequested = true;
+      return;
+    }
+    _closeRequested = false;
     _action(() async {
       _snapshot();
       final originalId = ref.read(workspaceProvider).activeId;
@@ -336,11 +405,20 @@ class _MarkerHomeState extends ConsumerState<MarkerHome> with WindowListener {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     FocusManager.instance.removeEarlyKeyEventHandler(_handleSyntaxEscape);
     FocusManager.instance.removeEarlyKeyEventHandler(_handleNavigationKey);
     _draftTimer?.cancel();
-    if (desktopWindow && defaultTargetPlatform == TargetPlatform.macOS) {
-      _filesChannel.setMethodCallHandler(null);
+    _diskTimer?.cancel();
+    if (desktopWindow &&
+        [
+          TargetPlatform.macOS,
+          TargetPlatform.windows,
+          TargetPlatform.linux,
+        ].contains(defaultTargetPlatform)) {
+      if (defaultTargetPlatform == TargetPlatform.macOS) {
+        _filesChannel.setMethodCallHandler(null);
+      }
     }
     if (desktopWindow) windowManager.removeListener(this);
     _toastTimer?.cancel();

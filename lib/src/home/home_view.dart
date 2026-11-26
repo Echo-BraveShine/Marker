@@ -2,6 +2,7 @@ part of '../../main.dart';
 
 extension _HomeView on _MarkerHomeState {
   Widget _buildHome(BuildContext context) {
+    ref.watch(autosaveProvider);
     final editorState = ref.watch(editorProvider);
     final workspace = ref.watch(workspaceProvider);
     final resourceState = ref.watch(resourceUiProvider);
@@ -100,7 +101,8 @@ extension _HomeView on _MarkerHomeState {
                       controller: _controller,
                       undoController: _undo,
                       focusNode: _focus,
-                      readOnly: _restoring || resourceState.busy,
+                      onTapOutside: _isMobile ? (_) => _focus.unfocus() : null,
+                      readOnly: _busy || _restoring || resourceState.busy,
                       maxLines: null,
                       expands: true,
                       textAlignVertical: TextAlignVertical.top,
@@ -132,7 +134,14 @@ extension _HomeView on _MarkerHomeState {
           },
         ),
       },
-      child: rawEditor,
+      child: Padding(
+        padding: EdgeInsets.only(
+          right: _isMobile && _mode != 1
+              ? MobileCutoutArea.insetsOf(context).right
+              : 0,
+        ),
+        child: rawEditor,
+      ),
     );
     final previewSignature = (
       _controller.text,
@@ -147,236 +156,278 @@ extension _HomeView on _MarkerHomeState {
       _previewSignature = previewSignature;
       _previewCache = _buildPreview(c: c, context: context);
     }
-    final preview = _previewCache!;
+    final preview = Padding(
+      padding: EdgeInsets.only(
+        right: _isMobile ? MobileCutoutArea.insetsOf(context).right : 0,
+      ),
+      child: _previewCache!,
+    );
     return CallbackShortcuts(
       bindings: _shortcutBindings(),
       child: Focus(
         autofocus: true,
         child: _resourceDropZone(
-          Scaffold(
-            backgroundColor: c.bgWindow,
-            body: Column(
-              children: [
-                if (desktopWindow &&
-                    defaultTargetPlatform == TargetPlatform.macOS)
-                  SizedBox(
-                    height: 36,
-                    child: DragToMoveArea(
-                      child: Center(
-                        child: Text(
-                          '$_name${_dirty ? ' •' : ''}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: c.textSecondary,
+          SafeArea(
+            left: !_isMobile,
+            right: !_isMobile,
+            top: !_isMobile,
+            bottom: !_isMobile,
+            minimum: _isMobile
+                ? const EdgeInsets.symmetric(horizontal: 16)
+                : EdgeInsets.zero,
+            // Android 系统栏已在缩放视口外避让；移动端此处仅保留圆角边距。
+            maintainBottomViewPadding: true,
+            child: Scaffold(
+              backgroundColor: c.bgWindow,
+              body: Column(
+                children: [
+                  if (desktopWindow &&
+                      defaultTargetPlatform == TargetPlatform.macOS)
+                    SizedBox(
+                      height: 36,
+                      child: DragToMoveArea(
+                        child: Center(
+                          child: Text(
+                            '$_name${_dirty ? ' •' : ''}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: c.textSecondary,
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-                Expanded(
-                  child: Row(
-                    children: [
-                      _buildSidebar(
-                        c: c,
-                        button: button,
-                        resourceState: resourceState,
-                        workspace: workspace,
-                      ),
-                      if (_sidebar)
-                        MouseRegion(
-                          cursor: SystemMouseCursors.resizeColumn,
-                          child: GestureDetector(
-                            key: const Key('sidebar-resize'),
-                            behavior: HitTestBehavior.opaque,
-                            onHorizontalDragUpdate: (details) => ref
-                                .read(themeProvider.notifier)
-                                .setSidebarWidth(
-                                  ref.read(themeProvider).sidebarWidth +
-                                      details.delta.dx,
-                                ),
-                            onHorizontalDragEnd: (_) => ref
-                                .read(themeProvider.notifier)
-                                .persistSidebarWidth(),
-                            child: SizedBox(
-                              width: 5,
-                              child: Center(
-                                child: Container(
-                                  width: 1,
-                                  color: c.separatorSoft,
+                  Expanded(
+                    child: Row(
+                      children: [
+                        _buildSidebar(
+                          c: c,
+                          button: button,
+                          resourceState: resourceState,
+                          workspace: workspace,
+                        ),
+                        if (_sidebar)
+                          MouseRegion(
+                            cursor: SystemMouseCursors.resizeColumn,
+                            child: GestureDetector(
+                              key: const Key('sidebar-resize'),
+                              behavior: HitTestBehavior.opaque,
+                              onHorizontalDragUpdate: (details) => ref
+                                  .read(themeProvider.notifier)
+                                  .setSidebarWidth(
+                                    ref.read(themeProvider).sidebarWidth +
+                                        details.delta.dx,
+                                  ),
+                              onHorizontalDragEnd: (_) => ref
+                                  .read(themeProvider.notifier)
+                                  .persistSidebarWidth(),
+                              child: SizedBox(
+                                width: 5,
+                                child: Center(
+                                  child: Container(
+                                    width: 1,
+                                    color: c.separatorSoft,
+                                  ),
                                 ),
                               ),
                             ),
                           ),
-                        ),
-                      Expanded(
-                        child: Column(
-                          children: [
-                            _buildToolbar(
-                              c: c,
-                              button: button,
-                              syntaxControl: syntaxControl,
-                              commandByLabel: commandByLabel,
-                            ),
-                            if (ref.watch(editorProvider).searchVisible)
-                              EditorSearchBar(
-                                editor: _controller,
-                                queryFocus: _searchFocus,
-                                onNext: () => _findMatch(),
-                                onPrevious: () => _findMatch(forward: false),
-                                onQuery: () => _findMatch(fromStart: true),
-                                onReplace: _replaceMatch,
-                                onReplaceAll: _replaceAllMatches,
-                                onClose: _closeSearch,
+                        Expanded(
+                          child: Column(
+                            children: [
+                              _buildToolbar(
+                                c: c,
+                                button: button,
+                                syntaxControl: syntaxControl,
+                                commandByLabel: commandByLabel,
                               ),
-                            Expanded(
-                              child: LayoutBuilder(
-                                builder: (context, size) {
-                                  Widget buildPanes() {
-                                    if (_mode == 0) {
-                                      return SizedBox.expand(child: editor);
-                                    }
-                                    if (_mode == 2) {
-                                      return SizedBox.expand(child: preview);
-                                    }
-                                    if (size.maxWidth < 560) {
-                                      return Column(
+                              if (ref.watch(editorProvider).searchVisible)
+                                EditorSearchBar(
+                                  editor: _controller,
+                                  queryFocus: _searchFocus,
+                                  onNext: () => _findMatch(),
+                                  onPrevious: () => _findMatch(forward: false),
+                                  onQuery: () => _findMatch(fromStart: true),
+                                  onReplace: _replaceMatch,
+                                  onReplaceAll: _replaceAllMatches,
+                                  onClose: _closeSearch,
+                                ),
+                              Expanded(
+                                child: LayoutBuilder(
+                                  builder: (context, size) {
+                                    Widget buildPanes() {
+                                      if (_mode == 0) {
+                                        return SizedBox.expand(child: editor);
+                                      }
+                                      if (_mode == 2) {
+                                        return SizedBox.expand(child: preview);
+                                      }
+                                      if (size.maxWidth < 560) {
+                                        return Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.stretch,
+                                          children: [
+                                            Expanded(child: editor),
+                                            const Divider(height: 1),
+                                            Expanded(child: preview),
+                                          ],
+                                        );
+                                      }
+                                      return Row(
                                         crossAxisAlignment:
                                             CrossAxisAlignment.stretch,
                                         children: [
-                                          Expanded(child: editor),
-                                          const Divider(height: 1),
-                                          Expanded(child: preview),
-                                        ],
-                                      );
-                                    }
-                                    return Row(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.stretch,
-                                      children: [
-                                        SizedBox(
-                                          width: (size.maxWidth - 8) * _ratio,
-                                          child: editor,
-                                        ),
-                                        MouseRegion(
-                                          cursor:
-                                              SystemMouseCursors.resizeColumn,
-                                          child: GestureDetector(
-                                            onDoubleTap: () =>
-                                                _update(() => _ratio = .5),
-                                            onHorizontalDragUpdate: (d) =>
-                                                _update(
-                                                  () => _ratio =
-                                                      (_ratio +
-                                                              d.delta.dx /
-                                                                  (size.maxWidth -
-                                                                      8))
-                                                          .clamp(.2, .8),
-                                                ),
-                                            child: Container(
-                                              width: 8,
-                                              color: c.bgToolbar,
-                                              child: Center(
-                                                child: Container(
-                                                  width: 1,
-                                                  color: c.separator,
+                                          SizedBox(
+                                            width: (size.maxWidth - 8) * _ratio,
+                                            child: editor,
+                                          ),
+                                          MouseRegion(
+                                            cursor:
+                                                SystemMouseCursors.resizeColumn,
+                                            child: GestureDetector(
+                                              onDoubleTap: () =>
+                                                  _update(() => _ratio = .5),
+                                              onHorizontalDragUpdate: (d) =>
+                                                  _update(
+                                                    () => _ratio =
+                                                        (_ratio +
+                                                                d.delta.dx /
+                                                                    (size.maxWidth -
+                                                                        8))
+                                                            .clamp(.2, .8),
+                                                  ),
+                                              child: Container(
+                                                width: 8,
+                                                color: c.bgToolbar,
+                                                child: Center(
+                                                  child: Container(
+                                                    width: 1,
+                                                    color: c.separator,
+                                                  ),
                                                 ),
                                               ),
                                             ),
                                           ),
-                                        ),
-                                        Expanded(child: preview),
+                                          Expanded(child: preview),
+                                        ],
+                                      );
+                                    }
+
+                                    final rightSpace =
+                                        _mode == 1 && size.maxWidth >= 560
+                                        ? (size.maxWidth - 8) * (1 - _ratio)
+                                        : size.maxWidth;
+                                    return Stack(
+                                      children: [
+                                        Positioned.fill(child: buildPanes()),
+                                        if (ref
+                                            .watch(editorProvider)
+                                            .toolbarExpanded)
+                                          Positioned(
+                                            top: 10,
+                                            bottom: 10,
+                                            right: 10,
+                                            width: (rightSpace - 20).clamp(
+                                              40.0,
+                                              340.0,
+                                            ),
+                                            child: MarkdownSyntaxPanel(
+                                              enabled: !_busy && !_restoring,
+                                              onCommand: _runMarkdownCommand,
+                                              onClose: () => ref
+                                                  .read(editorProvider.notifier)
+                                                  .update(
+                                                    (s) => s.copyWith(
+                                                      toolbarExpanded: false,
+                                                    ),
+                                                  ),
+                                            ),
+                                          ),
                                       ],
                                     );
-                                  }
-
-                                  final rightSpace =
-                                      _mode == 1 && size.maxWidth >= 560
-                                      ? (size.maxWidth - 8) * (1 - _ratio)
-                                      : size.maxWidth;
-                                  return Stack(
+                                  },
+                                ),
+                              ),
+                              DefaultTextStyle(
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: c.textTertiary,
+                                ),
+                                child: Container(
+                                  height: _isMobile ? 30 : 24,
+                                  color: c.bgToolbar,
+                                  padding: EdgeInsets.fromLTRB(
+                                    16,
+                                    0,
+                                    16,
+                                    _isMobile ? 6 : 0,
+                                  ),
+                                  child: Row(
                                     children: [
-                                      Positioned.fill(child: buildPanes()),
-                                      if (ref
-                                          .watch(editorProvider)
-                                          .toolbarExpanded)
-                                        Positioned(
-                                          top: 10,
-                                          bottom: 10,
-                                          right: 10,
-                                          width: (rightSpace - 20).clamp(
-                                            40.0,
-                                            340.0,
+                                      Text(
+                                        t(
+                                          '行 $line，列 $column',
+                                          'Ln $line, Col $column',
+                                        ),
+                                        style: const TextStyle(fontSize: 11),
+                                      ),
+                                      const Spacer(),
+                                      CupertinoButton(
+                                        key: const Key('save-status'),
+                                        minimumSize: Size.zero,
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                        ),
+                                        onPressed: _busy
+                                            ? null
+                                            : () => _action(() async {
+                                                await _save();
+                                              }),
+                                        child: Text(
+                                          _saveStatusText(),
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: c.textSecondary,
                                           ),
-                                          child: MarkdownSyntaxPanel(
-                                            enabled: !_busy && !_restoring,
-                                            onCommand: _runMarkdownCommand,
-                                            onClose: () => ref
-                                                .read(editorProvider.notifier)
-                                                .update(
-                                                  (s) => s.copyWith(
-                                                    toolbarExpanded: false,
-                                                  ),
-                                                ),
+                                        ),
+                                      ),
+                                      Text(
+                                        resourceState.busy
+                                            ? '${resourceState.operation}${resourceState.total > 0 ? ' ${resourceState.done}/${resourceState.total}' : ''}'
+                                            : exporting
+                                            ? _l10n.exportingDocument
+                                            : '${_lineIndex.characters} ${t('字符', 'characters')} · UTF-8 · Markdown',
+                                        style: const TextStyle(fontSize: 11),
+                                      ),
+                                      if (resourceState.busy)
+                                        CupertinoButton(
+                                          key: const Key(
+                                            'stop-resource-operation',
+                                          ),
+                                          padding: const EdgeInsets.only(
+                                            left: 8,
+                                          ),
+                                          minimumSize: const Size(0, 20),
+                                          onPressed: _resourceWork.cancel,
+                                          child: Text(
+                                            _l10n.stop,
+                                            style: const TextStyle(
+                                              fontSize: 11,
+                                            ),
                                           ),
                                         ),
                                     ],
-                                  );
-                                },
-                              ),
-                            ),
-                            DefaultTextStyle(
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: c.textTertiary,
-                              ),
-                              child: Container(
-                                height: 24,
-                                color: c.bgToolbar,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                ),
-                                child: Row(
-                                  children: [
-                                    Text(
-                                      t(
-                                        '行 $line，列 $column',
-                                        'Ln $line, Col $column',
-                                      ),
-                                      style: const TextStyle(fontSize: 11),
-                                    ),
-                                    const Spacer(),
-                                    Text(
-                                      resourceState.busy
-                                          ? '${resourceState.operation}${resourceState.total > 0 ? ' ${resourceState.done}/${resourceState.total}' : ''}'
-                                          : exporting
-                                          ? _l10n.exportingDocument
-                                          : '${_lineIndex.characters} ${t('字符', 'characters')} · UTF-8 · Markdown',
-                                      style: const TextStyle(fontSize: 11),
-                                    ),
-                                    if (resourceState.busy)
-                                      CupertinoButton(
-                                        key: const Key(
-                                          'stop-resource-operation',
-                                        ),
-                                        padding: const EdgeInsets.only(left: 8),
-                                        minimumSize: const Size(0, 20),
-                                        onPressed: _resourceWork.cancel,
-                                        child: Text(
-                                          _l10n.stop,
-                                          style: const TextStyle(fontSize: 11),
-                                        ),
-                                      ),
-                                  ],
+                                  ),
                                 ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

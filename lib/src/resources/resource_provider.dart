@@ -1,5 +1,8 @@
 import 'dart:async';
 import 'dart:ui' as ui;
+import 'dart:io';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
@@ -123,6 +126,18 @@ class ResourcePlatform {
   Future<void> reveal(String path) =>
       channel.invokeMethod<void>('reveal', path);
   Future<void> trash(String path) async {
+    if (Platform.isAndroid || Platform.isIOS) {
+      final root = await getApplicationDocumentsDirectory();
+      final canonical = await File(path).resolveSymbolicLinks();
+      if (!p.isWithin(await root.resolveSymbolicLinks(), canonical)) {
+        throw const ResourceFailure(
+          '只能删除 Marker 内的文件。',
+          'Only files inside Marker can be deleted.',
+        );
+      }
+      await File(canonical).delete();
+      return;
+    }
     try {
       await channel.invokeMethod<void>('trash', path);
     } on Exception {

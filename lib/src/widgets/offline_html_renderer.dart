@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'mobile_html_renderer.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
@@ -12,8 +13,19 @@ class OfflineHtmlRenderer {
   static Future<void> _pending = Future<void>.value();
   static Future<WebViewEnvironment>? _environment;
 
-  Future<Uint8List> render(File file, {required int width, bool pdf = false}) {
+  Future<Uint8List> render(
+    File file, {
+    required int width,
+    bool pdf = false,
+    bool splitPng = false,
+  }) {
     final result = _pending.then((_) async {
+      if ([
+        TargetPlatform.android,
+        TargetPlatform.iOS,
+      ].contains(defaultTargetPlatform)) {
+        return renderMobileHtml(file, width, pdf: pdf, splitPng: splitPng);
+      }
       if (defaultTargetPlatform == TargetPlatform.windows) {
         return _windows(file, width, pdf);
       }

@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
-import 'dart:typed_data' show BytesBuilder;
+import 'export_network_images.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:markdown/markdown.dart' as md;
@@ -375,29 +375,11 @@ setTimeout(()=>notify({ready:true,width:Math.ceil(window.innerWidth),height:Math
       bytes = await file.readAsBytes();
       mime = _mime(uri.path);
     } else if (uri.scheme == 'https' || uri.scheme == 'http') {
-      final client = HttpClient()
-        ..connectionTimeout = const Duration(seconds: 15);
-      try {
-        final response = await (await client.getUrl(
-          uri,
-        )).close().timeout(const Duration(seconds: 20));
-        if (response.statusCode != 200) {
-          throw HttpException('Image HTTP ${response.statusCode}', uri: uri);
-        }
-        final builder = BytesBuilder();
-        await for (final chunk in response.timeout(
-          const Duration(seconds: 20),
-        )) {
-          builder.add(chunk);
-          if (builder.length > 25 * 1024 * 1024) {
-            throw StateError('Image exceeds 25 MB: $uri');
-          }
-        }
-        bytes = builder.takeBytes();
-        mime = response.headers.contentType?.mimeType ?? _mime(uri.path);
-      } finally {
-        client.close(force: true);
-      }
+      final downloaded = await fetchExportImage(uri);
+      bytes = downloaded.bytes;
+      mime = downloaded.mime?.startsWith('image/') == true
+          ? downloaded.mime!
+          : _mime(uri.path);
     } else {
       throw StateError(
         '图片路径无法解析，请先保存文档 / Save the document to resolve image: $uri',

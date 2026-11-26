@@ -9,11 +9,12 @@ extension _ResourceMenuActions on _MarkerHomeState {
         t('导入图片（复制原图）', 'Import images (copy originals)'),
         CupertinoIcons.photo,
       ),
-      (
-        'reference',
-        t('引用原位置…', 'Link original location…'),
-        CupertinoIcons.link,
-      ),
+      if (!_isMobile)
+        (
+          'reference',
+          t('引用原位置…', 'Link original location…'),
+          CupertinoIcons.link,
+        ),
       ('paste', t('粘贴截图或图片', 'Paste image'), CupertinoIcons.doc_on_clipboard),
       ('network', t('插入网络图片…', 'Insert web image…'), CupertinoIcons.globe),
       (
@@ -26,15 +27,21 @@ extension _ResourceMenuActions on _MarkerHomeState {
         t('清理未使用资源…', 'Clean unused resources…'),
         CupertinoIcons.trash,
       ),
-      (
-        'authorize',
-        t('授权资源目录…', 'Allow folder access…'),
-        CupertinoIcons.lock_open,
-      ),
-      ('folder', t('新建文档文件夹…', 'New document folder…'), CupertinoIcons.folder),
+      if (!_isMobile)
+        (
+          'authorize',
+          t('授权资源目录…', 'Allow folder access…'),
+          CupertinoIcons.lock_open,
+        ),
+      if (!_isMobile)
+        (
+          'folder',
+          t('新建文档文件夹…', 'New document folder…'),
+          CupertinoIcons.folder,
+        ),
       if (_path != null)
         ('rename', t('重命名文档…', 'Rename document…'), CupertinoIcons.pencil),
-      if (resourcePackageExportEnabled)
+      if (resourcePackageExportEnabled || _isMobile)
         (
           'package',
           t('打包文档与图片…', 'Package document and images…'),
@@ -62,7 +69,7 @@ extension _ResourceMenuActions on _MarkerHomeState {
       case 'rename':
         await _action(_renameResourceDocument);
       case 'package':
-        await _action(_packageResources);
+        await _action(_isMobile ? _exportMobileDocument : _packageResources);
     }
   }
 
@@ -132,10 +139,10 @@ extension _ResourceMenuActions on _MarkerHomeState {
         ].contains(item.availability))
           (
             'open',
-            t('打开原图', 'Open image'),
+            _isMobile ? t('查看图片', 'View image') : t('打开原图', 'Open image'),
             CupertinoIcons.arrow_up_right_square,
           ),
-        if (item.path != null)
+        if (item.path != null && !_isMobile)
           (
             'reveal',
             t('在文件管理器中显示', 'Show in file manager'),
@@ -168,6 +175,10 @@ extension _ResourceMenuActions on _MarkerHomeState {
       case 'open':
         await _action(() async {
           final uri = resolveResourceUri(item.source, _path);
+          if (_isMobile && uri.scheme == 'file') {
+            await _previewMobileImage(File.fromUri(uri).path);
+            return;
+          }
           if (!['file', 'http', 'https'].contains(uri.scheme) ||
               !await launchUrl(uri, mode: LaunchMode.externalApplication)) {
             throw const ResourceFailure('无法打开图片。', 'Cannot open image.');
@@ -201,14 +212,9 @@ extension _ResourceMenuActions on _MarkerHomeState {
 // Resource relocation, download, and cleanup operations
 extension _ResourceRelocateActions on _MarkerHomeState {
   Future<void> _relocateResource(String source, {bool copy = false}) async {
-    final image = await openFile(
-      acceptedTypeGroups: [
-        XTypeGroup(
-          label: t('图片', 'Images'),
-          extensions: resourceImageExtensions,
-        ),
-      ],
-    );
+    final images = await _pickResourceImages(multiple: false);
+    final image = images.firstOrNull;
+    if (_isMobile) copy = true;
     if (image == null || !mounted) return;
     if (!await _ensureResourceDocument()) return;
     final newReference = await _resourceWork.run(t('更新图片', 'Updating image'), (
@@ -217,14 +223,22 @@ extension _ResourceRelocateActions on _MarkerHomeState {
     ) async {
       if (copy) {
         return (await _withResourceAccess(
-          () => _resources.importImage(
+          () async => _resources.importImage(
             _path!,
-            ResourceInput(name: image.name, path: image.path),
+            ResourceInput(
+              name: image.name,
+              path: _isMobile ? null : image.path,
+              bytes: _isMobile ? await image.readAsBytes() : null,
+            ),
           ),
         )).reference;
       }
       await _resources.readImage(
-        ResourceInput(name: image.name, path: image.path),
+        ResourceInput(
+          name: image.name,
+          path: _isMobile ? null : image.path,
+          bytes: _isMobile ? await image.readAsBytes() : null,
+        ),
       );
       return resourceReference(image.path, _path!);
     });
@@ -466,7 +480,7 @@ extension _ResourcePackageActions on _MarkerHomeState {
         !mounted) {
       return;
     }
-    final target = await getSaveLocation(
+    final target = await _chooseSaveLocation(
       suggestedName: '${p.basenameWithoutExtension(_path!)}.zip',
       acceptedTypeGroups: [
         const XTypeGroup(label: 'ZIP', extensions: ['zip']),

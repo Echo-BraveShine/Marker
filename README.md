@@ -1,6 +1,6 @@
 # Marker
 
-Flutter 桌面 Markdown 编辑预览工具。
+Flutter Markdown 编辑预览工具，支持桌面与 Android / iOS。
 
 ## 运行
 
@@ -13,13 +13,25 @@ flutter run -d macos
 
 - Markdown 实时预览、编辑/分屏/预览模式
 - 可拖拽分栏，双击恢复均分；窄窗口上下分屏
-- 新建、打开、保存、携图另存为 UTF-8 文档
+- 桌面新建先选择位置并创建文件，取消不会清空当前文档；手机新建自动创建独立文件
+- 已有路径的文档停止输入约 800ms 后自动保存，连续输入最长约 5 秒同步一次
+- 串行原子写入与保存状态；写入失败保留草稿，磁盘修改冲突需用户选择，外部删除不会被自动重建
+- 状态栏或文档菜单可立即保存，支持携图另存为 UTF-8 文档
 - 文档资源侧栏、图片导入/拖入/截图粘贴、图片整理与安全清理（[使用说明](docs/RESOURCES.md)）
 - 新建或打开另一文档前提示保存更改
 - 粗体、斜体、行内代码快捷插入
 - Cmd/Ctrl+S 保存、Cmd/Ctrl+O 打开
 - 字符数量、光标行列、未保存标记
 - 中英文切换及浅深主题，偏好本地存储
+
+## 移动端
+
+- 仅支持横屏，与桌面共用侧栏、顶部工具栏、编辑分屏预览及设置布局；小屏按比例适配，并保留安全区域与键盘避让。
+- 导入 Markdown 时保存独立副本；后续保存写入 Marker 的文档目录，不覆盖来源文件。
+- 带本地图片的文档可通过 ZIP 导入、导出；导入包需包含一份 Markdown，图片保持原相对目录。
+- 单独导入 Markdown 无法自动取得旁边图片的访问权限，建议使用包含图片的 ZIP。
+- 移动端支持 PDF / PNG / HTML，通过系统文件面板保存；文档与图片仍可打包导出 ZIP。
+- Android 本地构建可使用开发签名；GitHub Release 构建使用仓库 Secrets 中的固定发布密钥，缺少签名配置会停止发布。
 
 ## 验证
 
@@ -100,8 +112,14 @@ Markdown 的“打开方式”关联和三端窗口核对详见 [桌面集成说
 
 导出使用点击入口时的文档快照，包含未保存的编辑。文档中的本地图片按 Markdown 所在目录解析，网络图片会先下载并内嵌；缺失图片会提示失败；PDF、PNG 渲染时也会检查公式与图表语法。macOS 如提示目录授权，请选择相应的图片目录或导出目录。取消不会修改原文或现有输出；导出目标不能是 Markdown 文件。
 
-PDF、PNG 中的 GIF、WebP 和 APNG 动图按首帧导出；HTML 保留动图。PNG 高度最多 32768 px，超长文档请选择 PDF。单张图片最多约 25 MB，内嵌图片总量最多 128 MB。Windows 需要 Microsoft Edge WebView2 Runtime。
+PDF、PNG 中的 GIF、WebP 和 APNG 动图按首帧导出；HTML 保留动图。PNG 高度最多 32768 px；移动端单图最多 1600 万像素，超长文档可开启分图 ZIP（总量最多 64 MB），或选择 PDF。单张图片最多约 25 MB，内嵌图片总量最多 128 MB。Windows 需要 Microsoft Edge WebView2 Runtime。
 
-Use **Export** in the toolbar or **⌘⇧E / Ctrl+Shift+E**. PDF uses light A4 pages with selectable text and endnotes, keeping fitting content blocks together and splitting oversized content at lines or table rows; PNG exports the full document at a chosen width and appearance; HTML embeds offline rendering resources. The app appearance export preference survives dialog dismissal and app restarts. Export captures unsaved content when opened. Local images resolve relative to the Markdown file; remote images are downloaded and embedded. Missing assets or invalid equations/diagrams report an error. On macOS, grant access to the relevant image or output folder when asked. Cancellation preserves existing files. PNG height is limited to 32768 px; use PDF for longer documents. Images are limited to approximately 25 MB each and 128 MB total when embedded. Windows requires Edge WebView2 Runtime.
+Use **Export** in the toolbar or **⌘⇧E / Ctrl+Shift+E**. PDF uses light A4 pages with selectable text and endnotes, keeping fitting content blocks together and splitting oversized content at lines or table rows; PNG exports the full document at a chosen width and appearance; HTML embeds offline rendering resources. The app appearance export preference survives dialog dismissal and app restarts. Export captures unsaved content when opened. Local images resolve relative to the Markdown file; remote images are downloaded and embedded. Missing assets or invalid equations/diagrams report an error. On macOS, grant access to the relevant image or output folder when asked. Cancellation preserves existing files. PNG height is limited to 32768 px. Mobile single images are limited to 16 million pixels; use split-image ZIP (up to 64 MB) or PDF for longer documents. Images are limited to approximately 25 MB each and 128 MB total when embedded. Windows requires Edge WebView2 Runtime.
 
 macOS 原生导出回归：`bash scripts/ci/test-macos-export.sh`，检查脚注、可复制文字、完整分页及深浅主题 PNG；桌面 CI 自动运行此检查。
+
+移动端和桌面端均支持 HTTP / HTTPS 网络图片；导出会先下载并内嵌网络图片，每张下载总超时 30 秒，失败时明确提示。HTTPS 保留系统证书校验。
+
+Apple 平台使用 Swift Package Manager 管理原生插件依赖（Flutter 3.44.9），iOS / macOS 不再需要 CocoaPods 或 `pod install`。最低系统版本仍为 iOS 15 / macOS 12。
+
+首次启动的语法示例保存为应用文档目录下的 `Marker Examples/Welcome.md`，按普通文件自动保存并管理图片资源。删除后不会自动重建；设置 → 关于 →「打开示例 / Open example」可再次打开，文件缺失时重新生成，已有内容不会被覆盖。桌面端手动新建文档仍须选择保存位置。

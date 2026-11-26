@@ -177,14 +177,7 @@ extension _ResourceImportActions on _MarkerHomeState {
   Future<void> _importPictures({bool referenceOnly = false}) async {
     if (_busy || _restoring) return;
     final owner = ref.read(workspaceProvider).activeId;
-    final files = await openFiles(
-      acceptedTypeGroups: [
-        XTypeGroup(
-          label: t('图片', 'Images'),
-          extensions: resourceImageExtensions,
-        ),
-      ],
-    );
+    final files = await _pickResourceImages();
     if (files.isEmpty || !mounted) return;
     if (ref.read(workspaceProvider).activeId != owner) {
       _toast(
@@ -193,9 +186,12 @@ extension _ResourceImportActions on _MarkerHomeState {
       return;
     }
     await _action(
-      () => _importResourceInputs([
+      () async => _importResourceInputs([
         for (final file in files)
-          ResourceInput(name: file.name, path: file.path),
+          if (_isMobile)
+            ResourceInput(name: file.name, bytes: await file.readAsBytes())
+          else
+            ResourceInput(name: file.name, path: file.path),
       ], referenceOnly: referenceOnly),
     );
   }
@@ -270,6 +266,11 @@ extension _ResourceImportActions on _MarkerHomeState {
         _insertResourceText(markdown.join('\n'), selection: selection);
       }
     });
+    if (markdown.isNotEmpty && mounted) {
+      // Persist the Markdown reference before reporting successful photo import.
+      await _persist();
+      await ref.read(autosaveProvider.notifier).flush(force: true);
+    }
     if (failures.isNotEmpty && mounted) {
       await _showResourceIssues(failures);
     } else if (cancelled && mounted) {

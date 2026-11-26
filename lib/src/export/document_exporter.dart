@@ -18,6 +18,7 @@ abstract class DocumentExportOptions with _$DocumentExportOptions {
   const factory DocumentExportOptions({
     @Default(DocumentExportFormat.pdf) DocumentExportFormat format,
     @Default(false) bool followTheme,
+    @Default(false) bool splitPng,
     @Default(1280) int width,
   }) = _DocumentExportOptions;
 }
@@ -162,6 +163,8 @@ class DocumentExporter {
         file,
         width: width,
         pdf: options.format == DocumentExportFormat.pdf,
+        splitPng:
+            options.format == DocumentExportFormat.png && options.splitPng,
       );
     } finally {
       await temporary.delete(recursive: true);

@@ -10,6 +10,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
 NAMES = [
+    'Marker-android-universal.apk',
     'Marker-macos.zip', 'Marker-macos-arm64.dmg', 'Marker-macos-x86_64.dmg',
     'Marker-Windows-x64-Setup.exe', 'Marker-windows-x64.zip', 'Marker-Windows-x64.msi', 'Marker-Windows-x64-zh-CN.msi',
     'Marker-linux-x64.tar.gz', 'Marker-linux-amd64.deb',
@@ -89,7 +90,7 @@ class PublishTests(unittest.TestCase):
         self.state(exists=False)
         result = self.publish()
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(len(list(self.assets.iterdir())), 16)
+        self.assertEqual(len(list(self.assets.iterdir())), len(NAMES) + 1)
 
     def test_resumes_partial_draft_without_overwriting_original_package(self):
         self.state(draft=True)
@@ -98,7 +99,7 @@ class PublishTests(unittest.TestCase):
         result = self.publish()
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(original.read_bytes(), b'original published package')
-        self.assertEqual(len(list(self.assets.iterdir())), 16)
+        self.assertEqual(len(list(self.assets.iterdir())), len(NAMES) + 1)
         self.assertIn(hashlib.sha256(original.read_bytes()).hexdigest(),
                       (self.assets / 'SHA256SUMS.txt').read_text(encoding='utf-8'))
         self.assertFalse(json.loads((self.remote / 'state.json').read_text(encoding='utf-8'))['draft'])

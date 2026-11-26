@@ -17,10 +17,12 @@ class ResourceSidebar extends ConsumerWidget {
     required this.onImport,
     required this.onMenu,
     required this.onItem,
+    this.mobile = false,
   });
   final String text;
   final String? path;
   final bool zh;
+  final bool mobile;
   final VoidCallback onImport, onMenu;
   final void Function(ResourceItem) onItem;
   @override
@@ -156,80 +158,97 @@ class ResourceSidebar extends ConsumerWidget {
                       for (final item in inventory.items.where(
                         (i) => i.availability == status,
                       ))
-                        CupertinoButton(
-                          key: ValueKey('resource-${item.source}'),
-                          padding: const EdgeInsets.all(7),
-                          onPressed: work.busy ? null : () => onItem(item),
-                          child: Row(
-                            children: [
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(5),
-                                child: SizedBox(
-                                  width: 34,
-                                  height: 34,
-                                  child:
-                                      item.availability ==
-                                          ResourceAvailability.local
-                                      ? Image.file(
-                                          File(item.path!),
-                                          key: ValueKey((
-                                            item.path,
-                                            work.revision,
-                                          )),
-                                          fit: BoxFit.cover,
-                                          cacheWidth: 96,
-                                          errorBuilder: (_, _, _) => Icon(
-                                            CupertinoIcons.photo,
-                                            color: c.textTertiary,
-                                            size: 22,
+                        GestureDetector(
+                          onSecondaryTap: work.busy ? null : () => onItem(item),
+                          child: CupertinoButton(
+                            key: ValueKey('resource-${item.source}'),
+                            onLongPress: mobile && !work.busy
+                                ? () => onItem(item)
+                                : null,
+                            padding: const EdgeInsets.all(7),
+                            onPressed: work.busy ? null : () => onItem(item),
+                            child: Row(
+                              children: [
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(5),
+                                  child: SizedBox(
+                                    width: 34,
+                                    height: 34,
+                                    child:
+                                        item.availability ==
+                                            ResourceAvailability.local
+                                        ? Image.file(
+                                            File(item.path!),
+                                            key: ValueKey((
+                                              item.path,
+                                              work.revision,
+                                            )),
+                                            fit: BoxFit.cover,
+                                            cacheWidth: 96,
+                                            errorBuilder: (_, _, _) => Icon(
+                                              CupertinoIcons.photo,
+                                              color: c.textTertiary,
+                                              size: 22,
+                                            ),
+                                          )
+                                        : Icon(
+                                            status ==
+                                                    ResourceAvailability.remote
+                                                ? CupertinoIcons.link
+                                                : CupertinoIcons
+                                                      .exclamationmark_triangle,
+                                            color: c.textSecondary,
+                                            size: 21,
                                           ),
-                                        )
-                                      : Icon(
-                                          status == ResourceAvailability.remote
-                                              ? CupertinoIcons.link
-                                              : CupertinoIcons
-                                                    .exclamationmark_triangle,
-                                          color: c.textSecondary,
-                                          size: 21,
+                                  ),
+                                ),
+                                const SizedBox(width: 7),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        item.alt.isEmpty
+                                            ? Uri.tryParse(
+                                                    item.source,
+                                                  )?.pathSegments.lastOrNull ??
+                                                  item.source
+                                            : item.alt,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: c.textPrimary,
                                         ),
-                                ),
-                              ),
-                              const SizedBox(width: 7),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      item.alt.isEmpty
-                                          ? Uri.tryParse(
-                                                  item.source,
-                                                )?.pathSegments.lastOrNull ??
-                                                item.source
-                                          : item.alt,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: c.textPrimary,
                                       ),
-                                    ),
-                                    Text(
-                                      item.availability ==
-                                              ResourceAvailability.local
-                                          ? '${(item.size / 1024).ceil()} KB${item.managed ? ' · ${l10n.managed}' : ''}'
-                                          : item.availability ==
-                                                ResourceAvailability.remote
-                                          ? l10n.linkedUrl
-                                          : l10n.clickToRepair,
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        color: c.textSecondary,
+                                      Text(
+                                        item.availability ==
+                                                ResourceAvailability.local
+                                            ? '${(item.size / 1024).ceil()} KB${item.managed ? ' · ${l10n.managed}' : ''}'
+                                            : item.availability ==
+                                                  ResourceAvailability.remote
+                                            ? l10n.linkedUrl
+                                            : l10n.clickToRepair,
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          color: c.textSecondary,
+                                        ),
                                       ),
-                                    ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
-                              ),
-                            ],
+                                if (mobile)
+                                  Padding(
+                                    padding: const EdgeInsets.only(left: 6),
+                                    child: Icon(
+                                      CupertinoIcons.ellipsis,
+                                      size: 18,
+                                      color: c.textSecondary,
+                                    ),
+                                  ),
+                              ],
+                            ),
                           ),
                         ),
                     ],

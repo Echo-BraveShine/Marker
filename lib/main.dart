@@ -29,6 +29,7 @@ import 'src/widgets/markdown_templates.dart';
 import 'src/widgets/marker_dialog.dart';
 import 'src/widgets/text_color_picker.dart';
 import 'src/providers/workspace_provider.dart';
+import 'src/providers/sample_document_store.dart';
 import 'src/widgets/linked_scroll.dart';
 import 'src/widgets/markdown_commands.dart';
 import 'src/widgets/markdown_editing_controller.dart';
@@ -47,10 +48,18 @@ import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
+import 'src/mobile/mobile_document_store.dart';
+import 'src/mobile/mobile_path_restore.dart';
+import 'src/mobile/mobile_cutout_area.dart';
+import 'package:image_picker/image_picker.dart' show ImagePicker, ImageSource;
+import 'src/mobile/landscape_desktop_viewport.dart';
+import 'package:file_picker/file_picker.dart' show FilePicker;
+import 'package:path_provider/path_provider.dart';
 import 'src/theme/marker_app_theme.dart';
 import 'src/theme/marker_colors.dart';
 import 'src/providers/theme_provider.dart';
 import 'src/providers/editor_provider.dart';
+import 'src/providers/autosave_provider.dart';
 import 'src/l10n/app_localizations.dart';
 import 'src/widgets/marker_markdown_style.dart';
 
@@ -63,17 +72,22 @@ part 'src/home/home_preview.dart';
 part 'src/home/home_state.dart';
 part 'src/home/home_document_actions.dart';
 part 'src/home/home_file_actions.dart';
+part 'src/home/home_disk_sync.dart';
+part 'src/home/home_autosave.dart';
 part 'src/home/home_editor_actions.dart';
 part 'src/home/home_settings.dart';
 part 'src/home/home_view.dart';
+part 'src/home/home_mobile_actions.dart';
 
 bool desktopWindow = false;
+bool mobileWindow = false;
 
 Future<void> main(List<String> arguments) async {
   final binding = WidgetsFlutterBinding.ensureInitialized();
   final container = ProviderContainer(
     overrides: [
       initialFilesProvider.overrideWithValue(markdownOpenPaths(arguments)),
+      sampleDocumentStoreProvider.overrideWithValue(SampleDocumentStore()),
     ],
   );
   try {
@@ -88,6 +102,26 @@ Future<void> main(List<String> arguments) async {
         TargetPlatform.windows,
         TargetPlatform.linux,
       ].contains(defaultTargetPlatform);
+
+  mobileWindow =
+      !kIsWeb &&
+      [
+        TargetPlatform.android,
+        TargetPlatform.iOS,
+      ].contains(defaultTargetPlatform);
+  if (mobileWindow) {
+    await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      // Native insets APIs also support immersive mode on recent target SDKs.
+      await const MethodChannel(
+        'marker/display',
+      ).invokeMethod<void>('enableImmersive');
+    }
+    await SystemChrome.setPreferredOrientations([
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+    ]);
+  }
   if (desktopWindow) {
     await windowManager.ensureInitialized();
     final mode = container.read(themeProvider).mode;
@@ -152,7 +186,11 @@ class MarkerApp extends ConsumerWidget {
         ),
         child: DesktopIconSync(
           enabled: desktopWindow,
-          child: child ?? const SizedBox.shrink(),
+          child: mobileWindow
+              ? LandscapeDesktopViewport(
+                  child: child ?? const SizedBox.shrink(),
+                )
+              : child ?? const SizedBox.shrink(),
         ),
       ),
 

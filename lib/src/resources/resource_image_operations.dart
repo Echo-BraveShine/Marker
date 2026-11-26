@@ -280,6 +280,11 @@ extension _ResourceImageOperations on DocumentResourceService {
     try {
       await temporary.create(exclusive: true);
       await temporary.writeAsString(text, flush: true);
+      final expected = _existingUpdates[p.normalize(target.absolute.path)];
+      if (expected != null) {
+        final current = await target.readAsString();
+        if (current != expected && current != text) throw ResourceConflict();
+      }
       await temporary.rename(target.path);
     } finally {
       if (await temporary.exists()) await temporary.delete();

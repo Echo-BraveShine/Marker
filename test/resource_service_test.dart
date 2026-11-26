@@ -10,6 +10,7 @@ import 'package:marker/src/resources/resource_references.dart';
 
 part 'cases/resource_service_imports_cases.dart';
 part 'cases/resource_service_relocation_cases.dart';
+part 'cases/resource_service_deleted_files_cases.dart';
 
 Uint8List png([int suffix = 0]) => Uint8List.fromList([
   ...base64Decode(
@@ -32,6 +33,7 @@ void main() {
   tearDown(() => folder.delete(recursive: true));
   _registerResourceServiceImportsCases();
   _registerResourceServiceRelocationCases();
+  _registerResourceServiceDeletedFilesCases();
 }
 
 class _FailingWriter extends DocumentResourceService {

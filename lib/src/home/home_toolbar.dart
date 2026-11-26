@@ -19,13 +19,6 @@ extension _HomeToolbar on _MarkerHomeState {
         ),
         button(CupertinoIcons.folder, _l10n.openDocument, () => _action(_open)),
         button(
-          CupertinoIcons.square_arrow_down,
-          _l10n.save,
-          () => _action(() async {
-            await _save();
-          }),
-        ),
-        button(
           CupertinoIcons.square_arrow_down_on_square,
           _l10n.saveAs,
           () => _action(() async {

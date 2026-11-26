@@ -18,6 +18,8 @@ const _manifestName = '.marker-resources.json';
 
 class ResourceCancelled implements Exception {}
 
+class ResourceConflict implements Exception {}
+
 class ResourceFailure implements Exception {
   const ResourceFailure(this.zh, this.en);
   final String zh, en;
@@ -173,6 +175,8 @@ class DocumentResourceService {
 
   final Future<void> Function(Uint8List)? validateImage;
 
+  final _existingUpdates = <String, String>{};
+
   final _directoryCache =
       <String, ({int modified, int size, Directory directory})>{};
 
@@ -185,6 +189,21 @@ class DocumentResourceService {
 
   Future<ManagedImage> importImage(String documentPath, ResourceInput input) =>
       _serviceImportImage(documentPath, input);
+
+  /// Revalidate at publication, including deletion/modification during staging.
+  Future<void> updateExistingDocument(
+    File target,
+    String text,
+    String expected,
+  ) async {
+    final key = p.normalize(target.absolute.path);
+    _existingUpdates[key] = expected;
+    try {
+      await atomicWrite(target, text);
+    } finally {
+      _existingUpdates.remove(key);
+    }
+  }
 
   Future<void> atomicWrite(File target, String text) =>
       _serviceAtomicWrite(target, text);

@@ -1,5 +1,0 @@
-package com.marker.marker
-
-import io.flutter.embedding.android.FlutterActivity
-
-class MainActivity : FlutterActivity()

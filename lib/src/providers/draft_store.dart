@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Writes are serialized so an older edit cannot overwrite a newer snapshot.
@@ -14,8 +16,18 @@ class DraftStore {
   }
 
   Future<void> write(String text, String saved, String? path) {
-    final snapshot = jsonEncode({'text': text, 'saved': saved, 'path': path});
+    final root = Platform.isIOS || Platform.isAndroid
+        ? getApplicationDocumentsDirectory().then<String?>((d) => d.path)
+        : Future<String?>.value(null);
     return _pending = _pending.catchError((Object _) {}).then((_) async {
+      final directory = await root;
+      final data = <String, String?>{
+        'text': text,
+        'saved': saved,
+        'path': path,
+      };
+      if (directory != null) data['mobileDocumentsRoot'] = directory;
+      final snapshot = jsonEncode(data);
       final prefs = await SharedPreferences.getInstance();
       if (!await prefs.setString('documentDraft', snapshot)) {
         throw StateError('Unable to store draft');

@@ -12,8 +12,12 @@ void main() {
       final container = ProviderContainer();
       addTearDown(container.dispose);
       final workspace = container.read(workspaceProvider.notifier);
-      final documentPath =
-          '${Directory.systemTemp.path}${Platform.pathSeparator}中文 文档.md';
+      final directory = await Directory.systemTemp.createTemp(
+        'marker-workspace-',
+      );
+      addTearDown(() => directory.delete(recursive: true));
+      final documentPath = '${directory.path}${Platform.pathSeparator}中文 文档.md';
+      await File(documentPath).writeAsString('one');
       workspace.add(text: 'one', saved: 'one', path: documentPath);
       final first = workspace.active!.id;
       workspace.snapshot('modified one', 'one', documentPath);
@@ -40,6 +44,64 @@ void main() {
       expect(empty.read(workspaceProvider).documents, isEmpty);
     },
   );
+  test(
+    'external deletions remove clean tabs and detach dirty drafts',
+    () async {
+      final directory = await Directory.systemTemp.createTemp('marker-delete-');
+      addTearDown(() => directory.delete(recursive: true));
+      final file = File('${directory.path}/deleted.md');
+      await file.writeAsString('saved');
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      final workspace = container.read(workspaceProvider.notifier);
+      workspace.add(text: 'saved', saved: 'saved', path: file.path);
+      await file.delete();
+      expect(await workspace.syncDeletedFiles(), isTrue);
+      expect(container.read(workspaceProvider).documents, isEmpty);
+      workspace.add(
+        text: '![image](old.assets/a.png)',
+        saved: 'saved',
+        path: file.path,
+      );
+      final id = workspace.active!.id;
+      expect(await workspace.syncDeletedFiles(), isTrue);
+      expect(workspace.active!.id, id);
+      expect(workspace.active!.path, isNull);
+      expect(workspace.active!.dirty, isTrue);
+      expect(workspace.active!.text, contains('file:'));
+      expect(workspace.active!.text, contains('old.assets/a.png'));
+      expect(await file.exists(), isFalse);
+      await workspace.persist();
+      final restored = ProviderContainer();
+      addTearDown(restored.dispose);
+      await restored.read(workspaceProvider.notifier).restore();
+      expect(restored.read(workspaceProvider).documents.single.path, isNull);
+    },
+  );
+
+  test(
+    'restart drops deleted clean documents instead of reviving cached text',
+    () async {
+      final directory = await Directory.systemTemp.createTemp(
+        'marker-deleted-restore-',
+      );
+      addTearDown(() => directory.delete(recursive: true));
+      final file = File('${directory.path}/deleted.md');
+      await file.writeAsString('saved');
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      final workspace = container.read(workspaceProvider.notifier);
+      workspace.add(text: 'saved', saved: 'saved', path: file.path);
+      await workspace.persist();
+      await file.delete();
+      final restored = ProviderContainer();
+      addTearDown(restored.dispose);
+      await restored.read(workspaceProvider.notifier).restore();
+      expect(restored.read(workspaceProvider).documents, isEmpty);
+      expect(await file.exists(), isFalse);
+    },
+  );
+
   test(
     'recent content edits sort first, selection alone preserves order',
     () async {

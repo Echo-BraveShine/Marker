@@ -6,6 +6,7 @@ from pathlib import Path
 import sys
 
 ARTIFACTS = {
+    'android': ('Marker-android-universal.apk',),
     'macos': ('Marker-macos.zip', 'Marker-macos-arm64.dmg', 'Marker-macos-x86_64.dmg'),
     'windows': ('Marker-Windows-x64-Setup.exe', 'Marker-windows-x64.zip', 'Marker-Windows-x64.msi', 'Marker-Windows-x64-zh-CN.msi'),
     'linux': ('Marker-linux-x64.tar.gz', 'Marker-linux-amd64.deb',
@@ -26,8 +27,8 @@ def main():
     if args.platform is None:
         raise SystemExit('Specify the release platform')
     folder = args.project_dir / 'dist'
-    architecture = args.architecture or ('universal' if args.platform == 'macos' else 'x64')
-    supported = {'macos': ('universal',), 'windows': ('x64',), 'linux': ('x64', 'arm64')}
+    architecture = args.architecture or ('universal' if args.platform in ('macos', 'android') else 'x64')
+    supported = {'android': ('universal',), 'macos': ('universal',), 'windows': ('x64',), 'linux': ('x64', 'arm64')}
     if architecture not in supported[args.platform]:
         raise SystemExit(f'Unsupported release target: {args.platform}/{architecture}')
     names = LINUX_ARM64 if args.platform == 'linux' and architecture == 'arm64' else ARTIFACTS[args.platform]

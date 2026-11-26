@@ -71,5 +71,12 @@
 			</dict>
 		</dict>
 	</array>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+	</dict>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>访问文档引用的局域网图片与链接 / Access local network images and links referenced by your documents.</string>
 </dict>
 </plist>

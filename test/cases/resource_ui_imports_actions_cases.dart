@@ -159,6 +159,7 @@ void _registerResourceUiImportsActionsCases() {
         ).list().where((f) => f.path.endsWith('.png')).length,
       );
       expect(images, 1);
+      final originalSavedText = editor(tester).controller!.text;
       final copyPath = '${root.path}/副本.md';
       tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
         picker,
@@ -180,7 +181,7 @@ void _registerResourceUiImportsActionsCases() {
       );
       expect(
         await tester.runAsync(() => File('${root.path}/文档.md').readAsString()),
-        '原始内容',
+        originalSavedText,
       );
       expect(
         editor(tester).controller!.text,

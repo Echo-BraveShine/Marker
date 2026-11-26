@@ -21,6 +21,7 @@ void main() {
   testWidgets(
     'shows actual version and offers release downloads after checking',
     (tester) async {
+      var exampleOpened = false;
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
@@ -46,12 +47,23 @@ void main() {
               GlobalCupertinoLocalizations.delegate,
             ],
             theme: MarkerAppTheme().light(),
-            home: const Scaffold(body: AboutSettings(zh: true)),
+            home: Scaffold(
+              body: AboutSettings(
+                zh: true,
+                onOpenExample: () => exampleOpened = true,
+              ),
+            ),
           ),
         ),
       );
       await tester.pumpAndSettle();
       expect(find.text('版本 1.0.0 (7)'), findsOneWidget);
+      expect(find.byKey(const Key('buy-coffee')), findsOneWidget);
+      expect(find.text('请我喝杯咖啡'), findsOneWidget);
+      expect(find.text('打开示例'), findsOneWidget);
+      final exampleRow = tester.getRect(find.byKey(const Key('open-example')));
+      await tester.tapAt(Offset(exampleRow.right - 20, exampleRow.center.dy));
+      expect(exampleOpened, isTrue);
       await tester.tap(find.byKey(const Key('check-updates')));
       await tester.pumpAndSettle();
       expect(find.text('发现新版本 1.2.0'), findsOneWidget);

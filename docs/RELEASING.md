@@ -27,7 +27,8 @@
 | Windows x64 | `Marker-Windows-x64-Setup.exe`、`Marker-Windows-x64.msi`（英文）、`Marker-Windows-x64-zh-CN.msi`（中文）、`Marker-windows-x64.zip` |
 | Linux x64 | `Marker-linux-x64.tar.gz`、`Marker-linux-amd64.deb`、`Marker-linux-x86_64.AppImage`、`Marker-linux-x86_64.rpm` |
 | Linux ARM64 | `Marker-linux-arm64.tar.gz`、`Marker-linux-arm64.deb`、`Marker-linux-aarch64.AppImage`、`Marker-linux-aarch64.rpm` |
-| 校验 | `SHA256SUMS.txt`，覆盖以上 15 个安装包 |
+| Android | `Marker-android-universal.apk`，包含 ARMv7 / ARM64 / x86_64 |
+| 校验 | `SHA256SUMS.txt`，覆盖以上 16 个安装包 |
 
 macOS 对所有 Mach-O 文件检查 ARM64、x86_64，防止插件缺少架构；DMG 分别裁剪为 ARM64、x86_64，逐个检查所有 Mach-O 架构、重新签名并验证镜像，包含拖入 Applications 的入口。Windows EXE 与 MSI 注册 Markdown 打开方式，便携包附带 VC++ 运行库。MSI 使用独立 UpgradeCode；云端 Release 校验其版本、实际静默安装、检查安装文件并卸载，自托管低权限 Runner 只构建及检查 MSI 元数据。Linux TAR 含用户级安装脚本：解压到独立目录后，在该目录执行 `bash install-user.sh .`；DEB 安装至 `/opt/marker`，注册桌面入口、MIME 与图标。
 
@@ -73,7 +74,7 @@ Windows 与 Linux 的原生构建及安装器应由对应 runner 验证。本机
 
 手动在新版工作流所在分支运行旧标签时，可以使用修复后的打包工具；直接重跑历史 workflow run 仍使用历史工作流。标签里的应用代码或 Flutter 测试错误仍需通过包含修复的新版本标签解决，不能靠更换打包脚本绕过。发布前会再次确认标签没有被移动到其他提交。
 
-所有平台产物都做非空与文件名完整性检查，再计算校验值。Linux 两种架构的校验文件单独命名，防止合并时互相覆盖；发布必须包含完整 15 包，缺少任何格式或架构都会停止。Windows 同时检查 EXE、安装器的公开版本和 build number；Linux 检查 DEB 版本与架构；macOS 检查双架构及签名完整性。架构不匹配、任一平台构建失败或产物缺失均阻止发布。
+所有平台产物都做非空与文件名完整性检查，再计算校验值。Linux 两种架构的校验文件单独命名，防止合并时互相覆盖；发布必须包含完整 16 包，缺少任何格式或架构都会停止。Windows 同时检查 EXE、安装器的公开版本和 build number；Linux 检查 DEB 版本与架构；macOS 检查双架构及签名完整性。架构不匹配、任一平台构建失败或产物缺失均阻止发布。
 
 工具回归测试：`python3 -m unittest discover -s scripts/tests -v`。发布模拟使用临时目录与伪 GitHub CLI，不会创建真实 Release。手动 `build_only` 仍默认开启，推送正式标签仍自动发布。
 
@@ -131,3 +132,20 @@ AppImage 生成完成后，在独立 Xvfb 与 D-Bus 会话中启动实际运行�
 Linux 构建环境增加 `libwebkit2gtk-4.1-dev`；DEB/RPM 增加 WebKitGTK 4.1 运行依赖。Desktop checks 在 Linux 导出离线测试页，再运行 `scripts/ci/test-linux-native.sh`，覆盖 9 类图表的深浅主题、中文标签、无效语法，以及桌面入口的主题图标与配置保留。TAR/AppImage 使用系统 WebKitGTK 4.1。
 
 Windows 离线页面必须通过本地文件 URL 加载，不能将 3.3MB 的 Mermaid 脚本内联后交给限制 2MB 的 `NavigateToString`；页面显式使用 UTF-8。WebView2 profile 使用用户数据目录，不能写 Program Files。`test/windows_mermaid_test.cpp` 是原生 WebView2 回归探针，需在登录用户会话运行（SYSTEM 后台会话无法可靠创建控制器）；`test/windows_icon_sizes_test.cpp` 校验两套 ICO 在 10 个尺寸的原生加载结果。
+
+## Android APK
+
+Release 增加 Ubuntu runner，配置 JDK 17、Android SDK，构建 `flutter build apk --release --no-pub`。产物 `Marker-android-universal.apk` 包含 armeabi-v7a、arm64-v8a、x86_64，随桌面安装包一起上传到同一个 Release 并加入 SHA256SUMS。发布前校验内嵌版本、ABI 和 APK 签名。
+
+在仓库 Settings → Secrets and variables → Actions 中配置四个 repository secrets：
+
+- `ANDROID_KEYSTORE_BASE64`：发布 keystore 文件的 Base64 内容。
+- `ANDROID_KEYSTORE_PASSWORD`：密钥库密码。
+- `ANDROID_KEY_ALIAS`：签名密钥别名。
+- `ANDROID_KEY_PASSWORD`：签名密钥密码。
+
+所有发布（包括 build_only）使用固定密钥；缺少 Secrets 会明确失败，不会发布临时开发签名 APK。运行时只在 runner 临时目录恢复密钥，权限限制为当前用户，构建后清理。密码不写入仓库或构建产物。请离线备份密钥及密码，后续升级保持使用相同密钥并递增 pubspec 的 build number。
+
+本地正式签名通过 `MARKER_ANDROID_KEYSTORE_PATH` 和上述三个密码/别名环境变量配置；可设置 `MARKER_REQUIRE_ANDROID_SIGNING=true` 禁止回退开发签名。本地临时测试不配置密钥时仍可使用开发签名。
+
+已有 Release 保持不覆盖策略。添加 Android 格式后，若旧 Release 的校验清单不包含 APK，使用递增版本的新标签发布，避免修改既有发布清单。
