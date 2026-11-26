@@ -16,7 +16,11 @@ dependencies:
   file_selector: ^1.0.3
   url_launcher: ^6.3.2
   flutter_math_fork: ^0.7.4
-  flutter_inappwebview: ^6.2.0-beta.3
+  # Official platform packages only; macOS/Linux use native renderers.
+  flutter_inappwebview_platform_interface: 1.4.0-beta.3
+  flutter_inappwebview_android: 1.2.0-beta.3
+  flutter_inappwebview_ios: 1.2.0-beta.3
+  flutter_inappwebview_windows: 0.7.0-beta.3
 
   # Markdown 解析与渲染 - 使用更稳定的 flutter_markdown
   markdown: ^7.3.1

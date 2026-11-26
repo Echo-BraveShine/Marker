@@ -15,6 +15,7 @@ test -n "$analyzer"
 test "$("$analyzer" manifest application-id "$apk")" = dev.ekko.marker
 test "$("$analyzer" manifest version-name "$apk")" = "$EXPECTED_VERSION"
 test "$("$analyzer" manifest version-code "$apk")" = "$EXPECTED_BUILD"
+"$analyzer" manifest permissions "$apk" | grep -Fx 'android.permission.INTERNET' >/dev/null
 signer=$(find "$sdk/build-tools" -name apksigner -type f | sort -V | tail -n 1)
 test -n "$signer"
 "$signer" verify --verbose "$apk"

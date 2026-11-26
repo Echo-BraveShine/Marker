@@ -152,7 +152,12 @@ void _registerWidgetLayoutCases() {
       find.byKey(const Key('editor')),
       'Wide preview content',
     );
-    await tester.tap(find.text('预览'));
+    await tester.tap(
+      find.descendant(
+        of: find.byType(CupertinoSlidingSegmentedControl<int>),
+        matching: find.text('预览'),
+      ),
+    );
     await tester.pumpAndSettle();
     final preview = tester.getRect(find.byKey(const Key('preview')));
     expect(
@@ -171,7 +176,12 @@ void _registerWidgetLayoutCases() {
       ),
     );
     expect(paragraph.left - preview.left, closeTo(8, 1));
-    await tester.tap(find.text('编辑'));
+    await tester.tap(
+      find.descendant(
+        of: find.byType(CupertinoSlidingSegmentedControl<int>),
+        matching: find.text('编辑'),
+      ),
+    );
     await tester.pumpAndSettle();
     final edit = tester.getRect(find.byKey(const Key('editor')));
     expect(edit.width, greaterThan(1280));
@@ -181,7 +191,12 @@ void _registerWidgetLayoutCases() {
           .padding,
       const EdgeInsets.fromLTRB(4, 10, 4, 10),
     );
-    await tester.tap(find.text('分屏'));
+    await tester.tap(
+      find.descendant(
+        of: find.byType(CupertinoSlidingSegmentedControl<int>),
+        matching: find.text('分屏'),
+      ),
+    );
     await tester.pumpAndSettle();
     final split = tester.getRect(find.byKey(const Key('preview')));
     expect(split.width, closeTo((preview.width - 8) / 2, 1));
@@ -213,7 +228,17 @@ void _registerWidgetLayoutCases() {
     await tester.pumpAndSettle();
     final y = tester.getCenter(find.byIcon(CupertinoIcons.doc_append)).dy;
     expect(tester.getCenter(find.text('H1')).dy, closeTo(y, 1));
-    expect(tester.getCenter(find.text('分屏')).dy, closeTo(y, 1));
+    expect(
+      tester
+          .getCenter(
+            find.descendant(
+              of: find.byType(CupertinoSlidingSegmentedControl<int>),
+              matching: find.text('分屏'),
+            ),
+          )
+          .dy,
+      closeTo(y, 1),
+    );
     await tester.enterText(find.byKey(const Key('editor')), 'content');
     await tester.pumpAndSettle();
     await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
@@ -221,7 +246,12 @@ void _registerWidgetLayoutCases() {
     await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('editor')), findsNothing);
-    await tester.tap(find.text('分屏'));
+    await tester.tap(
+      find.descendant(
+        of: find.byType(CupertinoSlidingSegmentedControl<int>),
+        matching: find.text('分屏'),
+      ),
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('editor')));
     await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);

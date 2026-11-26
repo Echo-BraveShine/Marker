@@ -3,6 +3,7 @@ package dev.ekko.marker
 import io.flutter.embedding.android.FlutterActivity
 
 class MainActivity : FlutterActivity() {
+  private val incomingFiles by lazy { MarkerIncomingFiles(this) }
   private var immersiveEnabled = false
   private var keyboardVisible = false
   private val layoutListener = android.view.ViewTreeObserver.OnGlobalLayoutListener {
@@ -19,8 +20,16 @@ class MainActivity : FlutterActivity() {
     if (keyboardClosed && immersiveEnabled) hideSystemBars()
   }
   override fun onCreate(savedInstanceState: android.os.Bundle?) {
+    // Export snapshots may draw tiles outside the visible WebView viewport.
+    android.webkit.WebView.enableSlowWholeDocumentDraw()
     super.onCreate(savedInstanceState)
+    incomingFiles.receive(intent)
     window.decorView.viewTreeObserver.addOnGlobalLayoutListener(layoutListener)
+  }
+  override fun onNewIntent(intent: android.content.Intent) {
+    super.onNewIntent(intent)
+    setIntent(intent)
+    incomingFiles.receive(intent)
   }
   override fun onWindowFocusChanged(hasFocus: Boolean) {
     super.onWindowFocusChanged(hasFocus)
@@ -47,10 +56,12 @@ class MainActivity : FlutterActivity() {
   override fun onDestroy() {
     window.decorView.viewTreeObserver.removeOnGlobalLayoutListener(layoutListener)
     pdfExporter.cancel()
+    incomingFiles.detach()
     super.onDestroy()
   }
   override fun configureFlutterEngine(flutterEngine: io.flutter.embedding.engine.FlutterEngine) {
     super.configureFlutterEngine(flutterEngine)
+    incomingFiles.attach(flutterEngine.dartExecutor.binaryMessenger)
     io.flutter.plugin.common.MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "marker/mobilePdf")
       .setMethodCallHandler { call, result ->
         when (call.method) {

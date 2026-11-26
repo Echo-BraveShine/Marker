@@ -8,9 +8,15 @@ import '../l10n/app_localizations.dart';
 import 'document_exporter.dart';
 
 class ExportOptionsPanel extends ConsumerWidget {
-  const ExportOptionsPanel({super.key, required this.zh, this.mobile = false});
+  const ExportOptionsPanel({
+    super.key,
+    required this.zh,
+    this.mobile = false,
+    this.onSaveToFiles,
+  });
   final bool zh;
   final bool mobile;
+  final VoidCallback? onSaveToFiles;
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
@@ -130,6 +136,14 @@ class ExportOptionsPanel extends ConsumerWidget {
         ],
       ),
       actions: [
+        if (onSaveToFiles != null)
+          MarkerDialogButton(
+            onPressed: () {
+              onSaveToFiles!();
+              Navigator.pop(context, ref.read(documentExportOptionsProvider));
+            },
+            child: Text(zh ? '保存到文件' : 'Save to Files'),
+          ),
         MarkerDialogButton(
           primary: true,
           onPressed: () =>

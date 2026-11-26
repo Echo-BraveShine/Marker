@@ -70,7 +70,8 @@ class MarkerMobilePdfExporter(private val activity: Activity) {
       this.adapter = adapter
       val attributes = PrintAttributes.Builder().setMediaSize(PrintAttributes.MediaSize.ISO_A4)
         .setResolution(PrintAttributes.Resolution("pdf", "PDF", 300, 300))
-        .setMinMargins(PrintAttributes.Margins(709, 709, 709, 709)).build()
+        // CSS @page owns the 18 mm margins; do not apply a second native inset.
+        .setMinMargins(PrintAttributes.Margins.NO_MARGINS).build()
       adapter.onLayout(null, attributes, signal!!, object : android.print.MarkerPrintCallbacks.Layout() {
         override fun onLayoutFinished(info: PrintDocumentInfo, changed: Boolean) {
           if (completion == null) return

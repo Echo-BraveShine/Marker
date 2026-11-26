@@ -1,125 +1,112 @@
 # Marker
 
-Flutter Markdown 编辑预览工具，支持桌面与 Android / iOS。
+基于 Flutter 的跨平台 Markdown 编辑器。支持 macOS、Windows、Linux、Android 和 iOS；移动端采用横屏布局。
 
-## 运行
+本文面向项目开发与维护。[产品介绍与下载](https://echo-braveshine.github.io/Marker/) · [GitHub Releases](https://github.com/Echo-BraveShine/Marker/releases)
+
+## 开发环境
+
+- Flutter 版本以 [.fvmrc](.fvmrc) 为准，当前为 **3.44.9**；Dart SDK 约束见 [pubspec.yaml](pubspec.yaml)。
+- 使用目标平台的原生工具链构建。iOS / macOS 需要 Xcode，Windows 需要 Visual Studio C++ 桌面开发环境，Android 使用 JDK 17 与 Android SDK。
+- iOS 最低 15，macOS 最低 12。Apple 原生插件使用 Swift Package Manager，已移除 CocoaPods 集成，无需运行 `pod install`。
+- Linux 的 GTK、WebKitGTK 等构建依赖以 [.github/workflows/desktop.yml](.github/workflows/desktop.yml) 为准；Windows 预览与导出依赖 WebView2 Runtime。
 
 ```sh
-flutter pub get
+flutter pub get --enforce-lockfile
+flutter devices
 flutter run -d macos
 ```
 
-## 当前功能
+将设备参数替换为目标设备 ID；安装 FVM 的环境可统一用 `fvm flutter` / `fvm dart` 执行对应命令。`desktop_drop` 使用仓库内的[定制版本](third_party/desktop_drop/README.md)，获取源码时需保留该目录。WebView 直接引用官方 Android、iOS、Windows 平台包及公共平台接口，版本固定在 pubspec 与锁文件中；不维护 WebView 插件源码补丁。macOS / Linux 使用项目原生渲染器，不引入对应的 WebView 插件。
 
-- Markdown 实时预览、编辑/分屏/预览模式
-- 可拖拽分栏，双击恢复均分；窄窗口上下分屏
-- 桌面新建先选择位置并创建文件，取消不会清空当前文档；手机新建自动创建独立文件
-- 已有路径的文档停止输入约 800ms 后自动保存，连续输入最长约 5 秒同步一次
-- 串行原子写入与保存状态；写入失败保留草稿，磁盘修改冲突需用户选择，外部删除不会被自动重建
-- 状态栏或文档菜单可立即保存，支持携图另存为 UTF-8 文档
-- 文档资源侧栏、图片导入/拖入/截图粘贴、图片整理与安全清理（[使用说明](docs/RESOURCES.md)）
-- 新建或打开另一文档前提示保存更改
-- 粗体、斜体、行内代码快捷插入
-- Cmd/Ctrl+S 保存、Cmd/Ctrl+O 打开
-- 字符数量、光标行列、未保存标记
-- 中英文切换及浅深主题，偏好本地存储
+## 代码结构
 
-## 移动端
+| 路径 | 职责 |
+| --- | --- |
+| `lib/main.dart` | 启动、依赖注入、主题和平台入口 |
+| `lib/src/home/` | 工作区界面与文档操作，使用 Dart `part` 拆分主页面 |
+| `lib/src/providers/` | 编辑、工作区、偏好、自动保存、更新及示例文档状态与服务 |
+| `lib/src/resources/` | 图片导入、路径解析、资源整理和安全删除 |
+| `lib/src/export/` | 导出选项、HTML 构建、网络图片内嵌及输出文件保护 |
+| `lib/src/widgets/` | 编辑器、预览、滚动联动、共用弹窗与设置组件 |
+| `lib/src/mobile/` | 移动文档存储、沙盒路径恢复、横屏缩放及安全区域 |
+| `lib/src/theme/`、`lib/src/l10n/` | 配色、字体、样式与中英文文案 |
+| `ios/`、`android/`、`macos/`、`windows/`、`linux/` | 原生工程、系统集成与导出桥接 |
+| `assets/` | 品牌资源、中文字体、离线公式与 Mermaid 渲染资源 |
+| `test/`、`scripts/tests/` | Dart / Flutter 测试与 Python 发布工具回归测试 |
+| `.github/release/`、`.github/workflows/` | 平台打包、校验、发布与 Pages 部署 |
+| `website/` | 用户官网，静态 HTML / CSS / JavaScript |
 
-- 仅支持横屏，与桌面共用侧栏、顶部工具栏、编辑分屏预览及设置布局；小屏按比例适配，并保留安全区域与键盘避让。
-- 导入 Markdown 时保存独立副本；后续保存写入 Marker 的文档目录，不覆盖来源文件。
-- 带本地图片的文档可通过 ZIP 导入、导出；导入包需包含一份 Markdown，图片保持原相对目录。
-- 单独导入 Markdown 无法自动取得旁边图片的访问权限，建议使用包含图片的 ZIP。
-- 移动端支持 PDF / PNG / HTML，通过系统文件面板保存；文档与图片仍可打包导出 ZIP。
-- Android 本地构建可使用开发签名；GitHub Release 构建使用仓库 Secrets 中的固定发布密钥，缺少签名配置会停止发布。
+## 状态与界面约定
 
-## 验证
+状态管理统一使用 `flutter_riverpod` 的 Notifier / Provider 与 Freezed 不可变模型。`editorProvider` 管理编辑及界面状态，`workspaceProvider` 管理打开的文档，`themeProvider` 管理主题和语言，`autosaveProvider` 管理保存调度与状态。`TextEditingController`、焦点、撤销控制器及渲染缓存负责控件生命周期，不另建全局状态体系。
 
-```sh
-flutter analyze
-flutter test
-flutter build macos --debug
-```
-
-## 当前限制
-
-已实现桌面关闭保护、macOS 退出保护和草稿自动恢复（编辑后约 350ms 缓存）。草稿缓存不能替代文件保存。已支持多文档恢复、分屏滚动联动及可选的编辑器语法高亮。支持 PDF、PNG 长图与独立 HTML 导出；资源打包入口暂时隐藏。资源管理涉及的原生拖放、剪贴板和废纸篓需要分别在对应桌面系统验收。
-
-## 界面
-
-按 docs/UI_STYLE.md 调整为一体化 macOS 标题栏、240/56px 可折叠侧栏、44px 工具栏、24px 状态栏与居中限宽预览。设置提供跟随系统/浅色/深色主题、10–24 编辑字号、衬线预览。侧栏支持文档列表与图片资源切换，支持重启恢复上次文档和可选语法高亮；浮窗与设置使用共用界面组件。
-
-## 状态管理
-
-统一使用 `flutter_riverpod` 的 `NotifierProvider`，配合 Freezed 不可变状态：
-
-- `editorProvider`：文档内容、保存基线、文件路径、光标、恢复/忙碌状态与编辑界面选项。
-- `themeProvider`：主题与语言，持久化到本地偏好。
-- `ProviderScope` 在应用入口创建；测试使用独立容器，不共享单例状态。
-- `TextEditingController`、焦点、撤销控制器和缓存计时器仅负责界面/生命周期，不承担全局状态管理。
-
-修改 Freezed 模型后运行：
+修改 Freezed 模型后，更新生成文件并格式化：
 
 ```sh
 dart run build_runner build
+dart format lib test
 ```
 
-启动默认展示完整语法示例；若存在未保存草稿则优先恢复。编辑区提供 Markdown 颜色高亮，并在中文输入组合期间保留系统输入样式。侧栏标签按动画过程的实际宽度显示，避免切换溢出。
+界面复用 `MarkerColors`、`MarkerStyle`、`MarkerDialog` 与浮层组件；避免引入独立的弹窗样式或 Material 图标字体。手写文件保持职责单一，约 500 行时考虑拆分。完整规范见 [UI_STYLE.md](docs/UI_STYLE.md)。
 
-分屏模式下，编辑区和预览区按滚动进度双向联动，避免互相触发循环；这是比例联动，复杂图表和图片高度不同的文档尚非逐段精确对齐。顶部向下箭头可展开完整语法面板，覆盖当前支持的 Markdown 语法类型。命令保留当前选区并插入标记，未选中文本时填入占位内容；面板限制高度并可滚动。
+## 文件与数据约定
 
-## 多文档工作区
+- 桌面新建先取得系统保存位置，创建成功后再加入工作区；移动端在应用 Documents 目录创建独立文件。取消选择不修改当前文档。
+- 有路径的脏文档在停止输入约 800ms 后自动保存，连续输入最长约 5 秒触发一次。写入串行执行，冲突和失败保留编辑内容，不能以缓存替代磁盘保存。
+- 重启恢复工作区和草稿。确认磁盘文件已删除时，干净文档移出工作区；有未保存修改的文档转为草稿，不自动重建被删除文件。权限错误与文件删除分别处理。
+- 首次初始化将语法示例保存为应用文档目录下的 `Marker Examples/Welcome.md`，接入普通文件流程。删除后不自动生成；设置 → 关于 → 打开示例可显式重建，已有文件不被覆盖。升级时保留已有编辑草稿。
+- 移动端支持系统文件打开：iOS 使用文档类型关联与 Scene / AppDelegate URL 接收；Android 支持 VIEW / EDIT / SEND / SEND_MULTIPLE。冷启动与前台打开统一排队，系统授予的文件权限在原生层读取并复制到私有暂存区，导入完成后确认清理；应用不申请全盘访问权限。
+- 外部 Markdown 导入独立副本，不覆盖来源文件；相同文件名与内容复用已有副本并保留本地编辑，来源内容变化时创建新副本。Marker Documents 内已有文档直接打开，文件已删除时不以暂存内容恢复。导入索引使用相对路径，适配 iOS 沙盒路径变化。
+- 支持 Markdown / TXT（最多 16 MB）与 ZIP（最多 64 MB）导入。带本地图片时使用 ZIP 保持相对目录；单独文档图片缺失时提示补充资源。相机、相册图片复制到文档资源目录。
+- 图片资源随文档保存和重命名迁移。HTTP / HTTPS 图片使用系统网络配置，HTTPS 保留证书校验；导出前下载内嵌，每张下载总超时 30 秒。
+- 分屏滚动是双向比例联动，不是逐段精确映射；需避免渲染高度变化或程序滚动触发反馈循环。
+- Mermaid 预览共用本地脚本与字体，避免每张图重复拼接大体积内嵌资源。文档稳定后在后台解析图块，空闲时串行预热及预解码最多 24 个唯一图表；任一侧滚动时延后新任务和图片替换。完成缓存按主题、平台及源码区分，首帧使用 PNG 头部尺寸预留布局。当前不使用跨会话图表快照，冷启动后仍需渲染，不能以单元测试替代各设备的帧率分析。
 
-新建或打开文件会加入侧栏，点击切换；每份文档保留独立草稿。重启恢复打开列表、上次选中文档与未保存内容。干净文档尝试重新读取磁盘文件；路径失效或无读取权限时保留缓存内容，保存失败可通过另存为重新选择路径。
+资源迁移、另存为和清理规则见 [RESOURCES.md](docs/RESOURCES.md)，语法覆盖见 [MARKDOWN_SUPPORT.md](docs/MARKDOWN_SUPPORT.md)。
 
-侧栏右键菜单提供“关闭文档”和“删除磁盘文件”：关闭保留文件，删除会单独确认永久删除文件及未保存内容。关闭有修改的文档时提示保存，退出应用时检查所有打开文档。列表全部关闭后保持空工作区。状态统一由 Riverpod + Freezed 管理。
+## 导出与原生边界
 
-侧栏按最近实际内容编辑排序，新建/打开文档置顶；单纯选择文档不会重排，编辑时间随工作区保存并在重启后恢复。编辑区正文左/右内边距为 2/6，行号栏按位数自适应紧凑宽度。
+桌面及移动端支持 PDF、PNG、独立 HTML。导出使用打开导出入口时的文档快照，包含未保存编辑；渲染等待字体、图片、公式和 Mermaid 就绪，资源缺失或渲染失败须明确报错。格式细节与限制见 [EXPORT.md](docs/EXPORT.md)。
 
-文字颜色：选中文本后点击工具栏带彩色下划线的文字图标，拖动 HSV 色盘、调节亮度、选择常用色或输入 #RGB/#RRGGBB，然后点击“应用颜色”。应用会插入 `<span style="color:#RRGGBB">文字</span>`；无选区时插入占位文字。预览支持这个颜色扩展以及其中的粗体、斜体等基础格式；普通 Markdown 阅读器是否显示颜色取决于其 HTML 支持。
+移动端先生成文件字节，再调用系统文件保存面板；PDF 使用原生打印排版，PNG 分块截图后拼接或打包 ZIP。原生文件访问、剪贴板、拖放、系统栏、图标及打印行为仍需在目标设备验收，Widget 测试与构建通过不代表真机验收完成。
 
-应用内保存/删除确认、文字颜色和设置统一使用 `MarkerDialog` 与 `MarkerDialogButton`：同一套标题栏、圆角、表面色、阴影与底部操作区，适配深浅主题；内容超高时滚动、操作按钮可换行。文件选择仍由系统原生对话框提供。
+Android 使用原生沉浸模式，并处理系统栏临时显示时的布局。iOS 启动页使用 `LaunchScreen.storyboard`，不增加 Flutter 启动页面。启动资源跟随系统外观，应用内 Logo 跟随实际应用主题。图标及深浅资源规则见 [BRANDING.md](docs/BRANDING.md)。
 
-公式与 Mermaid 模板：工具栏 ƒx/图表按钮打开模板菜单；展开面板中的公式/Mermaid 入口也可进入。提供 10 种公式和 9 种 Mermaid 示例，点击插入后可继续修改。有选区时以选中内容替代示例主体。所有公式示例通过实际控件渲染测试，Mermaid 示例通过本地打包脚本的离线浏览器 SVG 渲染验证。
+## 检查与构建
 
-## 启动、搜索和快捷键
+提交前执行：
 
-桌面端统一 1200×800 初始窗口、900×600 最小窗口。窗口隐藏期间配置尺寸、主题和标题栏，首帧完成后再显示；macOS 原生窗口也阻止提前显示，Windows/Linux 启动器交由 Dart 统一显示。Windows/Linux 仍需在各自系统进行构建和启动验收。
+```sh
+dart format --output=none --set-exit-if-changed lib test
+flutter analyze --no-pub
+flutter test --no-pub
+python3 -m unittest discover -s scripts/tests -v
+```
 
-搜索按钮打开查找替换栏，支持大小写、匹配数量、前后查找、替换当前项与全部替换。Mac 使用 Cmd+F 查找、Cmd+Option+F 替换；Windows/Linux 使用 Ctrl+F 查找、Ctrl+H 替换。设置新增快捷键分类，快捷键说明与实际应用绑定共享清单。文本框继续保留系统剪贴板和撤销快捷键。
+按当前主机与设备环境运行所需构建：
 
-顶部功能与常用语法维持单行，按剩余宽度显示可容纳按钮，其余语法通过右侧浮层访问。
+```sh
+flutter build macos --release --no-pub
+flutter build windows --release --no-pub
+flutter build linux --release --no-pub
+flutter build apk --release --no-pub
+flutter build ios --simulator --no-pub
+```
 
-## 桌面集成更新
+macOS 原生导出回归：`bash scripts/ci/test-macos-export.sh`；共享 Mermaid 资源与深浅中文图表回归：`bash scripts/ci/test-macos-mermaid.sh`。其他原生测试入口见 `scripts/ci/`，文件关联与窗口配置见 [DESKTOP_INTEGRATION.md](docs/DESKTOP_INTEGRATION.md)。
 
-已将设置、选色、确认、模板和右键菜单统一为与右侧语法浮层相同的表面组件。启动帧等待设有 500ms 上限，避免隐藏窗口与首帧绘制相互等待导致窗口无法显示。
+## CI 与发布
 
-Markdown 的“打开方式”关联和三端窗口核对详见 [桌面集成说明](docs/DESKTOP_INTEGRATION.md)。macOS 已实测 Finder 右键打开；Windows 通过 Inno Setup 注册，Linux 通过 desktop/MIME 元数据或用户级安装脚本注册，不强制修改默认应用。
+| 工作流 | 触发与产物 |
+| --- | --- |
+| `desktop.yml` | 分支 / PR / 手动：工作流语法、依赖、格式、静态分析、测试、三端桌面、Android APK 与 iOS 模拟器构建 |
+| `release.yml` | `vX.Y.Z` 标签或手动：macOS、Windows、Linux、Android 打包；校验后发布同一个 GitHub Release |
+| `pages.yml` | main 上网站或 Pages 工作流变更：部署 `website/` 到 GitHub Pages |
+| `self-hosted.yml` | 维护者手动触发的自托管桌面构建 |
 
-## 构建、发布与更新
+Release 标签必须匹配 `pubspec.yaml` 的公开版本，发布前递增合适的版本与 build number。桌面产物包括 DMG / ZIP、EXE / MSI / ZIP、DEB / RPM / AppImage / TAR；Android 输出 `Marker-android-universal.apk`，包含 ARMv7、ARM64、x86_64。所有格式加入 `SHA256SUMS.txt`。iOS 当前没有公开安装包流水线。
 
-本项目绑定 [Echo-BraveShine/Marker](https://github.com/Echo-BraveShine/Marker)。GitHub Actions 提供三端构建检查及基于版本标签的安装包发布。设置 → 关于可查看实际版本、手动检查 GitHub 更新。
+Android 发布依赖四项 Repository secrets：`ANDROID_KEYSTORE_BASE64`、`ANDROID_KEYSTORE_PASSWORD`、`ANDROID_KEY_ALIAS`、`ANDROID_KEY_PASSWORD`。CI 缺少固定签名配置时停止，不回退开发签名；本地未配置时可使用开发签名测试。密钥和密码不得提交仓库，后续版本保持签名一致。完整配置、签名现状及安全重跑策略见 [RELEASING.md](docs/RELEASING.md)。
 
-详见 [发布说明](docs/RELEASING.md)，包括版本标签、安装包格式、签名现状及本地验证方式。
-
-## 文档导出 / Document export
-
-工具栏点击「导出」，或使用 **⌘⇧E（macOS）/ Ctrl+Shift+E（Windows、Linux）**。在设置的快捷键分类中也可查看。
-
-- **PDF**：浅色 A4 排版，长文自动分页，文字可选择与复制。脚注保留在文末；能容纳一页的段落、代码块、表格与图表尽量整体分页，超长内容按行或表格行拆分。
-- **PNG**：导出全文长图，可选择 960 / 1280 / 1600 px 宽度和跟随应用深浅主题。跟随主题选项在关闭弹窗、重启应用后保留。
-- **HTML**：独立离线文件，内嵌图片、字体、公式与 Mermaid 渲染资源。
-
-导出使用点击入口时的文档快照，包含未保存的编辑。文档中的本地图片按 Markdown 所在目录解析，网络图片会先下载并内嵌；缺失图片会提示失败；PDF、PNG 渲染时也会检查公式与图表语法。macOS 如提示目录授权，请选择相应的图片目录或导出目录。取消不会修改原文或现有输出；导出目标不能是 Markdown 文件。
-
-PDF、PNG 中的 GIF、WebP 和 APNG 动图按首帧导出；HTML 保留动图。PNG 高度最多 32768 px；移动端单图最多 1600 万像素，超长文档可开启分图 ZIP（总量最多 64 MB），或选择 PDF。单张图片最多约 25 MB，内嵌图片总量最多 128 MB。Windows 需要 Microsoft Edge WebView2 Runtime。
-
-Use **Export** in the toolbar or **⌘⇧E / Ctrl+Shift+E**. PDF uses light A4 pages with selectable text and endnotes, keeping fitting content blocks together and splitting oversized content at lines or table rows; PNG exports the full document at a chosen width and appearance; HTML embeds offline rendering resources. The app appearance export preference survives dialog dismissal and app restarts. Export captures unsaved content when opened. Local images resolve relative to the Markdown file; remote images are downloaded and embedded. Missing assets or invalid equations/diagrams report an error. On macOS, grant access to the relevant image or output folder when asked. Cancellation preserves existing files. PNG height is limited to 32768 px. Mobile single images are limited to 16 million pixels; use split-image ZIP (up to 64 MB) or PDF for longer documents. Images are limited to approximately 25 MB each and 128 MB total when embedded. Windows requires Edge WebView2 Runtime.
-
-macOS 原生导出回归：`bash scripts/ci/test-macos-export.sh`，检查脚注、可复制文字、完整分页及深浅主题 PNG；桌面 CI 自动运行此检查。
-
-移动端和桌面端均支持 HTTP / HTTPS 网络图片；导出会先下载并内嵌网络图片，每张下载总超时 30 秒，失败时明确提示。HTTPS 保留系统证书校验。
-
-Apple 平台使用 Swift Package Manager 管理原生插件依赖（Flutter 3.44.9），iOS / macOS 不再需要 CocoaPods 或 `pod install`。最低系统版本仍为 iOS 15 / macOS 12。
-
-首次启动的语法示例保存为应用文档目录下的 `Marker Examples/Welcome.md`，按普通文件自动保存并管理图片资源。删除后不会自动重建；设置 → 关于 →「打开示例 / Open example」可再次打开，文件缺失时重新生成，已有内容不会被覆盖。桌面端手动新建文档仍须选择保存位置。
+设置中的检查更新读取 GitHub 最新公开 Release，显示实际应用版本，提供下载页跳转，不自动安装更新。网站只展示实际存在的 Release 附件。网站维护方式见 [website/README.md](website/README.md)。

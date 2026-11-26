@@ -24,12 +24,18 @@ class _ScrollMapping {
 
 /// A gesture owns both its driving pane and its local offset mapping.
 class LinkedScroll {
-  LinkedScroll(this.editor, this.preview, {required this.enabled}) {
+  LinkedScroll(
+    this.editor,
+    this.preview, {
+    required this.enabled,
+    this.mapOffset,
+  }) {
     editor.addListener(_fromEditor);
     preview.addListener(_fromPreview);
   }
   final ScrollController editor, preview;
   final bool Function() enabled;
+  final double? Function(bool fromEditor, double offset)? mapOffset;
   bool _updating = false, _disposed = false;
   int? _frame;
   Timer? _idleTimer;
@@ -140,6 +146,10 @@ class LinkedScroll {
                 (a.pixels - current.sourceAnchor) * current.ratio)
             .clamp(b.minScrollExtent, b.maxScrollExtent)
             .toDouble();
+    final semantic = mapOffset?.call(source == editor, a.pixels);
+    if (semantic != null && semantic.isFinite) {
+      offset = semantic.clamp(b.minScrollExtent, b.maxScrollExtent).toDouble();
+    }
     if (a.pixels <= a.minScrollExtent) offset = b.minScrollExtent;
     if (a.pixels >= a.maxScrollExtent) offset = b.maxScrollExtent;
     if (!offset.isFinite || (offset - b.pixels).abs() < .5) return;

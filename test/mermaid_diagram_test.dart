@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:marker/src/widgets/markdown_templates.dart';
 import 'package:marker/src/widgets/mermaid_diagram.dart';
+import 'package:marker/src/widgets/mermaid_assets.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -47,6 +48,8 @@ void main() {
         () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
             .setMockMethodCallHandler(MermaidDiagram.linuxChannel, null),
       );
+      // Complete real resource file IO outside the widget fake-async zone.
+      await tester.runAsync(MermaidAssets.load);
       await tester.pumpWidget(
         ProviderScope(
           child: const CupertinoApp(
@@ -55,18 +58,22 @@ void main() {
         ),
       );
       await tester.pump(const Duration(milliseconds: 250));
-      // rootBundle performs real asset IO in this test.
-      await tester.runAsync(() async {
-        await rootBundle.load('assets/fonts/NotoSansSC.ttf');
-        await Future<void>.delayed(const Duration(milliseconds: 100));
-      });
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 100)),
+      );
+      await tester.pump();
+      expect(
+        calls,
+        isNotEmpty,
+        reason: 'Native render must start after the debounce',
+      );
       await tester.pumpAndSettle();
       expect(find.byType(Image), findsOneWidget);
       expect(calls.single.method, 'render');
       expect((calls.single.arguments as Map)['width'], mermaidCanvasWidth);
       expect(
         (calls.single.arguments as Map)['html'],
-        contains('data:font/ttf;base64,'),
+        contains('NotoSansSC.ttf'),
       );
       expect(
         (calls.single.arguments as Map)['html'],
@@ -80,7 +87,11 @@ void main() {
         ),
       );
       await tester.pump(const Duration(milliseconds: 250));
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 100)),
+      );
       await tester.pumpAndSettle();
+      expect(calls, hasLength(2));
       expect(find.textContaining('Invalid diagram syntax'), findsOneWidget);
     },
     variant: TargetPlatformVariant({TargetPlatform.linux}),
@@ -102,6 +113,24 @@ html,body{margin:0;background:#2b2b2d}
 <script>setTimeout(()=>window.webkit.messageHandlers.marker.postMessage({width:120,height:240}),100);</script>
 </body></html>''');
     final script = await File('assets/mermaid.min.js').readAsString();
+    for (final folder in [directory, '$directory/windows']) {
+      await File('$folder/mermaid.min.js').writeAsString(script);
+      await File('assets/fonts/NotoSansSC.ttf').copy('$folder/NotoSansSC.ttf');
+      for (final dark in [false, true]) {
+        await File(
+          '$folder/shared-assets-${dark ? 'dark' : 'light'}.html',
+        ).writeAsString(
+          mermaidHtml(
+            'flowchart TD\nA["中文 Start"] --> B["Prepare"] --> C["Render"] --> D["Ready"]',
+            '',
+            dark,
+            linux: folder == directory,
+            fontUri: File('$folder/NotoSansSC.ttf').absolute.uri.toString(),
+            scriptUri: File('$folder/mermaid.min.js').absolute.uri.toString(),
+          ),
+        );
+      }
+    }
     for (final template in mermaidTemplates) {
       for (final dark in [false, true]) {
         File(

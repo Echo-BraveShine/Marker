@@ -174,9 +174,19 @@ extension _HomeFileActions on _MarkerHomeState {
       try {
         await ref.read(exportAppearanceProvider.notifier).ready;
         if (!mounted) return;
+        var saveToFiles = false;
         final options = await showMarkerDialog<DocumentExportOptions>(
           context: context,
-          builder: (context) => ExportOptionsPanel(zh: _zh, mobile: _isMobile),
+          builder: (context) => ExportOptionsPanel(
+            zh: _zh,
+            mobile: _isMobile,
+            onSaveToFiles:
+                _isMobile && defaultTargetPlatform != TargetPlatform.iOS
+                ? () {
+                    saveToFiles = true;
+                  }
+                : null,
+          ),
         );
         if (options == null || !mounted) return;
         final basename = title.replaceFirst(
@@ -196,6 +206,20 @@ extension _HomeFileActions on _MarkerHomeState {
                 options: options,
                 dark: dark,
               );
+          if (!saveToFiles) {
+            await _shareExportBytes(
+              bytes,
+              split ? '$basename-images.zip' : '$basename.$extension',
+              split
+                  ? 'application/zip'
+                  : switch (options.format) {
+                      DocumentExportFormat.pdf => 'application/pdf',
+                      DocumentExportFormat.png => 'image/png',
+                      DocumentExportFormat.html => 'text/html',
+                    },
+            );
+            return;
+          }
           final saved = await FilePicker.saveFile(
             fileName: split ? '$basename-images.zip' : '$basename.$extension',
             bytes: bytes,
@@ -291,45 +315,6 @@ extension _HomeFileActions on _MarkerHomeState {
     }
   }
 
-  Future<void> _connectExternalFiles() async {
-    if (desktopWindow && defaultTargetPlatform == TargetPlatform.macOS) {
-      _MarkerHomeState._filesChannel.setMethodCallHandler((call) async {
-        if (call.method == 'openFiles') {
-          _queueExternalFiles((call.arguments as List).cast<String>());
-        }
-      });
-      try {
-        final initial = await _MarkerHomeState._filesChannel
-            .invokeListMethod<String>('start');
-        if (mounted) _queueExternalFiles(initial ?? const []);
-      } catch (error) {
-        if (mounted) _error(error);
-      }
-    }
-    if (mounted) _queueExternalFiles(ref.read(initialFilesProvider));
-  }
-
-  void _queueExternalFiles(Iterable<String> paths) {
-    for (final path in markdownOpenPaths(paths)) {
-      if (!_pendingOpenFiles.contains(path)) _pendingOpenFiles.add(path);
-    }
-    _drainExternalFiles();
-  }
-
-  void _drainExternalFiles() {
-    if (!mounted || _restoring || _busy || _pendingOpenFiles.isEmpty) return;
-    _action(() async {
-      while (mounted && _pendingOpenFiles.isNotEmpty) {
-        final path = _pendingOpenFiles.removeAt(0);
-        try {
-          await _openPath(path);
-        } catch (error) {
-          _error(error);
-        }
-      }
-    });
-  }
-
   Future<void> _newFile() async {
     final location = _isMobile
         ? FileSaveLocation(await MobileDocumentStore().newDocumentPath())
@@ -391,17 +376,10 @@ extension _HomeFileActions on _MarkerHomeState {
       ],
     );
     if (file == null) return;
-    final path = _isMobile
-        ? await MobileDocumentStore().importDocument(file)
-        : file.path;
-    await _openPath(path);
-    if (_isMobile && mounted) {
-      _toast(
-        t(
-          '已导入文档副本，编辑不会修改原文件。',
-          'Imported a copy. Edits will not change the original file.',
-        ),
-      );
+    if (_isMobile) {
+      await _importMobileFile(file);
+    } else {
+      await _openPath(file.path);
     }
   }
 
@@ -413,7 +391,9 @@ extension _HomeFileActions on _MarkerHomeState {
         .where((d) => d.path == path)
         .firstOrNull;
     if (existing != null) {
-      await _selectDocument(existing.id);
+      if (ref.read(workspaceProvider).activeId != existing.id) {
+        await _selectDocument(existing.id);
+      }
       return;
     }
     final text = await File(path).readAsString();

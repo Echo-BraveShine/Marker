@@ -11,7 +11,7 @@ class MarkerAppTheme {
       fontFamilyFallback: MarkerFonts.fallback,
       brightness: Brightness.light,
       colorScheme: const ColorScheme.light(
-        primary: Color(0xFF0066CC),
+        primary: Color(0xFF087F82),
         surface: Color(0xFFFFFFFF),
         onSurface: Color(0xFF1D1D1F),
         onPrimary: Colors.white,
@@ -40,10 +40,10 @@ class MarkerAppTheme {
       fontFamilyFallback: MarkerFonts.fallback,
       brightness: Brightness.dark,
       colorScheme: const ColorScheme.dark(
-        primary: Color(0xFF3D9BFF),
+        primary: Color(0xFF59D5CE),
         surface: Color(0xFF1A1A1C),
         onSurface: Color(0xFFF5F5F7),
-        onPrimary: Colors.white,
+        onPrimary: Color(0xFF123B39),
       ),
       dialogTheme: DialogThemeData(
         backgroundColor: MarkerColors.dark.bgEditor,

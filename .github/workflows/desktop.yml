@@ -13,12 +13,20 @@ concurrency:
   group: desktop-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  FLUTTER_SUPPRESS_ANALYTICS: 'true'
+  PYTHONUTF8: '1'
+
 jobs:
   quality:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v6
+      - name: Validate GitHub Actions workflows
+        uses: docker://rhysd/actionlint:1.7.12
+        with:
+          args: -color -shellcheck= -pyflakes=
       - uses: subosito/flutter-action@v2
         with:
           flutter-version-file: .fvmrc
@@ -60,6 +68,9 @@ jobs:
         if: matrix.target == 'linux'
         run: sudo apt-get update && sudo apt-get install -y clang cmake ninja-build pkg-config libfontconfig1-dev libgtk-3-dev libwebkit2gtk-4.1-dev libstdc++-12-dev libsecret-1-dev libjsoncpp-dev libcurl4-openssl-dev libgl1 libgl1-mesa-dri xvfb xauth dbus-x11
       - run: flutter pub get --enforce-lockfile
+      - name: Verify Linux renderer dependency graph
+        if: matrix.target == 'linux'
+        run: python3 scripts/check_linux_renderer_dependencies.py --project-dir .
       - name: Run platform-specific tests
         if: matrix.target != 'linux'
         run: flutter test --no-pub
@@ -80,6 +91,9 @@ jobs:
       - name: Verify macOS document export and pagination
         if: matrix.target == 'macos'
         run: bash scripts/ci/test-macos-export.sh
+      - name: Verify macOS shared Mermaid resources
+        if: matrix.target == 'macos'
+        run: bash scripts/ci/test-macos-mermaid.sh
       - name: Verify Linux offline Mermaid and launcher icons
         if: matrix.target == 'linux'
         run: |
@@ -93,3 +107,41 @@ jobs:
           path: ${{ runner.temp }}/marker-mermaid/rendered/
           if-no-files-found: ignore
       - run: flutter build ${{ matrix.target }} --debug --no-pub
+
+  mobile:
+    needs: quality
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            target: android
+          - os: macos-latest
+            target: ios
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version-file: .fvmrc
+          cache: true
+      - name: Set up Java for Android
+        if: matrix.target == 'android'
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Set up Android SDK
+        if: matrix.target == 'android'
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+          log-accepted-android-sdk-licenses: false
+      - run: flutter pub get --enforce-lockfile
+      - name: Build Android debug APK
+        if: matrix.target == 'android'
+        run: flutter build apk --debug --no-pub
+      - name: Build iOS simulator app
+        if: matrix.target == 'ios'
+        run: flutter build ios --simulator --debug --no-pub

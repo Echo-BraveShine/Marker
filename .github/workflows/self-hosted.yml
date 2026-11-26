@@ -32,6 +32,7 @@ jobs:
     env:
       CI: 'true'
       FLUTTER_SUPPRESS_ANALYTICS: 'true'
+      PYTHONUTF8: '1'
       CMAKE_BUILD_PARALLEL_LEVEL: '1'
       INNO_SETUP_COMPILER: C:\MarkerValidation\InnoSetup6\ISCC.exe
       DOTNET_INSTALL_DIR: C:\MarkerRunner\_tool\dotnet
@@ -95,6 +96,7 @@ jobs:
     env:
       CI: 'true'
       FLUTTER_SUPPRESS_ANALYTICS: 'true'
+      PYTHONUTF8: '1'
       CMAKE_BUILD_PARALLEL_LEVEL: '1'
       MARKER_LINUX_ARCH: arm64
     steps:
@@ -117,6 +119,7 @@ jobs:
           python3 -c 'import json,os; assert json.load(open(".fvmrc",encoding="utf-8"))["flutter"] == json.load(open(os.path.join(os.environ["RUNNER_TEMP"],"marker-flutter.json"),encoding="utf-8"))["frameworkVersion"]'
       - run: python3 -m unittest discover -s scripts/tests -v
       - run: flutter pub get --enforce-lockfile
+      - run: python3 scripts/check_linux_renderer_dependencies.py --project-dir .
       - run: flutter analyze --no-pub
       - run: flutter test --no-pub --concurrency=1
       - run: flutter build linux --release --no-pub

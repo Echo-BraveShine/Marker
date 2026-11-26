@@ -6,13 +6,17 @@ import 'src/resources/resource_references.dart';
 import 'src/resources/resource_provider.dart';
 import 'src/resources/resource_sidebar.dart';
 import 'src/widgets/shortcut_settings.dart';
+import 'src/widgets/settings_scroll_frame.dart';
+import 'package:share_plus/share_plus.dart';
 import 'src/export/document_exporter.dart';
 import 'src/export/export_destination.dart';
+import 'src/export/export_share.dart';
 import 'src/export/export_options_panel.dart';
 import 'package:flutter/rendering.dart' show RenderEditable;
 import 'src/widgets/about_settings.dart';
 import 'src/widgets/desktop_icon_sync.dart';
 import 'src/widgets/marker_logo.dart';
+import 'src/widgets/mermaid_preload.dart';
 import 'src/widgets/highlight_style_picker.dart';
 import 'src/theme/highlight_style.dart';
 import 'src/widgets/markdown_highlighter.dart';
@@ -31,7 +35,10 @@ import 'src/widgets/text_color_picker.dart';
 import 'src/providers/workspace_provider.dart';
 import 'src/providers/sample_document_store.dart';
 import 'src/widgets/linked_scroll.dart';
+import 'src/widgets/markdown_scroll_anchors.dart';
 import 'src/widgets/markdown_commands.dart';
+import 'src/widgets/markdown_indentation.dart';
+import 'src/mobile/mobile_open_files.dart';
 import 'src/widgets/markdown_editing_controller.dart';
 import 'dart:io';
 import 'package:url_launcher/url_launcher.dart';
@@ -47,7 +54,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:file_selector/file_selector.dart';
-import 'package:flutter_markdown/flutter_markdown.dart';
 import 'src/mobile/mobile_document_store.dart';
 import 'src/mobile/mobile_path_restore.dart';
 import 'src/mobile/mobile_cutout_area.dart';
@@ -72,6 +78,7 @@ part 'src/home/home_preview.dart';
 part 'src/home/home_state.dart';
 part 'src/home/home_document_actions.dart';
 part 'src/home/home_file_actions.dart';
+part 'src/home/home_external_files.dart';
 part 'src/home/home_disk_sync.dart';
 part 'src/home/home_autosave.dart';
 part 'src/home/home_editor_actions.dart';
@@ -182,6 +189,7 @@ class MarkerApp extends ConsumerWidget {
         // 确保 Cupertino 组件在所有平台上使用正确的字体，尤其是中文
         data: CupertinoThemeData(
           brightness: Theme.of(context).brightness,
+          primaryColor: Theme.of(context).extension<MarkerColors>()!.textAccent,
           textTheme: MarkerFonts.cupertino,
         ),
         child: DesktopIconSync(

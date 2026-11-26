@@ -14,19 +14,20 @@ class AppShortcut {
     this.shift = false,
     this.alt = false,
     this.native = false,
+    this.primary = true,
     this.windowsKey,
     this.noWindowsControl = false,
   });
   final String id, zh, en;
   final LogicalKeyboardKey key;
   final LogicalKeyboardKey? windowsKey;
-  final bool shift, alt, native, noWindowsControl;
+  final bool shift, alt, native, noWindowsControl, primary;
   SingleActivator activator(TargetPlatform platform) {
     final mac = platform == TargetPlatform.macOS;
     return SingleActivator(
       mac ? key : windowsKey ?? key,
-      meta: mac,
-      control: !mac && !noWindowsControl,
+      meta: mac && primary,
+      control: !mac && primary && !noWindowsControl,
       shift: shift,
       alt: mac ? alt : (id == 'replace' ? false : alt),
     );
@@ -38,7 +39,9 @@ class AppShortcut {
     final label = actual == LogicalKeyboardKey.comma
         ? ','
         : actual.keyLabel.toUpperCase();
-    return '${mac
+    return '${!primary
+        ? ''
+        : mac
         ? '⌘'
         : noWindowsControl
         ? ''
@@ -51,6 +54,23 @@ class AppShortcut {
 }
 
 const appShortcuts = [
+  AppShortcut(
+    'indent',
+    '缩进（编辑器内）',
+    'Indent (editor)',
+    LogicalKeyboardKey.tab,
+    native: true,
+    primary: false,
+  ),
+  AppShortcut(
+    'outdent',
+    '反缩进（编辑器内）',
+    'Outdent (editor)',
+    LogicalKeyboardKey.tab,
+    native: true,
+    primary: false,
+    shift: true,
+  ),
   AppShortcut('new', '新建文档', 'New document', LogicalKeyboardKey.keyN),
   AppShortcut('open', '打开文档', 'Open document', LogicalKeyboardKey.keyO),
   AppShortcut('save', '保存', 'Save', LogicalKeyboardKey.keyS),

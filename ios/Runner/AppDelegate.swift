@@ -12,8 +12,17 @@ import UIKit
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 
+  override func application(_ app: UIApplication, open url: URL,
+    options: [UIApplication.OpenURLOptionsKey: Any] = [:]) -> Bool {
+    if MarkerIncomingFiles.shared.receive(url) { return true }
+    return super.application(app, open: url, options: options)
+  }
+
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
+    if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "MarkerIncomingFiles") {
+      MarkerIncomingFiles.shared.attach(registrar.messenger())
+    }
     if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "MarkerPdf") {
       FlutterMethodChannel(name: "marker/mobilePdf", binaryMessenger: registrar.messenger()).setMethodCallHandler { [weak self] call, result in
         guard let self = self else { result(FlutterError(code: "unavailable", message: "Renderer unavailable", details: nil)); return }

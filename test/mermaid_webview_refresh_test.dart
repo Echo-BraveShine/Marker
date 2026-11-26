@@ -55,7 +55,10 @@ void main() {
       expect(pages.length, 1);
       expect(find.byType(Image), findsOneWidget);
       expect(widths.single, mermaidCanvasWidth);
-      expect(pages.single, contains('data:font/ttf;base64,'));
+      expect(pages.single, contains('NotoSansSC.ttf'));
+      expect(pages.single, contains('<script src="file:'));
+      expect(pages.single.length, lessThan(12000));
+      expect(pages.single, isNot(contains('base64,')));
       expect(
         pages.single.indexOf("await document.fonts.load('400"),
         lessThan(pages.single.indexOf("await mermaid.render(")),

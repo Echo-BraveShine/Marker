@@ -4,14 +4,14 @@ import 'dart:io';
 import 'mobile_html_renderer.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+import 'package:flutter_inappwebview_platform_interface/flutter_inappwebview_platform_interface.dart';
 import 'package:path_provider/path_provider.dart';
 
 /// Serial hidden rendering shared by document export and diagram previews.
 class OfflineHtmlRenderer {
   static const channel = MethodChannel('marker/export');
   static Future<void> _pending = Future<void>.value();
-  static Future<WebViewEnvironment>? _environment;
+  static Future<PlatformWebViewEnvironment>? _environment;
 
   Future<Uint8List> render(
     File file, {
@@ -46,7 +46,8 @@ class OfflineHtmlRenderer {
   }
 
   Future<Uint8List> _windows(File file, int width, bool pdf) async {
-    if (await WebViewEnvironment.getAvailableVersion() == null) {
+    if (await PlatformWebViewEnvironment.static().getAvailableVersion() ==
+        null) {
       throw StateError(
         '请安装 Microsoft Edge WebView2 Runtime / WebView2 Runtime is required',
       );
@@ -57,16 +58,20 @@ class OfflineHtmlRenderer {
     );
     await profile.create(recursive: true);
     final environment = await (_environment ??=
-        WebViewEnvironment.create(
-          settings: WebViewEnvironmentSettings(userDataFolder: profile.path),
-        ).catchError((Object error) {
-          _environment = null;
-          throw error;
-        }));
-    final ready = Completer<InAppWebViewController>();
+        PlatformWebViewEnvironment.static()
+            .create(
+              settings: WebViewEnvironmentSettings(
+                userDataFolder: profile.path,
+              ),
+            )
+            .catchError((Object error) {
+              _environment = null;
+              throw error;
+            }));
+    final ready = Completer<PlatformInAppWebViewController>();
     var closed = false;
     var polling = false;
-    Future<void> poll(InAppWebViewController controller) async {
+    Future<void> poll(PlatformInAppWebViewController controller) async {
       if (polling || closed || ready.isCompleted) return;
       polling = true;
       try {
@@ -88,7 +93,7 @@ class OfflineHtmlRenderer {
       }
     }
 
-    final view = HeadlessInAppWebView(
+    final params = PlatformHeadlessInAppWebViewCreationParams(
       webViewEnvironment: environment,
       initialSize: Size(width.toDouble(), 800),
       initialUrlRequest: URLRequest(url: WebUri('about:blank')),
@@ -125,6 +130,7 @@ class OfflineHtmlRenderer {
         }
       },
     );
+    final view = PlatformHeadlessInAppWebView(params);
     try {
       await view.run().timeout(const Duration(seconds: 30));
       final controller = await ready.future.timeout(

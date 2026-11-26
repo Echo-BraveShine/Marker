@@ -1,8 +1,16 @@
 import 'dart:io';
+import 'package:path/path.dart' as p;
 import 'package:archive/archive.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:file_selector/file_selector.dart';
 import 'package:marker/src/mobile/mobile_document_store.dart';
+
+class _PickerFile extends XFile {
+  _PickerFile(super.path, this.pickerName);
+  final String pickerName;
+  @override
+  String get name => pickerName;
+}
 
 void main() {
   test(
@@ -11,19 +19,21 @@ void main() {
       final root = await Directory.systemTemp.createTemp('marker-zip-import-');
       try {
         final store = MobileDocumentStore(
-          directory: () async => Directory('${root.path}/documents'),
+          directory: () async => Directory(p.join(root.path, 'documents')),
         );
         final archive = Archive()
           ..addFile(
             ArchiveFile.string('note/note.md', '![image](note.assets/a.png)'),
           )
           ..addFile(ArchiveFile('note/note.assets/a.png', 3, [1, 2, 3]));
-        final source = File('${root.path}/package.zip');
+        final source = File(p.join(root.path, 'package.zip'));
         await source.writeAsBytes(ZipEncoder().encode(archive));
         final imported = File(await store.importDocument(XFile(source.path)));
         expect(await imported.readAsString(), contains('note.assets/a.png'));
         expect(
-          await File('${imported.parent.path}/note.assets/a.png').readAsBytes(),
+          await File(
+            p.join(imported.parent.path, 'note.assets', 'a.png'),
+          ).readAsBytes(),
           [1, 2, 3],
         );
         final invalid = Archive()
@@ -34,11 +44,11 @@ void main() {
           throwsFormatException,
         );
         expect(
-          await File('${root.path}/documents/outside.md').exists(),
+          await File(p.join(root.path, 'documents', 'outside.md')).exists(),
           isFalse,
         );
         final folders = await Directory(
-          '${root.path}/documents',
+          p.join(root.path, 'documents'),
         ).list().toList();
         expect(folders, hasLength(1));
       } finally {
@@ -46,15 +56,38 @@ void main() {
       }
     },
   );
+  test('picker names can contain Windows or POSIX paths', () async {
+    final root = await Directory.systemTemp.createTemp('marker-picker-name-');
+    try {
+      final source = File(p.join(root.path, '原稿.md'));
+      await source.writeAsString('# 中文');
+      final store = MobileDocumentStore(
+        directory: () async => Directory(p.join(root.path, 'documents')),
+      );
+      for (final name in [
+        r'C:\picker cache\原稿.md',
+        '/picker cache/原稿.md',
+        '原稿.md',
+      ]) {
+        final imported = File(
+          await store.importDocument(_PickerFile(source.path, name)),
+        );
+        expect(p.basename(imported.path), '原稿.md');
+        expect(await imported.readAsString(), '# 中文');
+      }
+    } finally {
+      await root.delete(recursive: true);
+    }
+  });
   test(
     'imported copies survive picker cache deletion and preserve originals',
     () async {
       final root = await Directory.systemTemp.createTemp('marker-mobile-');
       try {
-        final source = File('${root.path}/原稿.md');
+        final source = File(p.join(root.path, '原稿.md'));
         await source.writeAsString('# 中文');
         final store = MobileDocumentStore(
-          directory: () async => Directory('${root.path}/documents'),
+          directory: () async => Directory(p.join(root.path, 'documents')),
         );
         final copy = File(await store.importDocument(XFile(source.path)));
         await copy.writeAsString('# Edited');

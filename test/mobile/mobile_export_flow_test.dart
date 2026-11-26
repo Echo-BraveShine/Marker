@@ -1,6 +1,8 @@
-import 'dart:typed_data';
+import 'package:share_plus/share_plus.dart';
+import 'package:marker/src/export/export_share.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:marker/main.dart';
@@ -67,6 +69,62 @@ void main() {
   );
   for (final format in DocumentExportFormat.values) {
     testWidgets(
+      'mobile ${format.name} can send a file to another app',
+      (tester) async {
+        SharedPreferences.setMockInitialValues({});
+        mobileWindow = true;
+        ShareParams? shared;
+        addTearDown(() {
+          mobileWindow = false;
+        });
+        final exporter = _Exporter();
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              exportShareProvider.overrideWithValue((params) async {
+                shared = params;
+                return const ShareResult(
+                  'target.app',
+                  ShareResultStatus.success,
+                );
+              }),
+              documentExporterProvider.overrideWithValue(exporter),
+              mermaidPreviewEnabledProvider.overrideWithValue(false),
+            ],
+            child: const MarkerApp(),
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.byIcon(CupertinoIcons.square_arrow_up));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text(format.name.toUpperCase()));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('导出'));
+        await tester.pumpAndSettle();
+        expect(find.text('导出到'), findsNothing);
+        await tester.runAsync(() async {
+          await Future<void>.delayed(const Duration(milliseconds: 150));
+        });
+        await tester.pumpAndSettle();
+        expect(shared, isNotNull);
+        expect(shared!.fileNameOverrides!.single, endsWith('.${format.name}'));
+        expect(await shared!.files!.single.readAsBytes(), [1, 2, 3]);
+        expect(shared!.files!.single.mimeType, switch (format) {
+          DocumentExportFormat.pdf => 'application/pdf',
+          DocumentExportFormat.png => 'image/png',
+          DocumentExportFormat.html => 'text/html',
+        });
+        expect(shared!.sharePositionOrigin!.width, greaterThan(0));
+        await tester.pumpWidget(const SizedBox.shrink());
+      },
+      variant: TargetPlatformVariant({
+        TargetPlatform.android,
+        TargetPlatform.iOS,
+      }),
+    );
+  }
+  for (final format in DocumentExportFormat.values) {
+    testWidgets(
       'mobile ${format.name} export uses system save panel and shared options',
       (tester) async {
         final previous = FilePickerPlatform.instance;
@@ -99,7 +157,7 @@ void main() {
           await tester.tap(find.byType(CupertinoSwitch).last);
           await tester.pumpAndSettle();
         }
-        await tester.tap(find.text('导出'));
+        await tester.tap(find.text('保存到文件'));
         await tester.pumpAndSettle();
         expect(exporter.options!.format, format);
         expect(saver.data, [1, 2, 3]);

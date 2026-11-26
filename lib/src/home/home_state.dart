@@ -38,6 +38,9 @@ class _MarkerHomeState extends ConsumerState<MarkerHome>
   bool _switchingDocument = false;
 
   final _pendingOpenFiles = <String>[];
+  final _pendingMobileFiles = <MobileOpenFile>[];
+  final _receivedMobileTokens = <String>{};
+  MobileOpenFiles? _mobileOpenFiles;
 
   static const _filesChannel = MethodChannel('marker/files');
 
@@ -49,6 +52,10 @@ class _MarkerHomeState extends ConsumerState<MarkerHome>
 
   final _lineIndex = LineNumberIndex();
 
+  String? _anchorSource;
+  List<int> _anchorLines = [];
+  Object? _editorAnchorSignature;
+  List<double> _editorAnchorOffsets = [];
   Widget? _previewCache;
 
   Object? _previewSignature;
@@ -67,6 +74,7 @@ class _MarkerHomeState extends ConsumerState<MarkerHome>
 
   final _undo = UndoHistoryController();
 
+  final _previewAnchors = MarkdownScrollAnchors();
   late final LinkedScroll _linkedScroll;
 
   String? get _path => ref.read(editorProvider).path;
@@ -143,6 +151,7 @@ class _MarkerHomeState extends ConsumerState<MarkerHome>
       _editorScroll,
       _previewScroll,
       enabled: () => mounted && _mode == 1,
+      mapOffset: _mapContentScroll,
     );
     if (!desktopWindow && !mobileWindow) {
       Future.microtask(() => ref.read(themeProvider.notifier).init());
@@ -176,6 +185,22 @@ class _MarkerHomeState extends ConsumerState<MarkerHome>
     }
     if (!_focus.hasFocus || !(ModalRoute.of(context)?.isCurrent ?? true)) {
       return KeyEventResult.ignored;
+    }
+
+    final keyboard = HardwareKeyboard.instance;
+    if (event.logicalKey == LogicalKeyboardKey.tab &&
+        !keyboard.isControlPressed &&
+        !keyboard.isMetaPressed &&
+        !keyboard.isAltPressed &&
+        !_busy &&
+        !_restoring &&
+        !ref.read(resourceUiProvider).busy) {
+      final next = indentMarkdownSelection(
+        _controller.value,
+        outdent: keyboard.isShiftPressed,
+      );
+      if (next != _controller.value) _controller.value = next;
+      return KeyEventResult.handled;
     }
 
     // Map intentional navigation keys - transfer ownership for editor caret movement
@@ -246,8 +271,9 @@ class _MarkerHomeState extends ConsumerState<MarkerHome>
       if (restored &&
           store != null &&
           legacy?.path == null &&
-          legacy?.text == defaultMarkdown &&
-          legacy?.saved == defaultMarkdown) {
+          (legacy?.text == defaultMarkdown ||
+              legacy?.text == legacyDefaultMarkdown) &&
+          legacy?.saved == legacy?.text) {
         final path = await store.initialize(defaultMarkdown);
         if (!mounted) return;
         if (path != null) {
@@ -405,6 +431,7 @@ class _MarkerHomeState extends ConsumerState<MarkerHome>
 
   @override
   void dispose() {
+    unawaited(_mobileOpenFiles?.disconnect() ?? Future<void>.value());
     WidgetsBinding.instance.removeObserver(this);
     FocusManager.instance.removeEarlyKeyEventHandler(_handleSyntaxEscape);
     FocusManager.instance.removeEarlyKeyEventHandler(_handleNavigationKey);

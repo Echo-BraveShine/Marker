@@ -4,7 +4,7 @@
 
 ## 日常提交
 
-`Desktop checks` 在分支 push、PR 或手动触发时执行：锁文件安装依赖 → 格式检查 → 静态检查 → Flutter 测试 → macOS/Windows/Linux 原生 Debug 构建。Windows、macOS 构建前额外运行各自的平台测试；Python 发布工具回归测试也纳入检查。Flutter 版本统一读取 `.fvmrc`。
+`Desktop checks` 在分支 push、PR 或手动触发时执行：actionlint 工作流校验 → 锁文件安装依赖 → 格式检查 → 静态检查 → Flutter 测试 → macOS/Windows/Linux 原生 Debug、Android APK 和 iOS 模拟器构建。Windows、macOS 构建前额外运行各自的平台测试；Python 发布工具回归测试也纳入检查。Flutter 版本统一读取 `.fvmrc`。
 
 项目已初始化为 `main` 分支并绑定 origin。提交源码时包含 `pubspec.lock`、`.fvmrc`、Freezed 生成文件及平台工程；构建目录、Pods、FVM SDK、编辑器设置和测试沙盒不提交。当前准备代码不代表已经推送至远端。
 
@@ -14,7 +14,7 @@
 2. 提交、推送代码，等待 Desktop checks 通过。
 3. 创建并推送与版本一致的 `vX.Y.Z` 标签。**推送版本标签会自动打包并创建 GitHub Release。**
 
-例如当前版本为 `0.0.1+1`，对应标签 `v0.0.1`。发布流程再次检查 tag 与应用版本，不允许错版发布。Windows 安装器从相同版本输入生成，避免安装包长期停留在硬编码版本。
+例如版本为 `0.0.1+1`，对应标签 `v0.0.1`。发布流程再次检查 tag 与应用版本，不允许错版发布。Windows 安装器从相同版本输入生成，避免安装包长期停留在硬编码版本。
 
 也可在 Actions → Release → Run workflow 中选择一个已经存在的标签。`build_only` 默认开启：只生成构建产物、不发布 Release；关闭后发布。
 
@@ -149,3 +149,28 @@ Release 增加 Ubuntu runner，配置 JDK 17、Android SDK，构建 `flutter bui
 本地正式签名通过 `MARKER_ANDROID_KEYSTORE_PATH` 和上述三个密码/别名环境变量配置；可设置 `MARKER_REQUIRE_ANDROID_SIGNING=true` 禁止回退开发签名。本地临时测试不配置密钥时仍可使用开发签名。
 
 已有 Release 保持不覆盖策略。添加 Android 格式后，若旧 Release 的校验清单不包含 APK，使用递增版本的新标签发布，避免修改既有发布清单。
+
+## WebView 平台依赖
+
+项目直接引用官方 `flutter_inappwebview_android`、`flutter_inappwebview_ios`、`flutter_inappwebview_windows` 和 `flutter_inappwebview_platform_interface`，不使用全平台入口包、不保存或修改 WebView 插件源码，也不修改 pub 缓存。当前保留各平台已使用的版本，避免因替换依赖入口引入额外升级。
+
+macOS 与 Linux 使用项目原生离线渲染器，因此不依赖 `flutter_inappwebview_macos` 或 Linux WPE 插件。macOS 保持最低 12 和 Swift Package Manager，无需恢复 CocoaPods；Ubuntu 保持 WebKitGTK 4.1 的构建与运行依赖，无需添加 WPE 包源。
+
+更新依赖后运行 pub get，并提交 pubspec.lock 和生成的 Linux 插件注册文件。确认生成的 Dart 注册器仍包含 Android / iOS / Windows 官方后端；这三个平台的隐藏 WebView 通过公共平台接口创建，macOS / Linux 继续走项目的原生通道。
+
+## SDK 安装与旧标签排查
+
+Android SDK setup 显式配置 `packages: platform-tools`，避免 Action 默认请求已撤下的旧 `tools` 包。平台 SDK 与 NDK 按 Flutter / Gradle 的工程配置解析。
+
+Release 的应用源码来自标签解析出的不可变 SHA，`release-tools` 仅提供当前工作流的打包脚本。分支上的源码补丁、本地未提交的源码、pubspec 与锁文件变更不会自动应用到旧标签。遇到 WPE 编译错误时，先检查工作流显示的应用 SHA 是否包含官方平台包依赖调整；提交完整修复后发布新版本标签，不通过复制最新源码到旧标签的构建目录来掩盖版本差异。
+
+Linux 在依赖解析后、编译前运行 `check_linux_renderer_dependencies.py`，若仍注册未使用的 WPE 插件，直接报告源码与标签不匹配，避免消耗构建时间后才得到 CMake 缺库错误。
+
+## 历史故障对应检查
+
+- 工作流结构与表达式：质量任务运行固定版本 actionlint；本地可运行 actionlint 和 Bash 语法检查。结构检查不等于目标平台实际构建成功。
+- SDK 与依赖：Flutter 读取 `.fvmrc`，依赖使用锁文件；Android 指定 JDK 17、`platform-tools`，不请求旧 `tools` 包；Apple 保留 SPM，WebView 只引用实际使用的官方平台包；Linux 编译前检查没有引入 WPE 后端。
+- Windows 路径与编码：跨平台测试在 Windows 主机执行；磁盘路径用平台拼接，URI / ZIP / Markdown 路径保持各自规则。Python 文本读写显式 UTF-8，构建任务也启用 UTF-8 模式。
+- 产物与发布：版本标签对应不可变源码 SHA，源码检查与当前打包工具分开检出；工具稀疏目录不包含 pubspec，避免嵌套项目资产检查。平台校验和与最终文件名集合一致，当前为 16 个安装包加总校验清单。
+- 签名与安装：Android 缺少固定密钥时停止 Release 构建，APK 检查 ABI、实际包名、版本、联网权限与签名。Windows 保留 MSVC coroutine 兼容开关、原生拖放测试日志及安装器验证；macOS 检查通用架构、签名及 DMG；Linux 保留 AppImage / DEB / RPM / TAR 验证及窗口探测重试。
+- 本地静态检查通过不能标记云端已通过。修复后应推送新提交并触发新工作流；旧运行重跑仍使用原事件的 SHA，旧标签也不会自动包含新源码。自托管流程仍只供维护者手动触发，本次不启动或验证本机虚拟机。

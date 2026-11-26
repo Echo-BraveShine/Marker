@@ -3,7 +3,7 @@ import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:archive/archive.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+import 'package:flutter_inappwebview_platform_interface/flutter_inappwebview_platform_interface.dart';
 
 const mobilePdfChannel = MethodChannel('marker/mobilePdf');
 
@@ -14,13 +14,13 @@ Future<Uint8List> renderMobileHtml(
   bool pdf = false,
   bool splitPng = false,
 }) async {
-  final ready = Completer<InAppWebViewController>();
+  final ready = Completer<PlatformInAppWebViewController>();
   // Observe early native failures even if view.run() has not returned yet.
   unawaited(
     ready.future.then<void>((_) {}, onError: (Object _, StackTrace _) {}),
   );
   var closed = false, disposed = false, polling = false;
-  final view = HeadlessInAppWebView(
+  final params = PlatformHeadlessInAppWebViewCreationParams(
     initialSize: Size(width.toDouble(), 1024),
     initialUrlRequest: URLRequest(url: WebUri.uri(file.uri)),
     initialSettings: InAppWebViewSettings(
@@ -57,13 +57,14 @@ Future<Uint8List> renderMobileHtml(
       }
     },
   );
+  final view = PlatformHeadlessInAppWebView(params);
   try {
     await view.run().timeout(const Duration(seconds: 20));
     final controller = await ready.future.timeout(const Duration(seconds: 90));
     if (pdf) {
       final html = await controller.evaluateJavascript(
         source:
-            '''(()=>{const root=document.documentElement.cloneNode(true);root.querySelectorAll('script').forEach(n=>n.remove());const style=document.createElement('style');style.textContent='@page{size:A4;margin:0!important}html{-webkit-print-color-adjust:exact;print-color-adjust:exact}';root.querySelector('head').appendChild(style);return '<!doctype html>'+root.outerHTML;})()''',
+            '''(()=>{const root=document.documentElement.cloneNode(true);root.querySelectorAll('script').forEach(n=>n.remove());const style=document.createElement('style');style.textContent='@page{size:A4;margin:${Platform.isAndroid ? '18mm' : '0'}!important}html{-webkit-print-color-adjust:exact;print-color-adjust:exact}';root.querySelector('head').appendChild(style);return '<!doctype html>'+root.outerHTML;})()''',
       );
       if (html is! String || html.isEmpty) {
         throw StateError('Missing printable document');
@@ -110,7 +111,8 @@ Future<Uint8List> renderMobileHtml(
               screenshotConfiguration: ScreenshotConfiguration(
                 rect: InAppWebViewRect(
                   x: 0,
-                  y: offset,
+                  // Android Canvas uses document coordinates; WKWebView uses viewport coordinates.
+                  y: Platform.isAndroid ? band.top.toDouble() : offset,
                   width: imageWidth.toDouble(),
                   height: band.height.toDouble(),
                 ),

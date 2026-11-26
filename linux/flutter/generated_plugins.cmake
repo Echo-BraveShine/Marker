@@ -5,7 +5,6 @@
 list(APPEND FLUTTER_PLUGIN_LIST
   desktop_drop
   file_selector_linux
-  flutter_inappwebview_linux
   pasteboard
   printing
   screen_retriever_linux

@@ -1,14 +1,96 @@
 import 'dart:io';
+import 'dart:convert';
+import 'package:crypto/crypto.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:archive/archive.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_selector/file_selector.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+
+final mobileDocumentStoreProvider = Provider((ref) => MobileDocumentStore());
 
 /// Editable documents live outside picker caches, in the app's Files directory.
 class MobileDocumentStore {
   MobileDocumentStore({Future<Directory> Function()? directory})
     : _directory = directory ?? getApplicationDocumentsDirectory;
   final Future<Directory> Function() _directory;
+  static const maxInputBytes = 64 * 1024 * 1024;
+  static const maxMarkdownBytes = 16 * 1024 * 1024;
+
+  /// Content-identical external opens select their existing copy, including edits.
+  /// Store relative paths so iOS sandbox UUID changes do not invalidate the index.
+  Future<({String path, bool reused})> openImportedDocument(
+    XFile source, {
+    String? ownedRelativePath,
+  }) async {
+    final name = p.posix.basename(source.name.replaceAll('\\', '/'));
+    await _validateInput(source, name);
+    final root = await _directory();
+    if (p.extension(name).toLowerCase() != '.zip') {
+      final owned = ownedRelativePath == null
+          ? p.normalize(source.path)
+          : p.normalize(p.join(root.path, ownedRelativePath));
+      if (p.isWithin(root.path, owned) &&
+          !p.isWithin(p.join(root.path, 'Inbox'), owned)) {
+        if (await File(owned).exists()) return (path: owned, reused: true);
+        if (ownedRelativePath != null) {
+          throw FileSystemException(
+            '文件已删除，未恢复缓存副本 / File was deleted; cached copy was not restored',
+            owned,
+          );
+        }
+      }
+    }
+    final digest = await sha256.bind(source.openRead()).first;
+    final key = sha256.convert(utf8.encode('$name:$digest')).toString();
+    final prefs = await SharedPreferences.getInstance();
+    var index = <String, dynamic>{};
+    try {
+      index = Map<String, dynamic>.from(
+        jsonDecode(prefs.getString('mobileImportsV1') ?? '{}') as Map,
+      );
+    } on FormatException {
+      /* A damaged index must not prevent importing. */
+    } on TypeError {
+      /* Ignore obsolete index formats. */
+    }
+    final relative = index[key];
+    if (relative is String && !p.isAbsolute(relative)) {
+      final existing = p.normalize(p.join(root.path, relative));
+      if (p.isWithin(root.path, existing) && await File(existing).exists()) {
+        return (path: existing, reused: true);
+      }
+    }
+    final path = await importDocument(source);
+    index.remove(key);
+    index[key] = p.relative(path, from: root.path);
+    while (index.length > 256) {
+      index.remove(index.keys.first);
+    }
+    if (!await prefs.setString('mobileImportsV1', jsonEncode(index))) {
+      // The imported document is still valid even when deduplication cannot persist.
+      return (path: path, reused: false);
+    }
+    return (path: path, reused: false);
+  }
+
+  Future<void> _validateInput(XFile source, String name) async {
+    final extension = p.extension(name).toLowerCase();
+    if (!['.md', '.markdown', '.txt', '.zip'].contains(extension)) {
+      throw const FormatException(
+        'Select Markdown, TXT or ZIP / 请选择 Markdown、TXT 或 ZIP 文件',
+      );
+    }
+    final limit = extension == '.zip' ? maxInputBytes : maxMarkdownBytes;
+    if (await source.length() > limit) {
+      throw FormatException(
+        extension == '.zip'
+            ? 'ZIP exceeds 64 MB / 压缩包不能超过 64 MB'
+            : 'Markdown exceeds 16 MB / 文档不能超过 16 MB',
+      );
+    }
+  }
 
   static String filename(String input) {
     final name = input.trim();
@@ -40,7 +122,14 @@ class MobileDocumentStore {
     final root = await _directory();
     await root.create(recursive: true);
     final directory = await root.createTemp('import-');
-    if (p.extension(source.name).toLowerCase() == '.zip') {
+    final sourceName = p.posix.basename(source.name.replaceAll('\\', '/'));
+    try {
+      await _validateInput(source, sourceName);
+    } catch (_) {
+      await directory.delete(recursive: true);
+      rethrow;
+    }
+    if (p.extension(sourceName).toLowerCase() == '.zip') {
       try {
         return await _importArchive(source, directory);
       } catch (_) {
@@ -48,8 +137,8 @@ class MobileDocumentStore {
         rethrow;
       }
     }
-    final target = File(p.join(directory.path, filename(source.name)));
     try {
+      final target = File(p.join(directory.path, filename(sourceName)));
       final sink = target.openWrite();
       try {
         await sink.addStream(source.openRead());
@@ -109,6 +198,9 @@ class MobileDocumentStore {
         '.md',
         '.markdown',
       ].contains(p.extension(target.path).toLowerCase())) {
+        if (entry.size > maxMarkdownBytes) {
+          throw const FormatException('Markdown exceeds 16 MB / 文档不能超过 16 MB');
+        }
         documents.add(target.path);
       }
     }

@@ -164,14 +164,12 @@ extension _HomeSettings on _MarkerHomeState {
                 Expanded(
                   child: page == 2
                       ? ShortcutSettings(zh: _zh)
-                      : SingleChildScrollView(
-                          key: PageStorageKey('settings-content-$page'),
-                          padding: EdgeInsets.zero,
+                      : SettingsScrollFrame(
+                          title: labels[page],
+                          page: page,
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(labels[page], style: MarkerStyle.heading),
-                              const SizedBox(height: 12),
                               if (page == 0) ...[
                                 group(t('外观', 'Appearance'), [
                                   row(

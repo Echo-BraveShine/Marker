@@ -118,8 +118,7 @@ extension _HomeSidebar on _MarkerHomeState {
                                     Padding(
                                       padding: EdgeInsets.only(
                                         right:
-                                            _isMobile &&
-                                                expanded &&
+                                            expanded &&
                                                 document.id ==
                                                     workspace.activeId
                                             ? 40
@@ -182,8 +181,7 @@ extension _HomeSidebar on _MarkerHomeState {
                                         ),
                                       ),
                                     ),
-                                    if (_isMobile &&
-                                        expanded &&
+                                    if (expanded &&
                                         document.id == workspace.activeId)
                                       Positioned(
                                         right: 0,

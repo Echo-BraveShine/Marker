@@ -160,7 +160,13 @@ extension _HomeView on _MarkerHomeState {
       padding: EdgeInsets.only(
         right: _isMobile ? MobileCutoutArea.insetsOf(context).right : 0,
       ),
-      child: _previewCache!,
+      child: MermaidPreload(
+        source: _controller.text,
+        dark: Theme.of(context).brightness == Brightness.dark,
+        enabled: _mode != 0 && ref.watch(mermaidPreviewEnabledProvider),
+        controllers: [_editorScroll, _previewScroll],
+        child: _previewCache!,
+      ),
     );
     return CallbackShortcuts(
       bindings: _shortcutBindings(),

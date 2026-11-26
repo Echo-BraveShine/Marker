@@ -1,6 +1,28 @@
 part of '../../main.dart';
 
 extension _HomeMobileActions on _MarkerHomeState {
+  Future<void> _shareExportBytes(
+    Uint8List bytes,
+    String name,
+    String mime,
+  ) async {
+    if (!mounted) return;
+    final box = context.findRenderObject() as RenderBox?;
+    final origin = box == null
+        ? null
+        : box.localToGlobal(Offset.zero) & box.size;
+    final result = await ref.read(exportShareProvider)(
+      ShareParams(
+        files: [XFile.fromData(bytes, mimeType: mime)],
+        fileNameOverrides: [name],
+        sharePositionOrigin: origin,
+      ),
+    );
+    if (mounted && result.status == ShareResultStatus.success) {
+      _toast(t('已发送到所选应用。', 'Sent to the selected app.'));
+    }
+  }
+
   Future<void> _previewMobileImage(String path) => showMarkerDialog<void>(
     context: context,
     builder: (_) => MarkerDialog(
@@ -134,14 +156,11 @@ extension _HomeMobileActions on _MarkerHomeState {
         allowIncomplete:
             inventory.unresolved.isNotEmpty || inventory.unsupported.isNotEmpty,
       );
-      final saved = await FilePicker.saveFile(
-        fileName: p.basename(zipPath),
-        mimeType: 'application/zip',
-        bytes: await File(zipPath).readAsBytes(),
+      await _shareExportBytes(
+        await File(zipPath).readAsBytes(),
+        p.basename(zipPath),
+        'application/zip',
       );
-      if (mounted && saved != null) {
-        _toast(t('已导出文档与图片。', 'Document and images exported.'));
-      }
     } finally {
       await stage.delete(recursive: true);
     }

@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'sample_markdown.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -26,7 +27,8 @@ class SampleDocumentStore {
     final root = await _directory();
     final file = File(p.join(root.path, 'Marker Examples', 'Welcome.md'));
     await file.parent.create(recursive: true);
-    if (!await file.exists()) {
+    if (!await file.exists() ||
+        await file.readAsString() == legacyDefaultMarkdown) {
       await file.writeAsString(content, flush: true);
     }
     final prefs = await SharedPreferences.getInstance();

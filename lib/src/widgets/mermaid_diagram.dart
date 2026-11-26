@@ -7,6 +7,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'offline_html_renderer.dart';
+import 'mermaid_assets.dart';
+import 'mermaid_render_scope.dart';
 
 /// Shared offline page for WebView2, WKWebView and the Linux snapshot renderer.
 String mermaidHtml(
@@ -15,12 +17,13 @@ String mermaidHtml(
   bool dark, {
   bool linux = false,
   String? fontUri,
+  String? scriptUri,
 }) {
   final encoded = jsonEncode(source).replaceAll('<', r'\u003c');
   final fontFace = fontUri == null
       ? ''
       : '@font-face{font-family:MarkerNoto;src:url(${jsonEncode(fontUri)});font-weight:400}';
-  return '''<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; font-src file: data:;"><style>$fontFace html,body{margin:0;background:${dark ? '#2b2b2d' : '#ffffff'}}body{padding:0;box-sizing:border-box;color:${dark ? '#f5f5f7' : '#1d1d1f'};font:14px MarkerNoto,-apple-system,'Segoe UI','Noto Sans CJK SC',sans-serif}#document{padding:12px;box-sizing:border-box}svg{max-width:100%;height:auto}pre{white-space:pre-wrap}</style></head><body><div id="document"></div><script>$script</script><script>
+  return '''<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' file:; style-src 'unsafe-inline'; img-src data:; font-src file: data:;"><style>$fontFace html,body{margin:0;background:${dark ? '#2b2b2d' : '#ffffff'}}body{padding:0;box-sizing:border-box;color:${dark ? '#f5f5f7' : '#1d1d1f'};font:14px MarkerNoto,-apple-system,'Segoe UI','Noto Sans CJK SC',sans-serif}#document{padding:12px;box-sizing:border-box}svg{max-width:100%;height:auto}pre{white-space:pre-wrap}</style></head><body><div id="document"></div>${scriptUri == null ? '<script>$script</script>' : '<script src=${jsonEncode(scriptUri)}></script>'}<script>
 const notify = value => { window.markerExport=value.error?value:{ready:true,width:value.width,height:value.height}; ${linux ? 'window.webkit.messageHandlers.marker.postMessage(value);' : ''} };
 (async()=>{try{
 mermaid.initialize({${fontUri == null ? '' : "fontFamily:'MarkerNoto, sans-serif',"}startOnLoad:false,securityLevel:'strict',themeVariables:{fontSize:'14px'},theme:'${dark ? 'dark' : 'default'}'});
@@ -61,38 +64,48 @@ final mermaidRenderProvider = Provider<MermaidRenderer>(
 );
 
 class MermaidRenderer {
+  MermaidRenderer({this.renderBackend});
+  final Future<Uint8List> Function(String, bool)? renderBackend;
+  static int _nextPage = 0;
   static final shared = MermaidRenderer();
-  static final _script = rootBundle.loadString('assets/mermaid.min.js');
-  static final _fontUri = _loadFont();
-  static Future<String> _loadFont() async {
-    final data = await rootBundle.load('assets/fonts/NotoSansSC.ttf');
-    return 'data:font/ttf;base64,${base64Encode(data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes))}';
-  }
-
   final _cache = <String, Future<Uint8List>>{};
   final _sizes = <String, int>{};
+  final _ready = <String, Uint8List>{};
   var _bytes = 0;
   Future<void> _pending = Future<void>.value();
   int get cachedEntries => _cache.length;
 
-  Future<Uint8List> render(String source, bool dark) {
-    final key = '${defaultTargetPlatform.name}:$dark:$source';
+  String _key(String source, bool dark) =>
+      '${defaultTargetPlatform.name}:$dark:$source';
+  Uint8List? peek(String source, bool dark) => _ready[_key(source, dark)];
+
+  Future<Uint8List> render(
+    String source,
+    bool dark, {
+    Future<void> Function()? waitForIdle,
+  }) {
+    final key = _key(source, dark);
     final cached = _cache.remove(key);
     if (cached != null) {
       _cache[key] = cached;
       return cached;
     }
-    final result = _pending.then((_) => _render(source, dark));
+    final result = _pending.then((_) async {
+      await waitForIdle?.call();
+      return (renderBackend ?? _render)(source, dark);
+    });
     _cache[key] = result;
     _pending = result.then<void>(
       (data) {
         if (!_cache.containsKey(key)) return;
+        _ready[key] = data;
         _sizes[key] = data.length;
         _bytes += data.length;
         while (_cache.length > 24 ||
             (_bytes > 24 * 1024 * 1024 && _cache.length > 1)) {
           final oldest = _cache.keys.first;
           _cache.remove(oldest);
+          _ready.remove(oldest);
           _bytes -= _sizes.remove(oldest) ?? 0;
         }
       },
@@ -104,15 +117,15 @@ class MermaidRenderer {
   }
 
   Future<Uint8List> _render(String source, bool dark) async {
-    final script = await _script;
-    final fontUri = await _fontUri;
+    final assets = await MermaidAssets.load();
     final linux = defaultTargetPlatform == TargetPlatform.linux;
     final html = mermaidHtml(
       source,
-      script,
+      '',
       dark,
       linux: linux,
-      fontUri: fontUri,
+      fontUri: assets.fontUri,
+      scriptUri: assets.scriptUri,
     );
     if (linux) {
       final bytes = await MermaidDiagram.linuxChannel
@@ -126,17 +139,18 @@ class MermaidRenderer {
       }
       return bytes;
     }
-    final directory = await Directory.systemTemp.createTemp('marker-mermaid-');
+    // WKWebView's read scope includes the shared local script and font.
+    final file = File(
+      '${assets.directory.path}${Platform.pathSeparator}diagram-${_nextPage++}.html',
+    );
     try {
-      final file = await File(
-        '${directory.path}${Platform.pathSeparator}diagram.html',
-      ).writeAsString(html);
+      await file.writeAsString(html);
       return await OfflineHtmlRenderer().render(
         file,
         width: mermaidCanvasWidth,
       );
     } finally {
-      await directory.delete(recursive: true);
+      if (await file.exists()) await file.delete();
     }
   }
 }
@@ -160,18 +174,34 @@ class _MermaidDiagramState extends ConsumerState<MermaidDiagram> {
       _debounce?.cancel();
       final renderer = ref.read(mermaidRenderProvider);
       final source = widget.source, dark = widget.dark;
+      final idle = MermaidRenderScope.idleOf(context);
+      final cached = renderer.peek(source, dark);
       final completer = Completer<Uint8List>();
       _content = completer.future;
-      _debounce = Timer(const Duration(milliseconds: 240), () async {
-        try {
-          completer.complete(await renderer.render(source, dark));
-        } catch (error, stack) {
-          completer.completeError(error, stack);
-        }
-      });
+      if (cached != null) {
+        completer.complete(cached);
+      } else {
+        _debounce = Timer(const Duration(milliseconds: 240), () async {
+          try {
+            final bytes = await renderer.render(
+              source,
+              dark,
+              waitForIdle: idle,
+            );
+            await idle?.call();
+            completer.complete(bytes);
+          } catch (error, stack) {
+            completer.completeError(error, stack);
+          }
+        });
+      }
     }
+    final cached = ref
+        .read(mermaidRenderProvider)
+        .peek(widget.source, widget.dark);
     return FutureBuilder<Uint8List>(
       future: _content,
+      initialData: cached,
       builder: (context, snapshot) {
         // Retain the previous image until an edited diagram finishes rendering.
         if (snapshot.hasError) {
@@ -191,22 +221,45 @@ class _MermaidDiagramState extends ConsumerState<MermaidDiagram> {
             child: Center(child: CupertinoActivityIndicator()),
           );
         }
+        final size = mermaidPngSize(bytes);
+        final image = RepaintBoundary(
+          child: Image.memory(
+            bytes,
+            fit: BoxFit.contain,
+            gaplessPlayback: true,
+            alignment: Alignment.topLeft,
+            semanticLabel: 'Mermaid diagram',
+          ),
+        );
         return Align(
           alignment: Alignment.topLeft,
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 960),
-            child: RepaintBoundary(
-              child: Image.memory(
-                bytes,
-                fit: BoxFit.contain,
-                gaplessPlayback: true,
-                alignment: Alignment.topLeft,
-                semanticLabel: 'Mermaid diagram',
-              ),
-            ),
+            constraints: BoxConstraints(maxWidth: size?.width ?? 960),
+            child: size == null
+                ? image
+                : AspectRatio(
+                    aspectRatio: size.width / size.height,
+                    child: image,
+                  ),
           ),
         );
       },
     );
   }
+}
+
+/// PNG IHDR geometry is available before Flutter decodes the first frame.
+Size? mermaidPngSize(Uint8List bytes) {
+  if (bytes.length < 24 ||
+      bytes[0] != 137 ||
+      bytes[1] != 80 ||
+      bytes[2] != 78 ||
+      bytes[3] != 71) {
+    return null;
+  }
+  final data = ByteData.sublistView(bytes);
+  final width = data.getUint32(16), height = data.getUint32(20);
+  return width > 0 && height > 0
+      ? Size(width.toDouble(), height.toDouble())
+      : null;
 }

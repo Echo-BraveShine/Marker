@@ -54,10 +54,20 @@ void main() {
         tester.getSize(find.byKey(const Key('document-sidebar'))).width,
         closeTo(originalSidebarWidth, 0.01),
       );
-      await tester.tap(find.text('编辑'));
+      await tester.tap(
+        find.descendant(
+          of: find.byType(CupertinoSlidingSegmentedControl<int>),
+          matching: find.text('编辑'),
+        ),
+      );
       await tester.pumpAndSettle();
       await tester.enterText(find.byKey(const Key('editor')), '# Mobile');
-      await tester.tap(find.text('分屏'));
+      await tester.tap(
+        find.descendant(
+          of: find.byType(CupertinoSlidingSegmentedControl<int>),
+          matching: find.text('分屏'),
+        ),
+      );
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('editor')));
       await tester.pumpAndSettle();
@@ -78,7 +88,12 @@ void main() {
       ]) {
         await tester.binding.setSurfaceSize(size);
         await tester.pumpAndSettle();
-        await tester.tap(find.text('分屏'));
+        await tester.tap(
+          find.descendant(
+            of: find.byType(CupertinoSlidingSegmentedControl<int>),
+            matching: find.text('分屏'),
+          ),
+        );
         await tester.pumpAndSettle();
         expect(
           find.byKey(const Key('markdown-toolbar-syntax')),
@@ -96,7 +111,12 @@ void main() {
         expect(sidebar.right, lessThan(editor.left));
         expect(editor.right, lessThanOrEqualTo(preview.left));
         expect((editor.top - preview.top).abs(), lessThan(2));
-        final toolbar = tester.getRect(find.text('分屏'));
+        final toolbar = tester.getRect(
+          find.descendant(
+            of: find.byType(CupertinoSlidingSegmentedControl<int>),
+            matching: find.text('分屏'),
+          ),
+        );
         expect(toolbar.top, greaterThanOrEqualTo(top));
         expect(toolbar.center.dy, lessThan(editor.top));
         expect(find.byIcon(CupertinoIcons.ellipsis_circle), findsNothing);

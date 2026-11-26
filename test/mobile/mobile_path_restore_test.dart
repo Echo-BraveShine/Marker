@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:path/path.dart' as p;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -16,7 +17,7 @@ void main() {
     () async {
       final root = await Directory.systemTemp.createTemp('marker-detached-');
       const old = '/var/mobile/Containers/Data/Application/OLD-UUID/Documents';
-      final image = File('${root.path}/note.assets/photo.png');
+      final image = File(p.join(root.path, 'note.assets', 'photo.png'));
       await image.parent.create();
       await image.writeAsBytes([1, 2, 3]);
       final text = '![photo](<${Uri.file('$old/note.assets/photo.png')}>)';
@@ -56,12 +57,12 @@ void main() {
     'restart rebases the document and keeps images when the sandbox root changes',
     () async {
       final temp = await Directory.systemTemp.createTemp('marker-sandbox-');
-      final old = await Directory('${temp.path}/old-documents').create();
-      final newRoot = '${temp.path}/new-documents';
-      final image = File('${old.path}/note.assets/photo.png');
+      final old = await Directory(p.join(temp.path, 'old-documents')).create();
+      final newRoot = p.join(temp.path, 'new-documents');
+      final image = File(p.join(old.path, 'note.assets', 'photo.png'));
       await image.parent.create();
       await image.writeAsBytes([1, 2, 3]);
-      final doc = File('${old.path}/note.md');
+      final doc = File(p.join(old.path, 'note.md'));
       await doc.writeAsString('![photo](note.assets/photo.png)');
       final first = ProviderContainer(
         overrides: [
@@ -85,7 +86,7 @@ void main() {
         await old.rename(newRoot);
         final workspace = second.read(workspaceProvider.notifier);
         await workspace.restore();
-        expect(workspace.active!.path, '$newRoot/note.md');
+        expect(workspace.active!.path, p.join(newRoot, 'note.md'));
         final inventory = await DocumentResourceService().scan(
           workspace.active!.text,
           workspace.active!.path,
@@ -114,9 +115,9 @@ void main() {
       );
       final old = '/var/mobile/Containers/Data/Application/OLD-UUID/Documents';
       final original = '![图](<${Uri.file('$old/note.assets/中文 图.png')}>)';
-      final file = File('${root.path}/note.md');
+      final file = File(p.join(root.path, 'note.md'));
       await file.writeAsString(original);
-      final image = File('${root.path}/note.assets/中文 图.png');
+      final image = File(p.join(root.path, 'note.assets', '中文 图.png'));
       await image.parent.create();
       await image.writeAsBytes([1, 2, 3]);
       SharedPreferences.setMockInitialValues({
