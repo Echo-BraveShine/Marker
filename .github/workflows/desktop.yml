@@ -2,7 +2,8 @@ name: Desktop checks
 
 on:
   push:
-    branches: ['**']
+    # Feature branches are checked by pull_request or workflow_dispatch.
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
@@ -132,6 +133,13 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+          cache: gradle
+          cache-dependency-path: |
+            android/**/*.gradle.kts
+            android/gradle.properties
+            android/gradle/wrapper/gradle-wrapper.properties
+            pubspec.lock
+            .fvmrc
       - name: Set up Android SDK
         if: matrix.target == 'android'
         uses: android-actions/setup-android@v3

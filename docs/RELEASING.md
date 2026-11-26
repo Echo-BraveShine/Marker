@@ -174,3 +174,9 @@ Linux 在依赖解析后、编译前运行 `check_linux_renderer_dependencies.py
 - 产物与发布：版本标签对应不可变源码 SHA，源码检查与当前打包工具分开检出；工具稀疏目录不包含 pubspec，避免嵌套项目资产检查。平台校验和与最终文件名集合一致，当前为 16 个安装包加总校验清单。
 - 签名与安装：Android 缺少固定密钥时停止 Release 构建，APK 检查 ABI、实际包名、版本、联网权限与签名。Windows 保留 MSVC coroutine 兼容开关、原生拖放测试日志及安装器验证；macOS 检查通用架构、签名及 DMG；Linux 保留 AppImage / DEB / RPM / TAR 验证及窗口探测重试。
 - 本地静态检查通过不能标记云端已通过。修复后应推送新提交并触发新工作流；旧运行重跑仍使用原事件的 SHA，旧标签也不会自动包含新源码。自托管流程仍只供维护者手动触发，本次不启动或验证本机虚拟机。
+
+## CI 提速与触发规则
+
+- 日常五端检查：推送到 `main`、提交/更新 PR 或手动运行时触发。普通功能分支不再同时通过 push 和 PR 重复构建；尚未创建 PR 的分支可手动验证。发布 tag 的触发规则不变。
+- Android 日常构建和 Release 均通过 `setup-java` 缓存 Gradle 依赖与 Wrapper。缓存键涵盖 Gradle 配置、依赖锁文件与 Flutter SDK 版本；不缓存签名密钥或工程 `build/`。
+- Linux ARM64 Release 按系统、CPU 架构和 `.fvmrc` 缓存 Flutter SDK。缓存命中仍验证 SDK 版本与 Dart 架构；未命中则自动获取 SDK。首次运行和缓存被回收后需要正常下载，实际节省时间需以命中后的 Actions 日志衡量。

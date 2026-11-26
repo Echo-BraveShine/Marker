@@ -25,6 +25,8 @@ cleanup() {
 trap cleanup EXIT
 failed() {
   echo "::error::$1" >&2
+  # Keep app diagnostics and X11 window identities together on CI failures.
+  xdotool search --onlyvisible --name '.*' getwindowname %@ >&2 2>/dev/null || true
   cat "$log" >&2
   if [[ -s "$log.x11" ]]; then cat "$log.x11" >&2; fi
   exit 1
@@ -35,9 +37,11 @@ stable=0
 last_windows=''
 while (( SECONDS - start < limit )); do
   alive || failed 'AppImage exited before the window was ready'
+  # Document titles change with Welcome.md, restored files and dirty state.
+  # WM_CLASS comes from the GTK application identity, not the document name.
   # GTK can create/destroy helper windows during startup. XQueryTree results can
   # become stale before xdotool reads attributes; retry this bounded observation.
-  if windows=$(xdotool search --onlyvisible --name '^Untitled\.md( •)?$' 2>"$log.x11") && [[ -n "$windows" ]]; then
+  if windows=$(xdotool search --onlyvisible --class '^(dev\.ekko\.marker|[Mm]arker)$' 2>"$log.x11") && [[ -n "$windows" ]]; then
     if [[ "$windows" == "$last_windows" ]]; then stable=$((stable + 1))
     else stable=1; last_windows=$windows; fi
     if (( stable >= 3 )); then

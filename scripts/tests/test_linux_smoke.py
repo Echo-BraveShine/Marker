@@ -2,13 +2,14 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
 
 
-@unittest.skipUnless(os.name == 'posix' and shutil.which('setsid'), 'Requires Linux setsid')
+@unittest.skipUnless(os.name == 'posix' and hasattr(os, 'setsid'), 'Requires POSIX process groups')
 class LinuxSmokeTests(unittest.TestCase):
     def run_probe(self, mode, app='sleep 20', limit='4'):
         with tempfile.TemporaryDirectory() as folder:
@@ -16,8 +17,16 @@ class LinuxSmokeTests(unittest.TestCase):
             executable = root / 'app'
             executable.write_text('#!/bin/sh\n' + app + '\n', encoding='utf-8')
             executable.chmod(0o755)
+            if not shutil.which('setsid'):
+                launcher = root / 'setsid'
+                launcher.write_text('#!' + sys.executable + '\nimport os,sys\nos.setsid()\nos.execvp(sys.argv[1],sys.argv[1:])\n', encoding='utf-8')
+                launcher.chmod(0o755)
             probe = root / 'xdotool'
             probe.write_text('''#!/bin/sh
+case "$*" in
+  *--class*) ;;
+  *) echo 'Document title is Welcome.md, not Untitled.md' >&2; exit 1 ;;
+esac
 n=0
 [ ! -f "$PROBE_STATE" ] || n=$(cat "$PROBE_STATE")
 n=$((n+1)); echo "$n" > "$PROBE_STATE"
@@ -32,6 +41,11 @@ echo 1234
             return subprocess.run(['bash', str(ROOT / '.github/release/linux-smoke.sh'),
                                    '--inside', str(executable), str(root / 'app.log'), limit],
                                   env=env, capture_output=True, text=True, timeout=12)
+
+    def test_matches_application_identity_independent_of_document_title(self):
+        result = self.run_probe('welcome')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('process checks passed', result.stdout)
 
     def test_retries_transient_bad_window(self):
         result = self.run_probe('retry')

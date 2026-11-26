@@ -120,13 +120,26 @@ jobs:
         with:
           flutter-version-file: .fvmrc
           cache: true
+      - name: Cache Flutter SDK on Linux ARM64
+        if: matrix.platform == 'linux' && matrix.arch == 'arm64'
+        uses: actions/cache@v5
+        with:
+          path: ${{ runner.temp }}/flutter-arm64
+          key: flutter-sdk-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.fvmrc') }}
       - name: Set up Flutter on Linux ARM64
         if: matrix.platform == 'linux' && matrix.arch == 'arm64'
         run: |
           version=$(python3 -c 'import json; print(json.load(open(".fvmrc",encoding="utf-8"))["flutter"])')
           sdk="$RUNNER_TEMP/flutter-arm64"
-          git clone --depth 1 --branch "$version" https://github.com/flutter/flutter.git "$sdk"
-          "$sdk/bin/flutter" --version
+          if [[ ! -x "$sdk/bin/flutter" ]]; then
+            git clone --depth 1 --branch "$version" https://github.com/flutter/flutter.git "$sdk"
+          fi
+          actual=$("$sdk/bin/flutter" --version --machine | python3 -c 'import json,sys; print(json.load(sys.stdin)["frameworkVersion"])')
+          if [[ "$actual" != "$version" ]]; then
+            echo "::error::Cached Flutter version mismatch: expected $version, got $actual"
+            exit 1
+          fi
+          "$sdk/bin/dart" --version 2>&1 | grep -F 'linux_arm64'
           echo "$sdk/bin" >> "$GITHUB_PATH"
       - name: Set up Java for Android
         if: matrix.platform == 'android'
@@ -134,6 +147,13 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+          cache: gradle
+          cache-dependency-path: |
+            android/**/*.gradle.kts
+            android/gradle.properties
+            android/gradle/wrapper/gradle-wrapper.properties
+            pubspec.lock
+            .fvmrc
       - name: Set up Android SDK
         if: matrix.platform == 'android'
         uses: android-actions/setup-android@v3
