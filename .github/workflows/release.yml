@@ -94,6 +94,7 @@ jobs:
           sparse-checkout-cone-mode: false
           sparse-checkout: |
             /.github/release/
+            /.github/workflows/release.yml
             /scripts/
             /linux/packaging/
             /windows/installer/
@@ -265,6 +266,7 @@ jobs:
           sparse-checkout-cone-mode: false
           sparse-checkout: |
             /.github/release/
+            /.github/workflows/release.yml
             /scripts/
             /linux/packaging/
             /windows/installer/

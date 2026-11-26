@@ -47,6 +47,20 @@ class Arm64SdkSetupTests(unittest.TestCase):
                                     cwd=root, env=env, capture_output=True, text=True, timeout=10)
             return result, output.exists()
 
+    def test_packaging_checkouts_include_workflow_without_nested_project(self):
+        workflow = (ROOT / '.github/workflows/release.yml').read_text(encoding='utf-8')
+        blocks = workflow.split('          sparse-checkout: |\n')[1:]
+        self.assertEqual(len(blocks), 2)
+        for block in blocks:
+            patterns = []
+            for line in block.splitlines():
+                if not line.startswith('            '):
+                    break
+                patterns.append(line.strip())
+            self.assertIn('/.github/workflows/release.yml', patterns)
+            self.assertNotIn('/pubspec.yaml', patterns)
+            self.assertNotIn('/*', patterns)
+
     def test_bootstrap_noise_does_not_corrupt_version_check(self):
         result, exported = self.probe()
         self.assertEqual(result.returncode, 0, result.stderr)
