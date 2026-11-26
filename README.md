@@ -100,7 +100,7 @@ macOS 原生导出回归：`bash scripts/ci/test-macos-export.sh`；共享 Merma
 
 | 工作流 | 触发与产物 |
 | --- | --- |
-| `desktop.yml` | 分支 / PR / 手动：工作流语法、依赖、格式、静态分析、测试、三端桌面、Android APK 与 iOS 模拟器构建 |
+| `desktop.yml` | main 推送 / PR / 手动：工作流语法、依赖、格式、静态分析、测试、三端桌面、Android APK 与 iOS 模拟器构建 |
 | `release.yml` | `vX.Y.Z` 标签或手动：macOS、Windows、Linux、Android 打包；校验后发布同一个 GitHub Release |
 | `pages.yml` | main 上网站或 Pages 工作流变更：部署 `website/` 到 GitHub Pages |
 | `self-hosted.yml` | 维护者手动触发的自托管桌面构建 |

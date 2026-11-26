@@ -134,7 +134,10 @@ jobs:
           if [[ ! -x "$sdk/bin/flutter" ]]; then
             git clone --depth 1 --branch "$version" https://github.com/flutter/flutter.git "$sdk"
           fi
-          actual=$("$sdk/bin/flutter" --version --machine | python3 -c 'import json,sys; print(json.load(sys.stdin)["frameworkVersion"])')
+          # First boot may print SDK/tool bootstrap progress before version data.
+          # Keep initialization logs visible and read the generated JSON file only.
+          "$sdk/bin/flutter" --version
+          actual=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1],encoding="utf-8"))["frameworkVersion"])' "$sdk/bin/cache/flutter.version.json")
           if [[ "$actual" != "$version" ]]; then
             echo "::error::Cached Flutter version mismatch: expected $version, got $actual"
             exit 1
