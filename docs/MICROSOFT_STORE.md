@@ -16,7 +16,7 @@
 
 前三项写入生成的 `AppxManifest.xml`，PFN 用于核对，不手工写入 Manifest；Package SID 暂不需要。以上是产品身份，不是登录凭据。构建无需 Partner Center 密钥或付费代码签名证书。
 
-应用显示名称目前仍为 **Marker**，未作品牌改名。提交前核对 Partner Center 已保留的应用名称与之匹配；确认新名称后另行统一修改。其他平台 Bundle ID 不受影响。
+Windows 商店包显示名称为已保留的 **Marker Document**，同时用于清单 `Properties/DisplayName` 和 `uap:VisualElements/DisplayName`。产品技术身份仍为 `Ekko.MarkerDocument`。此处仅修改商店包显示名称，其他平台名称和 Bundle ID 不受影响。
 
 ## GitHub Actions 操作
 
