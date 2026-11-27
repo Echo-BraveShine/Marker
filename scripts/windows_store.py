@@ -21,8 +21,9 @@ for prefix, uri in NS.items():
     ET.register_namespace(prefix, uri)
 LANGUAGES = ('en-US', 'zh-Hans', 'zh-Hant', 'ja-JP', 'ko-KR', 'de-DE',
              'fr-FR', 'es-ES', 'pt-BR', 'it-IT', 'ru-RU', 'tr-TR', 'pl-PL', 'id-ID')
-ASSETS = {'StoreLogo.png': 50, 'Square44x44Logo.png': 44,
-          'Square150x150Logo.png': 150, 'Square310x310Logo.png': 310}
+ASSETS = {'StoreLogo.png': (50, 50), 'Square44x44Logo.png': (44, 44),
+          'Square150x150Logo.png': (150, 150), 'Square310x310Logo.png': (310, 310),
+          'Wide310x150Logo.png': (310, 150)}
 REQUIRED = ('marker.exe', 'flutter_windows.dll', 'data/icudtl.dat', 'data/app.so',
             'data/flutter_assets/AssetManifest.bin', 'msvcp140.dll',
             'vcruntime140.dll', 'vcruntime140_1.dll',
@@ -97,7 +98,8 @@ def manifest(version, values):
                   Description='Markdown editor and preview', BackgroundColor='transparent',
                   Square44x44Logo=r'Assets\Square44x44Logo.png',
                   Square150x150Logo=r'Assets\Square150x150Logo.png')
-    node(visual, 'uap:DefaultTile', Square310x310Logo=r'Assets\Square310x310Logo.png')
+    node(visual, 'uap:DefaultTile', Square310x310Logo=r'Assets\Square310x310Logo.png',
+         Wide310x150Logo=r'Assets\Wide310x150Logo.png')
     extensions = node(app, 'Extensions')
     extension = node(extensions, 'uap:Extension', Category='windows.fileTypeAssociation')
     association = node(extension, 'uap3:FileTypeAssociation', Name='markdown', Parameters='"%1"')
@@ -114,10 +116,10 @@ def manifest(version, values):
 
 
 def validate_assets(directory):
-    for name, size in ASSETS.items():
+    for name, dimensions in ASSETS.items():
         data = (directory / name).read_bytes()
-        if data[:8] != b'\x89PNG\r\n\x1a\n' or struct.unpack('>II', data[16:24]) != (size, size):
-            raise ValueError(f'Invalid Store PNG: {name} (expected {size} x {size})')
+        if data[:8] != b'\x89PNG\r\n\x1a\n' or struct.unpack('>II', data[16:24]) != dimensions:
+            raise ValueError(f'Invalid Store PNG: {name} (expected {dimensions[0]} x {dimensions[1]})')
 
 
 def prepare(bundle, output, version, root=ROOT):

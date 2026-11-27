@@ -2,6 +2,7 @@ import importlib.util
 from pathlib import Path
 import tempfile
 import subprocess
+import shutil
 import sys
 import unittest
 import xml.etree.ElementTree as ET
@@ -28,6 +29,10 @@ class WindowsStoreTests(unittest.TestCase):
         app = document.find('Applications/Application', ns)
         self.assertEqual(app.attrib['Executable'], 'marker.exe')
         self.assertEqual(app.attrib['EntryPoint'], 'Windows.FullTrustApplication')
+        tile = app.find('uap:VisualElements/uap:DefaultTile', ns)
+        self.assertIn('Square310x310Logo', tile.attrib)
+        self.assertEqual(tile.attrib['Wide310x150Logo'], r'Assets\Wide310x150Logo.png')
+
         association = app.find('Extensions/uap:Extension/uap3:FileTypeAssociation', ns)
         self.assertEqual(association.attrib['Parameters'], '"%1"')
         self.assertEqual([e.text for e in association.findall('uap:SupportedFileTypes/uap:FileType', ns)], ['.md', '.markdown'])
@@ -35,6 +40,18 @@ class WindowsStoreTests(unittest.TestCase):
         capabilities = {e.attrib['Name'] for e in document.find('Capabilities', ns)}
         self.assertEqual(capabilities, {'internetClient', 'runFullTrust'})
         store.validate_assets(ROOT / 'windows/store/Assets')
+
+    def test_missing_or_square_wide_tile_asset_is_rejected(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            assets = Path(temporary) / 'Assets'
+            shutil.copytree(ROOT / 'windows/store/Assets', assets)
+            wide = assets / 'Wide310x150Logo.png'
+            wide.unlink()
+            with self.assertRaises(FileNotFoundError):
+                store.validate_assets(assets)
+            shutil.copyfile(assets / 'Square310x310Logo.png', wide)
+            with self.assertRaisesRegex(ValueError, '310 x 150'):
+                store.validate_assets(assets)
 
     def test_invalid_store_versions_are_rejected(self):
         for value in ('0.1.0.0', '1.0.0.1', '1.0.0', '01.0.0.0', '1.65536.0.0', '1.0.0.0\n', '1.0.0.0;echo bad'):
