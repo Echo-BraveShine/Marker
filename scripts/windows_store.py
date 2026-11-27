@@ -32,12 +32,24 @@ REQUIRED = ('marker.exe', 'flutter_windows.dll', 'data/icudtl.dat', 'data/app.so
             'data/flutter_assets/assets/export/katex-fonts-LICENSE.txt')
 
 
+def normalize_version(value):
+    version = value.strip()
+    if version.startswith(('v', 'V')):
+        version = version[1:]
+    if re.fullmatch(r'(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)', version):
+        version += '.0'
+    version_parts(version)
+    return version
+
+
 def version_parts(version):
     if not re.fullmatch(r'(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)\.0', version):
         raise ValueError('Store version must be Major.Minor.Build.0 (e.g. 1.0.0.0)')
     parts = tuple(map(int, version.split('.')))
     if parts[0] == 0 or any(p > 65535 for p in parts):
-        raise ValueError('Store version requires Major >= 1; each part must be <= 65535')
+        raise ValueError('Store package Major must be >= 1 and each part <= 65535. '
+                         'For a 0.x app, keep pubspec.yaml unchanged and use a separate '
+                         'Store version such as 1.0.0.0.')
     return parts
 
 
@@ -139,14 +151,23 @@ def main():
     parser.add_argument('--bundle', type=Path)
     parser.add_argument('--output', type=Path)
     parser.add_argument('--verify', type=Path)
+    parser.add_argument('--normalized', action='store_true')
+    parser.add_argument('--github-output', type=Path)
     args = parser.parse_args()
+    try:
+        args.version = normalize_version(args.version)
+    except ValueError as error:
+        parser.error(f'Invalid Store version {args.version!r}: {error}')
     parts = version_parts(args.version)
+    if args.github_output:
+        with args.github_output.open('a', encoding='utf-8', newline='\n') as output:
+            output.write(f'store_version={args.version}\n')
     if args.verify:
         verify(args.verify, args.version)
     elif args.bundle and args.output:
         prepare(args.bundle, args.output, args.version)
     else:
-        print('.'.join(map(str, parts[:3])))
+        print(args.version if args.normalized else '.'.join(map(str, parts[:3])))
 
 
 if __name__ == '__main__':

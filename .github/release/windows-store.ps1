@@ -7,13 +7,12 @@ $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $false
 $root = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 $prepare = Join-Path $root 'scripts/windows_store.py'
-& python $prepare --version $StoreVersion
+$normalized = & python $prepare --version $StoreVersion --normalized
 if ($LASTEXITCODE -ne 0) { throw 'Invalid Microsoft Store version' }
+$StoreVersion = $normalized
 $bundle = (Resolve-Path -LiteralPath $BundleDir).Path
-$exe = Get-Item (Join-Path $bundle 'marker.exe')
-$expected = $StoreVersion
-$actual = "$($exe.VersionInfo.ProductMajorPart).$($exe.VersionInfo.ProductMinorPart).$($exe.VersionInfo.ProductBuildPart).$($exe.VersionInfo.ProductPrivatePart)"
-if ($actual -ne $expected) { throw "Runner version $actual does not match Store version $StoreVersion" }
+if (!(Test-Path -LiteralPath (Join-Path $bundle 'marker.exe'))) { throw 'Release runner not found' }
+# MSIX version is independent of the application version in pubspec.yaml.
 
 # Ship the Release CRT app-locally; do not require an MSI prerequisite installer.
 $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio/Installer/vswhere.exe'

@@ -9,7 +9,8 @@ on:
         default: main
         type: string
       store_version:
-        description: 'Store package version: Major.Minor.Build.0 (Major >= 1; increase for updates)'
+        description: 'Independent Store version (e.g. 1.0.0.0). A 0.x pubspec version stays unchanged.'
+        default: '1.0.0.0'
         required: true
         type: string
 
@@ -43,9 +44,8 @@ jobs:
       - name: Validate package version and record source commit
         id: version
         run: |
-          $name = & python scripts/windows_store.py --version $env:STORE_VERSION
-          if ($LASTEXITCODE -ne 0) { throw 'Invalid Store package version' }
-          "build_name=$name" >> $env:GITHUB_OUTPUT
+          python scripts/windows_store.py --version $env:STORE_VERSION --normalized --github-output $env:GITHUB_OUTPUT
+          if ($LASTEXITCODE -ne 0) { throw 'Use a Store version such as 1.0.0.0; keep the 0.x pubspec app version unchanged.' }
           git rev-parse HEAD
       - name: Validate packaging contracts
         run: python -m unittest discover -s scripts/tests -p test_windows_store.py -v
@@ -61,12 +61,14 @@ jobs:
           flutter test --no-pub
           if ($LASTEXITCODE -ne 0) { throw 'Flutter tests failed' }
       - name: Build Store release
-        env:
-          STORE_BUILD_NAME: ${{ steps.version.outputs.build_name }}
-        run: flutter build windows --release --no-pub --build-name $env:STORE_BUILD_NAME --build-number 0
+        run: flutter build windows --release --no-pub
       - name: Package and inspect unsigned Store MSIX
+        env:
+          STORE_VERSION: ${{ steps.version.outputs.store_version }}
         run: ./.github/release/windows-store.ps1 -StoreVersion $env:STORE_VERSION
       - name: Record build provenance
+        env:
+          STORE_VERSION: ${{ steps.version.outputs.store_version }}
         run: |
           $sha = git rev-parse HEAD
           @{
@@ -76,7 +78,7 @@ jobs:
           } | ConvertTo-Json | Set-Content -Encoding utf8 dist/windows-store/build-info.json
       - uses: actions/upload-artifact@v6
         with:
-          name: Marker-Microsoft-Store-x64-${{ inputs.store_version }}
+          name: Marker-Microsoft-Store-x64-${{ steps.version.outputs.store_version }}
           path: dist/windows-store/
           if-no-files-found: error
           retention-days: 30

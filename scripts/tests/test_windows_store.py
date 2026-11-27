@@ -1,6 +1,8 @@
 import importlib.util
 from pathlib import Path
 import tempfile
+import subprocess
+import sys
 import unittest
 import xml.etree.ElementTree as ET
 import zipfile
@@ -39,6 +41,32 @@ class WindowsStoreTests(unittest.TestCase):
             with self.subTest(value=value), self.assertRaises(ValueError):
                 store.version_parts(value)
         self.assertEqual(store.version_parts('1.65535.9.0'), (1, 65535, 9, 0))
+
+    def test_input_normalization_and_workflow_output(self):
+        for value in ('1.0.0', 'v1.0.0', '1.0.0.0', ' 1.0.0 \n'):
+            self.assertEqual(store.normalize_version(value), '1.0.0.0')
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary) / 'output.txt'
+            result = subprocess.run(
+                [sys.executable, str(ROOT / 'scripts/windows_store.py'),
+                 '--version', 'v1.0.0', '--normalized', '--github-output', str(output)],
+                capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout.strip(), '1.0.0.0')
+            self.assertEqual(output.read_text(encoding='utf-8'), 'store_version=1.0.0.0\n')
+
+    def test_invalid_cli_version_explains_rules_without_traceback_or_outputs(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary) / 'output.txt'
+            result = subprocess.run(
+                [sys.executable, str(ROOT / 'scripts/windows_store.py'),
+                 '--version', '0.1.0', '--github-output', str(output)],
+                capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('0.1.0', result.stderr)
+            self.assertIn('Major must be >= 1', result.stderr)
+            self.assertNotIn('Traceback', result.stderr)
+            self.assertFalse(output.exists())
 
     def bundle(self, directory):
         bundle = directory / '中文 空格 bundle'

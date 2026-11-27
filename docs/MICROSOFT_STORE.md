@@ -23,7 +23,7 @@
 1. 将这些改动提交并推送到自己的仓库（本次实现没有替你提交或推送）。
 2. 打开 Actions → **Windows Store MSIX** → Run workflow。
 3. `source_ref` 填包含这些脚本的分支、提交或标签，例如 `main`；旧标签若不包含 Store 支持，不能直接使用。
-4. `store_version` 填 `Major.Minor.Build.0`，例如首次 `1.0.0.0`，下一次 `1.0.1.0`。第一段至少 1，各段最多 65535，第四段固定 0。更新时必须高于已提交版本；运行号重跑不会自动提升商店版本。
+4. `store_version` 默认首次 `1.0.0.0`，下一次可填 `1.0.1.0`。也接受 `1.0.0`、`v1.0.0` 并自动补成 `1.0.0.0`，前后空白会去除。第一段至少 1，各段最多 65535，第四段固定 0。更新时必须高于已提交版本；运行号重跑不会自动提升商店版本。
 5. 下载 `Marker-Microsoft-Store-x64-版本号` Artifact。
 
 产物包括：
@@ -34,7 +34,7 @@
 - `build-info.json`：源码提交、商店版本及工作流链接。
 - 本说明文档。
 
-Store 专用构建会传 `--build-name Major.Minor.Build --build-number 0`，保证 EXE 与包版本一致，不改写仓库 `pubspec.yaml`。正式显示版本不包含构建号。
+应用版本由 `pubspec.yaml` 管理，目前为 `1.0.0+1`，界面显示 `1.0.0`。商店包版本独立使用四段（首次 `1.0.0.0`），第四段保留为 0，不把 Flutter 的 `+1` 直接用作第四段；构建时保留源码版本，不覆盖应用构建号。以后需分别维护应用版本及递增的商店包版本。首段为 0 的商店输入会明确拒绝，不会偷偷修改版本。
 
 工作流先执行打包契约测试、Flutter 分析和测试，再构建 Windows Release。PowerShell 补齐 Visual C++ Release CRT，Python 检查 Flutter 资源和字体授权文件不丢失，再调用 Windows SDK MakeAppx（不关闭其语义校验），最终解包检查身份、版本和必需内容，并生成校验和。
 
@@ -61,7 +61,7 @@ Store 专用构建会传 `--build-name Major.Minor.Build --build-number 0`，保
 
 ```powershell
 flutter pub get
-flutter build windows --release --build-name 1.0.0 --build-number 0
+flutter build windows --release
 ./.github/release/windows-store.ps1 -StoreVersion 1.0.0.0
 ```
 
