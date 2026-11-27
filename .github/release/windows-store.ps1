@@ -1,5 +1,5 @@
 param(
-  [Parameter(Mandatory = $true)][string]$StoreVersion,
+  [string]$StoreVersion,
   [string]$BundleDir = 'build/windows/x64/runner/Release',
   [string]$OutputDir = 'dist/windows-store'
 )
@@ -7,22 +7,23 @@ $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $false
 $root = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 $prepare = Join-Path $root 'scripts/windows_store.py'
-$normalized = & python $prepare --version $StoreVersion --normalized
+$normalized = if ($StoreVersion) {
+  & python $prepare --version $StoreVersion --normalized
+} else {
+  & python $prepare --pubspec (Join-Path $root 'pubspec.yaml') --normalized
+}
 if ($LASTEXITCODE -ne 0) { throw 'Invalid Microsoft Store version' }
 $StoreVersion = $normalized
 $bundle = (Resolve-Path -LiteralPath $BundleDir).Path
 if (!(Test-Path -LiteralPath (Join-Path $bundle 'marker.exe'))) { throw 'Release runner not found' }
-# MSIX version is independent of the application version in pubspec.yaml.
+# Default MSIX version follows the three-part pubspec version with revision 0.
 
 # Ship the Release CRT app-locally; do not require an MSI prerequisite installer.
 $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio/Installer/vswhere.exe'
 $vs = & $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
 if ($LASTEXITCODE -ne 0 -or !$vs) { throw 'Visual C++ installation not found' }
-$crt = Get-ChildItem -Path (Join-Path $vs 'VC/Redist/MSVC') -Directory |
-  Sort-Object { [version]$_.Name } -Descending |
-  ForEach-Object { Get-ChildItem -Path (Join-Path $_.FullName 'x64/Microsoft.VC*.CRT') -Directory } |
-  Select-Object -First 1
-if (!$crt) { throw 'Visual C++ x64 Release CRT not found' }
+. (Join-Path $PSScriptRoot 'windows-runtime.ps1')
+$crt = Get-MarkerVisualCppRuntime -RedistRoot (Join-Path $vs 'VC/Redist/MSVC')
 Get-ChildItem -LiteralPath $crt.FullName -Filter '*.dll' | Copy-Item -Destination $bundle
 
 $kits = Join-Path ${env:ProgramFiles(x86)} 'Windows Kits/10/bin'

@@ -55,6 +55,23 @@ class _Response extends Stream<List<int>> implements HttpClientResponse {
   dynamic noSuchMethod(Invocation invocation) => null;
 }
 
+/// Native image decoding can finish after pumpAndSettle has no frames to pump.
+/// Wait for observable completion with a bound, rather than a fixed wall delay.
+Future<void> _pumpUntil(WidgetTester tester, bool Function() ready) async {
+  final deadline = DateTime.now().add(const Duration(seconds: 10));
+  while (!ready() && DateTime.now().isBefore(deadline)) {
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+    });
+    await tester.pump();
+  }
+  expect(
+    ready(),
+    isTrue,
+    reason: 'Image loading did not reach the expected state',
+  );
+}
+
 void main() {
   testWidgets('retry issues a new request without rebuilding Markdown', (
     tester,
@@ -77,21 +94,21 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      await tester.runAsync(() async {
-        await Future<void>.delayed(const Duration(milliseconds: 100));
-      });
-      await tester.pumpAndSettle();
+      await _pumpUntil(tester, () => find.text('Retry').evaluate().isNotEmpty);
       expect(client.requests, 1);
       expect(find.text('Retry'), findsOneWidget);
       await tester.tap(find.text('Retry'));
       await tester.pumpAndSettle();
-      await tester.runAsync(() async {
-        await Future<void>.delayed(const Duration(milliseconds: 50));
-      });
-      await tester.pumpAndSettle();
+      await _pumpUntil(
+        tester,
+        () => tester
+            .widgetList<RawImage>(find.byType(RawImage))
+            .any((image) => image.image != null),
+      );
       expect(client.requests, 2);
       expect(find.text('Retry'), findsNothing, reason: '$failures');
       expect(find.byType(RawImage), findsOneWidget);
+      expect(tester.widget<RawImage>(find.byType(RawImage)).image, isNotNull);
       await tester.pumpWidget(const SizedBox.shrink());
     }, createHttpClient: (_) => client);
   });

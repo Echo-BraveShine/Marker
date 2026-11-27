@@ -138,3 +138,5 @@ Android 发布依赖四项 Repository secrets：`ANDROID_KEYSTORE_BASE64`、`AND
 移动端编辑副本保存在应用 Documents 目录，不保留在文件选择器缓存中；顶部导出面板统一提供 PDF、PNG、HTML、MD 和 ZIP；其中 MD 分享当前 UTF-8 原始内容，ZIP 分享含本地图片的文档资源包。单独 MD 保留原始图片链接，不携带本地图片，网络图片仍需要联网。导出副本不改变应用内文档的保存位置。
 
 Microsoft Store 专用 MSIX：手动运行 `Windows Store MSIX` 工作流，操作与身份配置见 [MICROSOFT_STORE.md](docs/MICROSOFT_STORE.md)。该流程只构建商店包，不自动提交、发布，也不改变现有安装包。
+
+Android CI 仓库限流（Maven Central 429）、缓存与 Flutter included build 的处理见 [ANDROID_CI.md](docs/ANDROID_CI.md)。

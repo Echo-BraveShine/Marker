@@ -53,6 +53,16 @@ def version_parts(version):
     return parts
 
 
+def version_from_pubspec(path):
+    source = path.read_text(encoding='utf-8-sig')
+    match = re.search(
+        r"""(?m)^version:[ \t]*(['"]?)([0-9]+\.[0-9]+\.[0-9]+)(?:\+([0-9]+))?\1[ \t]*(?:#.*)?$""",
+        source)
+    if not match:
+        raise ValueError('pubspec.yaml must contain a stable version such as 1.0.0+1')
+    return normalize_version(match[2])
+
+
 def identity(root=ROOT):
     values = json.loads((root / 'windows/store/identity.json').read_text(encoding='utf-8'))
     if any(not isinstance(v, str) or v != v.strip() or not v for v in values.values()):
@@ -147,17 +157,21 @@ def verify(package, version, root=ROOT):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--version', required=True)
+    version_input = parser.add_mutually_exclusive_group(required=True)
+    version_input.add_argument('--version')
+    version_input.add_argument('--pubspec', type=Path)
     parser.add_argument('--bundle', type=Path)
     parser.add_argument('--output', type=Path)
     parser.add_argument('--verify', type=Path)
     parser.add_argument('--normalized', action='store_true')
     parser.add_argument('--github-output', type=Path)
     args = parser.parse_args()
+    version_source = str(args.pubspec) if args.pubspec else args.version
     try:
-        args.version = normalize_version(args.version)
-    except ValueError as error:
-        parser.error(f'Invalid Store version {args.version!r}: {error}')
+        args.version = (version_from_pubspec(args.pubspec) if args.pubspec
+                        else normalize_version(args.version))
+    except (ValueError, OSError) as error:
+        parser.error(f'Invalid Store version input {version_source!r}: {error}')
     parts = version_parts(args.version)
     if args.github_output:
         with args.github_output.open('a', encoding='utf-8', newline='\n') as output:

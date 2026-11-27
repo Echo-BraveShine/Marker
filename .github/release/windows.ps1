@@ -17,12 +17,8 @@ $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio/Installer
 if (-not (Test-Path $vswhere)) { throw 'vswhere not found' }
 $vs = & $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
 if (-not $vs) { throw 'Visual Studio C++ tools not found' }
-$crt = Get-ChildItem "$vs/VC/Redist/MSVC" -Directory |
-  Where-Object { $_.Name -match '^\d+\.\d+\.\d+$' } |
-  Sort-Object { [version]$_.Name } -Descending |
-  ForEach-Object { Get-ChildItem "$($_.FullName)/x64/Microsoft.VC*.CRT" -Directory } |
-  Select-Object -First 1
-if (-not $crt) { throw 'Visual C++ x64 runtime not found' }
+. (Join-Path $PSScriptRoot 'windows-runtime.ps1')
+$crt = Get-MarkerVisualCppRuntime -RedistRoot (Join-Path $vs 'VC/Redist/MSVC')
 foreach ($dll in 'msvcp140.dll', 'vcruntime140.dll', 'vcruntime140_1.dll') {
   Copy-Item (Join-Path $crt.FullName $dll) $bundle
 }

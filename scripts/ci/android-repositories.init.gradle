@@ -1,0 +1,44 @@
+import org.gradle.api.artifacts.repositories.MavenArtifactRepository
+
+// CI-only: apply to the application AND Flutter's included Gradle build.
+// Official Google Cloud documentation describes this Maven Central mirror:
+// https://docs.cloud.google.com/docs/buildpacks/java#google_cloud_hosted_maven_central_mirror
+final String centralMirror = 'https://maven-central.storage-download.googleapis.com/maven2/'
+def redirectCentral = { repository ->
+    if (repository instanceof MavenArtifactRepository &&
+        repository.url.host in ['repo.maven.apache.org', 'repo1.maven.org']) {
+        repository.setUrl(centralMirror)
+    }
+}
+
+// Limit cold-cache download fan-out on shared hosted-runner networks.
+gradle.startParameter.maxWorkerCount = Math.min(gradle.startParameter.maxWorkerCount, 2)
+
+gradle.beforeSettings { settings ->
+    // Flutter's included build has no explicit pluginManagement repositories;
+    // otherwise Kotlin plugin dependencies fall through Plugin Portal to Central.
+    settings.pluginManagement.repositories {
+        maven {
+            name = 'MarkerCentralMirror'
+            url = uri(centralMirror)
+        }
+        google()
+        gradlePluginPortal()
+    }
+    settings.pluginManagement.repositories.configureEach(redirectCentral)
+    // Keep FAIL_ON_PROJECT_REPOS intact in Flutter's Gradle build.
+    settings.dependencyResolutionManagement.repositories.configureEach(redirectCentral)
+}
+
+gradle.beforeProject { project ->
+    project.buildscript.repositories {
+        maven {
+            name = 'MarkerCentralMirror'
+            url = uri(centralMirror)
+        }
+        google()
+        gradlePluginPortal()
+    }
+    project.buildscript.repositories.configureEach(redirectCentral)
+    project.repositories.configureEach(redirectCentral)
+}

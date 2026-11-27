@@ -8,17 +8,12 @@ on:
         required: true
         default: main
         type: string
-      store_version:
-        description: 'Independent Store version (e.g. 1.0.0.0). A 0.x pubspec version stays unchanged.'
-        default: '1.0.0.0'
-        required: true
-        type: string
 
 permissions:
   contents: read
 
 concurrency:
-  group: windows-store-${{ inputs.source_ref }}-${{ inputs.store_version }}
+  group: windows-store-${{ inputs.source_ref }}
   cancel-in-progress: false
 
 env:
@@ -32,8 +27,6 @@ jobs:
     defaults:
       run:
         shell: pwsh
-    env:
-      STORE_VERSION: ${{ inputs.store_version }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -44,11 +37,11 @@ jobs:
       - name: Validate package version and record source commit
         id: version
         run: |
-          python scripts/windows_store.py --version $env:STORE_VERSION --normalized --github-output $env:GITHUB_OUTPUT
-          if ($LASTEXITCODE -ne 0) { throw 'Use a Store version such as 1.0.0.0; keep the 0.x pubspec app version unchanged.' }
+          python scripts/windows_store.py --pubspec pubspec.yaml --normalized --github-output $env:GITHUB_OUTPUT
+          if ($LASTEXITCODE -ne 0) { throw 'pubspec.yaml needs a stable app version with Major >= 1 (for example 1.0.0+1).' }
           git rev-parse HEAD
       - name: Validate packaging contracts
-        run: python -m unittest discover -s scripts/tests -p test_windows_store.py -v
+        run: python -m unittest discover -s scripts/tests -p 'test_windows*.py' -v
       - uses: subosito/flutter-action@v2
         with:
           flutter-version-file: .fvmrc

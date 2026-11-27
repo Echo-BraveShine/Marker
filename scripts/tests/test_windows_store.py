@@ -68,6 +68,31 @@ class WindowsStoreTests(unittest.TestCase):
             self.assertNotIn('Traceback', result.stderr)
             self.assertFalse(output.exists())
 
+    def test_pubspec_automatically_sets_store_version_and_ignores_build_revision(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            pubspec = directory / '中文 pubspec.yaml'
+            output = directory / 'github-output'
+            for version in ('1.0.0+1', '1.0.0+2', '1.2.3'):
+                pubspec.write_text(f'\ufeffdescription: "中文"\nversion: "{version}" # app version\n', encoding='utf-8')
+                expected = version.split('+')[0] + '.0'
+                self.assertEqual(store.version_from_pubspec(pubspec), expected)
+            result = subprocess.run([
+                sys.executable, str(ROOT / 'scripts/windows_store.py'),
+                '--pubspec', str(pubspec), '--normalized', '--github-output', str(output)],
+                capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout.strip(), '1.2.3.0')
+            self.assertEqual(output.read_text(encoding='utf-8'), 'store_version=1.2.3.0\n')
+
+    def test_missing_unstable_or_incompatible_pubspec_version_is_rejected(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            pubspec = Path(temporary) / 'pubspec.yaml'
+            for text in ('name: marker', 'version: 1.0.0-beta+1', 'version: 0.1.0+1'):
+                pubspec.write_text(text, encoding='utf-8')
+                with self.subTest(text=text), self.assertRaises(ValueError):
+                    store.version_from_pubspec(pubspec)
+
     def bundle(self, directory):
         bundle = directory / '中文 空格 bundle'
         for name in store.REQUIRED:

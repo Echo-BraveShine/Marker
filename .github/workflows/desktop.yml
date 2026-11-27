@@ -140,6 +140,10 @@ jobs:
             android/gradle/wrapper/gradle-wrapper.properties
             pubspec.lock
             .fvmrc
+            scripts/ci/android-repositories.init.gradle
+      - name: Configure Android dependency repositories
+        if: matrix.target == 'android'
+        run: python3 scripts/configure_android_ci.py
       - name: Set up Android SDK
         if: matrix.target == 'android'
         uses: android-actions/setup-android@v3
