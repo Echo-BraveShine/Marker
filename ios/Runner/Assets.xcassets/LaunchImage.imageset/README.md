@@ -1,5 +1,5 @@
-# Launch Screen Assets
+# Native launch appearance
 
-You can customize the launch screen with your own desired assets by replacing the image files in this directory.
+`LaunchScreen.storyboard` uses `LaunchImage` and `LaunchBackground`. Both asset catalogs supply Any and Dark appearances, selected by the device system setting. Keep all three image scales for both appearances. The scene background uses the same dynamic color during the handoff to Flutter.
 
-You can also do it by opening your Flutter project's Xcode project with `open ios/Runner.xcworkspace`, selecting `Runner/Assets.xcassets` in the Project Navigator and dropping in the desired images.
+The native launch screen follows the system. After the first Flutter frame, the saved app theme applies; selecting System in Marker keeps both appearances aligned.

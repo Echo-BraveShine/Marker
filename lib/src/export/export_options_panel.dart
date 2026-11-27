@@ -7,20 +7,32 @@ import '../widgets/marker_dialog.dart';
 import '../l10n/app_localizations.dart';
 import 'document_exporter.dart';
 
+final exportSourceFormatProvider =
+    NotifierProvider<ExportSourceFormat, String?>(ExportSourceFormat.new);
+
+class ExportSourceFormat extends Notifier<String?> {
+  @override
+  String? build() => null;
+  void select(String? value) => state = value;
+}
+
 class ExportOptionsPanel extends ConsumerWidget {
   const ExportOptionsPanel({
     super.key,
     required this.zh,
     this.mobile = false,
     this.onSaveToFiles,
+    this.onExportSource,
   });
   final bool zh;
   final bool mobile;
   final VoidCallback? onSaveToFiles;
+  final ValueChanged<String>? onExportSource;
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final options = ref.watch(documentExportOptionsProvider);
+    final sourceFormat = ref.watch(exportSourceFormatProvider);
     void update(DocumentExportOptions Function(DocumentExportOptions) change) =>
         ref.read(documentExportOptionsProvider.notifier).update(change);
     final c = Theme.of(context).extension<MarkerColors>()!;
@@ -47,26 +59,44 @@ class ExportOptionsPanel extends ConsumerWidget {
           ),
           const SizedBox(height: 10),
           group(
-            CupertinoSlidingSegmentedControl<DocumentExportFormat>(
+            CupertinoSlidingSegmentedControl<String>(
               backgroundColor: c.bgSidebar,
               thumbColor: Theme.of(context).brightness == Brightness.dark
                   ? c.separator
                   : c.bgEditor,
-              groupValue: options.format,
-              children: const {
-                DocumentExportFormat.pdf: Text('PDF'),
-                DocumentExportFormat.png: Text('PNG'),
-                DocumentExportFormat.html: Text('HTML'),
+              groupValue: sourceFormat ?? options.format.name,
+              children: {
+                'pdf': const Text('PDF'),
+                'png': const Text('PNG'),
+                'html': const Text('HTML'),
+                if (onExportSource != null) 'md': const Text('MD'),
+                if (onExportSource != null) 'zip': const Text('ZIP'),
               },
               onValueChanged: (value) {
-                if (value != null) {
-                  update((state) => state.copyWith(format: value));
+                if (value == null) return;
+                final source = value == 'md' || value == 'zip';
+                ref
+                    .read(exportSourceFormatProvider.notifier)
+                    .select(source ? value : null);
+                if (!source) {
+                  update(
+                    (state) => state.copyWith(
+                      format: DocumentExportFormat.values.byName(value),
+                    ),
+                  );
                 }
               },
             ),
           ),
           const SizedBox(height: 16),
-          if (options.format == DocumentExportFormat.pdf)
+          if (sourceFormat != null)
+            Text(
+              sourceFormat == 'md'
+                  ? 'Markdown (.md)'
+                  : l10n.message(AppMessage.packageDocumentAndImages2),
+              style: TextStyle(fontSize: 13, color: c.textSecondary),
+            )
+          else if (options.format == DocumentExportFormat.pdf)
             Text(
               l10n.exportA4Info,
               style: TextStyle(fontSize: 13, color: c.textSecondary),
@@ -92,7 +122,15 @@ class ExportOptionsPanel extends ConsumerWidget {
               Row(
                 children: [
                   Expanded(
-                    child: Text(zh ? '分图导出（ZIP）' : 'Split images (ZIP)'),
+                    child: Text(
+                      messageForLanguage(
+                        AppLocalizations.languageTagOf(
+                          context,
+                          fallbackChinese: zh,
+                        ),
+                        AppMessage.splitImagesZIP,
+                      ),
+                    ),
                   ),
                   CupertinoSwitch(
                     value: options.splitPng,
@@ -136,18 +174,29 @@ class ExportOptionsPanel extends ConsumerWidget {
         ],
       ),
       actions: [
-        if (onSaveToFiles != null)
+        if (onSaveToFiles != null && sourceFormat == null)
           MarkerDialogButton(
             onPressed: () {
               onSaveToFiles!();
               Navigator.pop(context, ref.read(documentExportOptionsProvider));
             },
-            child: Text(zh ? '保存到文件' : 'Save to Files'),
+            child: Text(
+              messageForLanguage(
+                AppLocalizations.languageTagOf(context, fallbackChinese: zh),
+                AppMessage.saveToFiles,
+              ),
+            ),
           ),
         MarkerDialogButton(
           primary: true,
-          onPressed: () =>
-              Navigator.pop(context, ref.read(documentExportOptionsProvider)),
+          onPressed: () {
+            if (sourceFormat != null) {
+              onExportSource!(sourceFormat);
+              Navigator.pop(context);
+            } else {
+              Navigator.pop(context, ref.read(documentExportOptionsProvider));
+            }
+          },
           child: Text(l10n.exportButton),
         ),
       ],

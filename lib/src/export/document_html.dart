@@ -1,3 +1,4 @@
+import '../l10n/message_catalog.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
@@ -153,7 +154,7 @@ class ExportHtmlBuilder {
       );
       embeddedLength += image.length;
       if (embeddedLength > 128 * 1024 * 1024) {
-        throw StateError('图片总量过大 / Embedded images exceed 128 MB');
+        throw LocalizedMessageError(AppMessage.embeddedImagesTooLarge);
       }
       body = body.replaceAll(
         'src="marker-image:$i"',
@@ -193,18 +194,23 @@ class ExportHtmlBuilder {
       'assets/export/katex-fonts-LICENSE.txt',
       'assets/export/marker-fonts-OFL.txt',
       'assets/mermaid.LICENSE',
+      'assets/fonts/OFL-NotoSansKR.txt',
     ]) {
       licenses[name] = await _string(name);
     }
     final licenseMetadata = jsonEncode(licenses).replaceAll('<', r'\u003c');
     final faces = StringBuffer();
-    for (final family in ['Latin', 'CJK']) {
+    for (final family in ['Latin', 'CJK', 'Korean']) {
       for (final style in ['Regular', 'Bold']) {
         final data = await _loadAsset(
           'assets/export/fonts/Marker$family-$style.woff2',
         );
         faces.write(
-          '@font-face{font-family:MarkerExportFont;font-weight:${style == 'Bold' ? 700 : 400};src:url(data:font/woff2;base64,${base64Encode(_assetBytes(data))});${family == 'CJK' ? 'unicode-range:U+2E80-D7AF,U+F900-FFEF,U+20000-2FA1F;' : ''}}',
+          '@font-face{font-family:MarkerExportFont;font-weight:${style == 'Bold' ? 700 : 400};src:url(data:font/woff2;base64,${base64Encode(_assetBytes(data))});${family == 'Korean'
+              ? 'unicode-range:U+1100-11FF,U+3130-318F,U+A960-A97F,U+AC00-D7FF;'
+              : family == 'CJK'
+              ? 'unicode-range:U+2E80-D7AF,U+F900-FFEF,U+20000-2FA1F;'
+              : ''}}',
         );
       }
     }
@@ -351,7 +357,8 @@ return cuts;
 const notify=value=>{window.markerExport=value;if(window.webkit?.messageHandlers?.marker)window.webkit.messageHandlers.marker.postMessage(value);};
 (async()=>{try{
 mermaid.initialize({startOnLoad:false,securityLevel:'strict',theme:'${dark ? 'dark' : 'default'}',fontFamily:'MarkerExportFont,sans-serif',flowchart:{useMaxWidth:false,htmlLabels:false},sequence:{useMaxWidth:false},gantt:{useMaxWidth:false},themeVariables:{fontFamily:'MarkerExportFont,sans-serif',fontSize:'16px'}});
-await Promise.all([document.fonts.load('16px MarkerExportFont','中文Aa'),document.fonts.load('700 16px MarkerExportFont','中文Aa'),document.fonts.load('16px MarkerExportMono','Aa0123')]);await document.fonts.ready;
+const fontSample='中文Aa'+(/[\u1100-\u11ff\u3130-\u318f\ua960-\ua97f\uac00-\ud7ff]/.test(document.getElementById('document').textContent)?'한국어':'');
+await Promise.all([document.fonts.load('16px MarkerExportFont',fontSample),document.fonts.load('700 16px MarkerExportFont',fontSample),document.fonts.load('16px MarkerExportMono','Aa0123')]);await document.fonts.ready;
 for(const node of document.querySelectorAll('.math-inline,.math-block')){katex.render(node.textContent,node,{displayMode:node.classList.contains('math-block'),throwOnError:true,trust:false,strict:'ignore'});}
 let id=0;for(const node of document.querySelectorAll('.mermaid')){
 const code=node.textContent;
@@ -384,7 +391,7 @@ setTimeout(()=>notify({ready:true,width:Math.ceil(window.innerWidth),height:Math
           r'^data:image/(?:png|jpeg|gif|webp|svg\+xml);base64,',
         ).hasMatch(uri.toString())) {
       if (uri.toString().length > 35 * 1024 * 1024) {
-        throw StateError('图片超过 25 MB / Image exceeds 25 MB');
+        throw LocalizedMessageError(AppMessage.imageExceedsSizeLimit);
       }
       final data = uri.data!;
       bytes = data.contentAsBytes();
@@ -392,7 +399,9 @@ setTimeout(()=>notify({ready:true,width:Math.ceil(window.innerWidth),height:Math
     } else if (uri.scheme == 'file') {
       final file = File.fromUri(uri);
       if (await file.length() > 25 * 1024 * 1024) {
-        throw StateError('图片超过 25 MB / Image exceeds 25 MB: $uri');
+        throw LocalizedMessageError(AppMessage.imageExceedsSizeLimitAt, {
+          'p0': uri,
+        });
       }
       bytes = await file.readAsBytes();
       mime = _mime(uri.path);
@@ -403,9 +412,9 @@ setTimeout(()=>notify({ready:true,width:Math.ceil(window.innerWidth),height:Math
           ? downloaded.mime!
           : _mime(uri.path);
     } else {
-      throw StateError(
-        '图片路径无法解析，请先保存文档 / Save the document to resolve image: $uri',
-      );
+      throw LocalizedMessageError(AppMessage.saveDocumentToResolveImagePath, {
+        'p0': uri,
+      });
     }
     if (bytes.length > 25 * 1024 * 1024 || !mime.startsWith('image/')) {
       throw StateError('Unsupported image: $uri');

@@ -25,36 +25,38 @@ extension _HomeAutosave on _MarkerHomeState {
   }
 
   String _saveStatusText() {
-    if (_path == null) return t('草稿 · 尚未保存到文件', 'Draft · Not saved to file');
+    if (_path == null) return _l10n.message(AppMessage.draftNotSavedToFile);
     final status = ref.read(autosaveProvider)[_workspace.active?.id];
     return switch (status) {
-      SaveStatus.saving => t('正在保存…', 'Saving…'),
-      SaveStatus.failed => t('保存失败 · 点击重试', 'Save failed · Retry'),
-      SaveStatus.conflict => t('磁盘内容已变更 · 点击处理', 'File changed · Resolve'),
-      SaveStatus.deleted => t('文件已删除', 'File deleted'),
-      _ => _dirty ? t('等待保存…', 'Pending save…') : t('已保存', 'Saved'),
+      SaveStatus.saving => _l10n.message(AppMessage.saving),
+      SaveStatus.failed => _l10n.message(AppMessage.saveFailedRetry),
+      SaveStatus.conflict => _l10n.message(AppMessage.fileChangedResolve),
+      SaveStatus.deleted => _l10n.message(AppMessage.fileDeleted),
+      _ =>
+        _dirty
+            ? _l10n.message(AppMessage.pendingSave)
+            : _l10n.message(AppMessage.saved),
     };
   }
 
   Future<bool> _resolveSaveConflict(String id) async {
     final choice = await _resourceChoice(
-      t('磁盘文件已被修改', 'File changed on disk'),
+      _l10n.message(AppMessage.fileChangedOnDisk),
       [
         (
           'load',
-          t('加载磁盘版本', 'Load disk version'),
+          _l10n.message(AppMessage.loadDiskVersion),
           CupertinoIcons.arrow_clockwise,
         ),
         (
           'mine',
-          t('使用我的版本覆盖', 'Overwrite with my version'),
+          _l10n.message(AppMessage.overwriteWithMyVersion),
           CupertinoIcons.square_arrow_down,
         ),
         ('copy', _l10n.saveAs, CupertinoIcons.doc_on_doc),
       ],
-      description: t(
-        '自动保存已暂停，你的编辑已保留在草稿中。',
-        'Autosave paused. Your edits are preserved as a draft.',
+      description: _l10n.message(
+        AppMessage.autosavePausedYourEditsArePreservedAsADraft,
       ),
     );
     if (!mounted || _workspace.active?.id != id) return false;

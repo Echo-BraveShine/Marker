@@ -18,6 +18,7 @@ void main() {
       'export panel shares app chrome and controls (${dark ? 'dark' : 'light'})',
       (tester) async {
         DocumentExportOptions? result;
+        String? sourceFormat;
         await tester.pumpWidget(
           ProviderScope(
             child: MaterialApp(
@@ -35,7 +36,11 @@ void main() {
                   onPressed: () async {
                     result = await showMarkerDialog<DocumentExportOptions>(
                       context: context,
-                      builder: (_) => const ExportOptionsPanel(zh: true),
+                      builder: (_) => ExportOptionsPanel(
+                        zh: true,
+                        mobile: true,
+                        onExportSource: (value) => sourceFormat = value,
+                      ),
                     );
                   },
                   child: const Text('Open'),
@@ -57,13 +62,24 @@ void main() {
         expect(find.text('图片宽度（px）'), findsOneWidget);
         await tester.tap(find.text('1600'));
         await tester.pumpAndSettle();
-        await tester.tap(find.byType(CupertinoSwitch));
+        await tester.tap(find.byType(CupertinoSwitch).first);
         await tester.pumpAndSettle();
         await tester.tap(find.text('导出'));
         await tester.pumpAndSettle();
         expect(result!.format, DocumentExportFormat.png);
         expect(result!.width, 1600);
         expect(result!.followTheme, isTrue);
+        await tester.tap(find.text('Open'));
+        await tester.pumpAndSettle();
+        expect(find.text('MD'), findsOneWidget);
+        await tester.tap(find.text('ZIP'));
+        await tester.pumpAndSettle();
+        expect(find.byType(CupertinoSwitch), findsNothing);
+        expect(find.text('图片宽度（px）'), findsNothing);
+        await tester.tap(find.text('导出'));
+        await tester.pumpAndSettle();
+        expect(sourceFormat, 'zip');
+
         expect(tester.takeException(), isNull);
       },
     );

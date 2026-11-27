@@ -2,302 +2,233 @@ part of '../app_localizations.dart';
 
 class StringsZh implements AppStrings {
   @override
-  String get title => 'Marker';
-
+  String get title => localizedMessage('zh', AppMessage.title);
   @override
-  String get recoveredUnsavedDoc => '已恢复未保存的文档';
-
+  String get recoveredUnsavedDoc =>
+      localizedMessage('zh', AppMessage.recoveredUnsavedDoc);
   @override
-  String get file => '文件';
-
+  String get file => localizedMessage('zh', AppMessage.file);
   @override
-  String get openFile => '打开文件';
-
+  String get openFile => localizedMessage('zh', AppMessage.openFile);
   @override
-  String get save => '保存';
-
+  String get save => localizedMessage('zh', AppMessage.save);
   @override
-  String get export => '导出';
-
+  String get export => localizedMessage('zh', AppMessage.export);
   @override
-  String get exportHtml => '导出 HTML';
-
+  String get exportHtml => localizedMessage('zh', AppMessage.exportHtml);
   @override
-  String get exportPdf => '导出 PDF';
-
+  String get exportPdf => localizedMessage('zh', AppMessage.exportPdf);
   @override
-  String get settings => '设置';
-
+  String get settings => localizedMessage('zh', AppMessage.settings);
   @override
-  String get theme => '主题';
-
+  String get theme => localizedMessage('zh', AppMessage.theme);
   @override
-  String get themeLight => '浅色';
-
+  String get themeLight => localizedMessage('zh', AppMessage.themeLight);
   @override
-  String get themeDark => '深色';
-
+  String get themeDark => localizedMessage('zh', AppMessage.themeDark);
   @override
-  String get themeSystem => '系统';
-
+  String get themeSystem => localizedMessage('zh', AppMessage.themeSystem);
   @override
-  String get fontSize => '字号';
-
+  String get fontSize => localizedMessage('zh', AppMessage.fontSize);
   @override
-  String get language => '语言';
-
+  String get language => localizedMessage('zh', AppMessage.language);
   @override
-  String get languageZh => '简体中文';
-
+  String get languageZh => localizedMessage('zh', AppMessage.languageZh);
   @override
-  String get languageEn => 'English';
-
+  String get languageEn => localizedMessage('zh', AppMessage.languageEn);
   @override
-  String get edit => '编辑';
-
+  String get edit => localizedMessage('zh', AppMessage.edit);
   @override
-  String get preview => '预览';
-
+  String get preview => localizedMessage('zh', AppMessage.preview);
   @override
-  String get split => '分屏';
-
+  String get split => localizedMessage('zh', AppMessage.split);
   @override
-  String get statusLine => '第 1 行，第 1 列';
-
-  // 文档操作
+  String get statusLine => localizedMessage('zh', AppMessage.statusLine);
   @override
-  String get closeDocument => '关闭文档';
-
+  String get closeDocument => localizedMessage('zh', AppMessage.closeDocument);
   @override
-  String get rename => '重命名…';
-
+  String get rename => localizedMessage('zh', AppMessage.rename);
   @override
-  String get moveToTrash => '移到废纸篓…';
-
+  String get moveToTrash => localizedMessage('zh', AppMessage.moveToTrash);
   @override
-  String get moveToTrashPrompt => '将文档移到废纸篓？';
-
+  String get moveToTrashPrompt =>
+      localizedMessage('zh', AppMessage.moveToTrashPrompt);
   @override
-  String get moveToTrashContent => '文档文件将移到废纸篓，关联图片会保留。未保存的编辑内容将关闭。';
-
+  String get moveToTrashContent =>
+      localizedMessage('zh', AppMessage.moveToTrashContent);
   @override
-  String get saveAs => '另存为';
-
+  String get saveAs => localizedMessage('zh', AppMessage.saveAs);
   @override
-  String get saveChanges => '保存更改？';
-
+  String get saveChanges => localizedMessage('zh', AppMessage.saveChanges);
   @override
-  String get discard => '不保存';
-
+  String get discard => localizedMessage('zh', AppMessage.discard);
   @override
-  String get pathConflict => '该路径已由另一个打开的文档使用，请选择其他路径。';
-
+  String get pathConflict => localizedMessage('zh', AppMessage.pathConflict);
   @override
-  String get saveCancelled => '已取消保存，文档内容已保留。';
-
+  String get saveCancelled => localizedMessage('zh', AppMessage.saveCancelled);
   @override
-  String get fileOperationFailed => '文件操作失败';
-
+  String get fileOperationFailed =>
+      localizedMessage('zh', AppMessage.fileOperationFailed);
   @override
-  String get unableToExport => '无法导出文档';
-
-  // 资源侧边栏
+  String get unableToExport =>
+      localizedMessage('zh', AppMessage.unableToExport);
   @override
-  String get importImages => '导入图片';
-
+  String get importImages => localizedMessage('zh', AppMessage.importImages);
   @override
-  String get stopRemainingWork => '停止后续处理';
-
+  String get stopRemainingWork =>
+      localizedMessage('zh', AppMessage.stopRemainingWork);
   @override
-  String get cannotReadImages => '无法读取图片，请检查目录权限。';
-
+  String get cannotReadImages =>
+      localizedMessage('zh', AppMessage.cannotReadImages);
   @override
-  String get importOrPasteImages => '导入图片或将截图粘贴到编辑区。\n原图会保留，资源目录按需创建。';
-
+  String get importOrPasteImages =>
+      localizedMessage('zh', AppMessage.importOrPasteImages);
   @override
-  String get customSyntaxUnchanged => '部分特殊语法保持原样';
-
+  String get customSyntaxUnchanged =>
+      localizedMessage('zh', AppMessage.customSyntaxUnchanged);
   @override
-  String get localImages => '本地图片';
-
+  String get localImages => localizedMessage('zh', AppMessage.localImages);
   @override
-  String get webImages => '网络图片';
-
+  String get webImages => localizedMessage('zh', AppMessage.webImages);
   @override
-  String get needsAttention => '需要处理';
-
+  String get needsAttention =>
+      localizedMessage('zh', AppMessage.needsAttention);
   @override
-  String get managed => '已管理';
-
+  String get managed => localizedMessage('zh', AppMessage.managed);
   @override
-  String get linkedUrl => '保留网址';
-
+  String get linkedUrl => localizedMessage('zh', AppMessage.linkedUrl);
   @override
-  String get clickToRepair => '点击修复';
-
-  // 导出选项
+  String get clickToRepair => localizedMessage('zh', AppMessage.clickToRepair);
   @override
-  String get exportFormat => '格式';
-
+  String get exportFormat => localizedMessage('zh', AppMessage.exportFormat);
   @override
-  String get exportA4Info => 'A4 自动分页，文字可选择与复制。包含公式、Mermaid 与图片。';
-
+  String get exportA4Info => localizedMessage('zh', AppMessage.exportA4Info);
   @override
-  String get useAppAppearance => '跟随应用深浅主题';
-
+  String get useAppAppearance =>
+      localizedMessage('zh', AppMessage.useAppAppearance);
   @override
-  String get imageWidth => '图片宽度（px）';
-
+  String get imageWidth => localizedMessage('zh', AppMessage.imageWidth);
   @override
-  String get selfContainedHtml => '独立 HTML，包含图片与图表，可离线查看。';
-
+  String get selfContainedHtml =>
+      localizedMessage('zh', AppMessage.selfContainedHtml);
   @override
-  String get exportButton => '导出';
-
-  // 关于设置
+  String get exportButton => localizedMessage('zh', AppMessage.export);
   @override
-  String get version => '版本';
-
+  String get version => localizedMessage('zh', AppMessage.version);
   @override
-  String get loadingVersion => '读取版本中…';
-
+  String get loadingVersion =>
+      localizedMessage('zh', AppMessage.loadingVersion);
   @override
-  String get unsavedDoc => '有未保存的内容';
-
+  String get unsavedDoc => localizedMessage('zh', AppMessage.unsavedDoc);
   @override
-  String get unsupportedLinkType => '不支持此链接类型';
-
+  String get unsupportedLinkType =>
+      localizedMessage('zh', AppMessage.unsupportedLinkType);
   @override
-  String get webImageLoadFailed => '网络图片加载失败';
-
+  String get webImageLoadFailed =>
+      localizedMessage('zh', AppMessage.webImageLoadFailed);
   @override
-  String get cannotAccessImage => '无法访问图片，请授权目录';
-
+  String get cannotAccessImage =>
+      localizedMessage('zh', AppMessage.cannotAccessImage);
   @override
-  String get imageNotFound => '图片未找到';
-
+  String get imageNotFound => localizedMessage('zh', AppMessage.imageNotFound);
   @override
-  String get locateImage => '重新定位图片';
-
+  String get locateImage => localizedMessage('zh', AppMessage.locateImage);
   @override
-  String get allowImageFolderAndRetry => '授权图片所在目录并重试';
-
+  String get allowImageFolderAndRetry =>
+      localizedMessage('zh', AppMessage.allowImageFolderAndRetry);
   @override
-  String get reloadImage => '重新加载图片';
-
+  String get reloadImage => localizedMessage('zh', AppMessage.reloadImage);
   @override
-  String get saveToResolveImages => '保存文档以解析相对路径图片';
-
+  String get saveToResolveImages =>
+      localizedMessage('zh', AppMessage.saveToResolveImages);
   @override
-  String get stop => '停止';
-
+  String get stop => localizedMessage('zh', AppMessage.stop);
   @override
-  String get toggleSidebar => '切换侧栏';
-
+  String get toggleSidebar => localizedMessage('zh', AppMessage.toggleSidebar);
   @override
-  String get resources => '资源';
-
+  String get resources => localizedMessage('zh', AppMessage.resources);
   @override
-  String get files => '文件';
-
+  String get files => localizedMessage('zh', AppMessage.files);
   @override
-  String get documents => '文档列表';
-
+  String get documents => localizedMessage('zh', AppMessage.documents);
   @override
-  String get documentResources => '文档资源';
-
+  String get documentResources =>
+      localizedMessage('zh', AppMessage.documentResources);
   @override
-  String get newDocument => '新建';
-
+  String get newDocument => localizedMessage('zh', AppMessage.newDocument);
   @override
-  String get openDocument => '打开';
-
+  String get openDocument => localizedMessage('zh', AppMessage.openDocument);
   @override
-  String get undo => '撤销';
-
+  String get undo => localizedMessage('zh', AppMessage.undo);
   @override
-  String get redo => '重做';
-
+  String get redo => localizedMessage('zh', AppMessage.redo);
   @override
-  String get findAndReplace => '搜索替换';
-
+  String get findAndReplace =>
+      localizedMessage('zh', AppMessage.findAndReplace);
   @override
-  String get textColor => '文字颜色';
-
+  String get textColor => localizedMessage('zh', AppMessage.textColor);
   @override
-  String get equationTemplates => '公式模板';
-
+  String get equationTemplates =>
+      localizedMessage('zh', AppMessage.equationTemplates);
   @override
-  String get mermaidTemplates => 'Mermaid 模板';
-
+  String get mermaidTemplates =>
+      localizedMessage('zh', AppMessage.mermaidTemplates);
   @override
-  String get allMarkdownSyntax => '全部 Markdown 语法';
-
+  String get allMarkdownSyntax =>
+      localizedMessage('zh', AppMessage.allMarkdownSyntax);
   @override
-  String get serifFont => '衬线字体';
-
+  String get serifFont => localizedMessage('zh', AppMessage.serifFont);
   @override
-  String get startWriting => '开始书写…';
-
+  String get startWriting => localizedMessage('zh', AppMessage.startWriting);
   @override
-  String get auto => '自动';
-
+  String get auto => localizedMessage('zh', AppMessage.auto);
   @override
-  String get lightTheme => '浅色';
-
+  String get lightTheme => localizedMessage('zh', AppMessage.themeLight);
   @override
-  String get darkTheme => '深色';
-
+  String get darkTheme => localizedMessage('zh', AppMessage.themeDark);
   @override
-  String get general => '通用';
-
+  String get general => localizedMessage('zh', AppMessage.general);
   @override
-  String get editorAndPreview => '编辑与预览';
-
+  String get editorAndPreview =>
+      localizedMessage('zh', AppMessage.editorAndPreview);
   @override
-  String get keyboardShortcuts => '快捷键';
-
+  String get keyboardShortcuts =>
+      localizedMessage('zh', AppMessage.keyboardShortcuts);
   @override
-  String get about => '关于';
-
+  String get about => localizedMessage('zh', AppMessage.about);
   @override
-  String get appearance => '外观';
-
+  String get appearance => localizedMessage('zh', AppMessage.appearance);
   @override
-  String get interfaceLanguage => '界面语言';
-
+  String get interfaceLanguage =>
+      localizedMessage('zh', AppMessage.interfaceLanguage);
   @override
-  String get versionUnavailable => '版本信息暂不可用';
-
+  String get versionUnavailable =>
+      localizedMessage('zh', AppMessage.versionUnavailable);
   @override
-  String get focusedMarkdown => '专注 Markdown 写作与即时预览。';
-
+  String get focusedMarkdown =>
+      localizedMessage('zh', AppMessage.focusedMarkdown);
   @override
-  String get checkForUpdates => '检查更新';
-
+  String get checkForUpdates =>
+      localizedMessage('zh', AppMessage.checkForUpdates);
   @override
-  String get versionAvailable => '发现新版本';
-
+  String get versionAvailable =>
+      localizedMessage('zh', AppMessage.versionAvailable);
   @override
-  String get requestLimited => '请求受限，请稍后重试。';
-
+  String get requestLimited =>
+      localizedMessage('zh', AppMessage.requestLimited);
   @override
-  String get cannotConnect => '无法连接，请检查网络后重试。';
-
+  String get cannotConnect => localizedMessage('zh', AppMessage.cannotConnect);
   @override
-  String get cannotReadVersion => '无法读取当前版本信息，请重试。';
-
+  String get cannotReadVersion =>
+      localizedMessage('zh', AppMessage.cannotReadVersion);
   @override
-  String get invalidReleaseInfo => '版本信息格式异常，请稍后重试。';
-
+  String get invalidReleaseInfo =>
+      localizedMessage('zh', AppMessage.invalidReleaseInfo);
   @override
-  String get checkFailed => '检查失败，请重试或查看发布页面。';
-
+  String get checkFailed => localizedMessage('zh', AppMessage.checkFailed);
   @override
-  String get viewAndDownload => '查看并下载';
-
+  String get viewAndDownload =>
+      localizedMessage('zh', AppMessage.viewAndDownload);
   @override
-  String get releases => '发布页面';
+  String get releases => localizedMessage('zh', AppMessage.releases);
 }
-
-/// 英文实现

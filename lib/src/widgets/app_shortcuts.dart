@@ -1,3 +1,4 @@
+import '../l10n/message_catalog.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
@@ -8,8 +9,7 @@ const resourcePackageExportEnabled = false;
 class AppShortcut {
   const AppShortcut(
     this.id,
-    this.zh,
-    this.en,
+    this.message,
     this.key, {
     this.shift = false,
     this.alt = false,
@@ -18,7 +18,11 @@ class AppShortcut {
     this.windowsKey,
     this.noWindowsControl = false,
   });
-  final String id, zh, en;
+  final String id;
+  final AppMessage message;
+  String get zh => localizedMessage('zh', message);
+  String get en => localizedMessage('en', message);
+  String labelFor(Object chinese) => messageForLanguage(chinese, message);
   final LogicalKeyboardKey key;
   final LogicalKeyboardKey? windowsKey;
   final bool shift, alt, native, noWindowsControl, primary;
@@ -56,105 +60,99 @@ class AppShortcut {
 const appShortcuts = [
   AppShortcut(
     'indent',
-    '缩进（编辑器内）',
-    'Indent (editor)',
+    AppMessage.indentEditor,
     LogicalKeyboardKey.tab,
     native: true,
     primary: false,
   ),
   AppShortcut(
     'outdent',
-    '反缩进（编辑器内）',
-    'Outdent (editor)',
+    AppMessage.outdentEditor,
     LogicalKeyboardKey.tab,
     native: true,
     primary: false,
     shift: true,
   ),
-  AppShortcut('new', '新建文档', 'New document', LogicalKeyboardKey.keyN),
-  AppShortcut('open', '打开文档', 'Open document', LogicalKeyboardKey.keyO),
-  AppShortcut('save', '保存', 'Save', LogicalKeyboardKey.keyS),
-  AppShortcut('saveAs', '另存为', 'Save as', LogicalKeyboardKey.keyS, shift: true),
+  AppShortcut('new', AppMessage.newDocument2, LogicalKeyboardKey.keyN),
+  AppShortcut('open', AppMessage.openDocument2, LogicalKeyboardKey.keyO),
+  AppShortcut('save', AppMessage.save, LogicalKeyboardKey.keyS),
+  AppShortcut(
+    'saveAs',
+    AppMessage.saveAs,
+    LogicalKeyboardKey.keyS,
+    shift: true,
+  ),
   if (documentExportEnabled)
     AppShortcut(
       'export',
-      '导出文档',
-      'Export document',
+      AppMessage.exportDocument,
       LogicalKeyboardKey.keyE,
       shift: true,
     ),
-  AppShortcut('close', '关闭当前文档', 'Close document', LogicalKeyboardKey.keyW),
-  AppShortcut('find', '查找', 'Find', LogicalKeyboardKey.keyF),
+  AppShortcut('close', AppMessage.closeDocument2, LogicalKeyboardKey.keyW),
+  AppShortcut('find', AppMessage.find, LogicalKeyboardKey.keyF),
   AppShortcut(
     'replace',
-    '查找与替换',
-    'Find and replace',
+    AppMessage.findAndReplace2,
     LogicalKeyboardKey.keyF,
     alt: true,
     windowsKey: LogicalKeyboardKey.keyH,
   ),
   AppShortcut(
     'next',
-    '下一个匹配',
-    'Next match',
+    AppMessage.nextMatch,
     LogicalKeyboardKey.keyG,
     windowsKey: LogicalKeyboardKey.f3,
     noWindowsControl: true,
   ),
   AppShortcut(
     'previous',
-    '上一个匹配',
-    'Previous match',
+    AppMessage.previousMatch,
     LogicalKeyboardKey.keyG,
     shift: true,
     windowsKey: LogicalKeyboardKey.f3,
     noWindowsControl: true,
   ),
-  AppShortcut('bold', '粗体', 'Bold', LogicalKeyboardKey.keyB),
-  AppShortcut('italic', '斜体', 'Italic', LogicalKeyboardKey.keyI),
-  AppShortcut('code', '行内代码', 'Inline code', LogicalKeyboardKey.keyE),
+  AppShortcut('bold', AppMessage.bold, LogicalKeyboardKey.keyB),
+  AppShortcut('italic', AppMessage.italic, LogicalKeyboardKey.keyI),
+  AppShortcut('code', AppMessage.inlineCode, LogicalKeyboardKey.keyE),
   AppShortcut(
     'strike',
-    '删除线',
-    'Strikethrough',
+    AppMessage.strikethrough,
     LogicalKeyboardKey.keyX,
     shift: true,
   ),
-  AppShortcut('editor', '编辑模式', 'Editor mode', LogicalKeyboardKey.digit1),
-  AppShortcut('split', '分屏模式', 'Split mode', LogicalKeyboardKey.digit2),
-  AppShortcut('preview', '预览模式', 'Preview mode', LogicalKeyboardKey.digit3),
+  AppShortcut('editor', AppMessage.editorMode, LogicalKeyboardKey.digit1),
+  AppShortcut('split', AppMessage.splitMode, LogicalKeyboardKey.digit2),
+  AppShortcut('preview', AppMessage.previewMode, LogicalKeyboardKey.digit3),
   AppShortcut(
     'sidebar',
-    '切换侧栏',
-    'Toggle sidebar',
+    AppMessage.toggleSidebar,
     LogicalKeyboardKey.keyB,
     shift: true,
   ),
   AppShortcut(
     'syntax',
-    '全部语法',
-    'All syntax',
+    AppMessage.allSyntax,
     LogicalKeyboardKey.keyM,
     shift: true,
   ),
-  AppShortcut('settings', '设置', 'Settings', LogicalKeyboardKey.comma),
-  AppShortcut('quit', '退出应用', 'Quit app', LogicalKeyboardKey.keyQ),
-  AppShortcut('undo', '撤销', 'Undo', LogicalKeyboardKey.keyZ, native: true),
+  AppShortcut('settings', AppMessage.settings, LogicalKeyboardKey.comma),
+  AppShortcut('quit', AppMessage.quitApp, LogicalKeyboardKey.keyQ),
+  AppShortcut('undo', AppMessage.undo, LogicalKeyboardKey.keyZ, native: true),
   AppShortcut(
     'redo',
-    '重做',
-    'Redo',
+    AppMessage.redo,
     LogicalKeyboardKey.keyZ,
     shift: true,
     native: true,
   ),
-  AppShortcut('cut', '剪切', 'Cut', LogicalKeyboardKey.keyX, native: true),
-  AppShortcut('copy', '复制', 'Copy', LogicalKeyboardKey.keyC, native: true),
-  AppShortcut('paste', '粘贴', 'Paste', LogicalKeyboardKey.keyV, native: true),
+  AppShortcut('cut', AppMessage.cut, LogicalKeyboardKey.keyX, native: true),
+  AppShortcut('copy', AppMessage.copy, LogicalKeyboardKey.keyC, native: true),
+  AppShortcut('paste', AppMessage.paste, LogicalKeyboardKey.keyV, native: true),
   AppShortcut(
     'selectAll',
-    '全选',
-    'Select all',
+    AppMessage.selectAll,
     LogicalKeyboardKey.keyA,
     native: true,
   ),

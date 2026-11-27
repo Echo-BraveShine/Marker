@@ -2,310 +2,233 @@ part of '../app_localizations.dart';
 
 class StringsEn implements AppStrings {
   @override
-  String get title => 'Marker';
-
+  String get title => localizedMessage('en', AppMessage.title);
   @override
-  String get recoveredUnsavedDoc => 'Recovered unsaved documents';
-
+  String get recoveredUnsavedDoc =>
+      localizedMessage('en', AppMessage.recoveredUnsavedDoc);
   @override
-  String get file => 'File';
-
+  String get file => localizedMessage('en', AppMessage.file);
   @override
-  String get openFile => 'Open File';
-
+  String get openFile => localizedMessage('en', AppMessage.openFile);
   @override
-  String get save => 'Save';
-
+  String get save => localizedMessage('en', AppMessage.save);
   @override
-  String get export => 'Export';
-
+  String get export => localizedMessage('en', AppMessage.export);
   @override
-  String get exportHtml => 'Export HTML';
-
+  String get exportHtml => localizedMessage('en', AppMessage.exportHtml);
   @override
-  String get exportPdf => 'Export PDF';
-
+  String get exportPdf => localizedMessage('en', AppMessage.exportPdf);
   @override
-  String get settings => 'Settings';
-
+  String get settings => localizedMessage('en', AppMessage.settings);
   @override
-  String get theme => 'Theme';
-
+  String get theme => localizedMessage('en', AppMessage.theme);
   @override
-  String get themeLight => 'Light';
-
+  String get themeLight => localizedMessage('en', AppMessage.themeLight);
   @override
-  String get themeDark => 'Dark';
-
+  String get themeDark => localizedMessage('en', AppMessage.themeDark);
   @override
-  String get themeSystem => 'System';
-
+  String get themeSystem => localizedMessage('en', AppMessage.themeSystem);
   @override
-  String get fontSize => 'characters';
-
+  String get fontSize => localizedMessage('en', AppMessage.fontSize);
   @override
-  String get language => 'Language';
-
+  String get language => localizedMessage('en', AppMessage.language);
   @override
-  String get languageZh => 'Chinese';
-
+  String get languageZh => localizedMessage('en', AppMessage.languageZh);
   @override
-  String get languageEn => 'English';
-
+  String get languageEn => localizedMessage('en', AppMessage.languageEn);
   @override
-  String get edit => 'Edit';
-
+  String get edit => localizedMessage('en', AppMessage.edit);
   @override
-  String get preview => 'Preview';
-
+  String get preview => localizedMessage('en', AppMessage.preview);
   @override
-  String get split => 'Split';
-
+  String get split => localizedMessage('en', AppMessage.split);
   @override
-  String get statusLine => 'Line 1, Column 1';
-
-  // 文档操作
+  String get statusLine => localizedMessage('en', AppMessage.statusLine);
   @override
-  String get closeDocument => 'Close document';
-
+  String get closeDocument => localizedMessage('en', AppMessage.closeDocument);
   @override
-  String get rename => 'Rename…';
-
+  String get rename => localizedMessage('en', AppMessage.rename);
   @override
-  String get moveToTrash => 'Move to Trash…';
-
+  String get moveToTrash => localizedMessage('en', AppMessage.moveToTrash);
   @override
-  String get moveToTrashPrompt => 'Move document to Trash?';
-
+  String get moveToTrashPrompt =>
+      localizedMessage('en', AppMessage.moveToTrashPrompt);
   @override
   String get moveToTrashContent =>
-      'The document moves to Trash; associated images are kept. Unsaved edits will be closed.';
-
+      localizedMessage('en', AppMessage.moveToTrashContent);
   @override
-  String get saveAs => 'Save as';
-
+  String get saveAs => localizedMessage('en', AppMessage.saveAs);
   @override
-  String get saveChanges => 'Save changes?';
-
+  String get saveChanges => localizedMessage('en', AppMessage.saveChanges);
   @override
-  String get discard => 'Discard';
-
+  String get discard => localizedMessage('en', AppMessage.discard);
   @override
-  String get pathConflict =>
-      'Another open document uses this path. Choose a different path.';
-
+  String get pathConflict => localizedMessage('en', AppMessage.pathConflict);
   @override
-  String get saveCancelled =>
-      'Save cancelled. Your document content is preserved.';
-
+  String get saveCancelled => localizedMessage('en', AppMessage.saveCancelled);
   @override
-  String get fileOperationFailed => 'File operation failed';
-
+  String get fileOperationFailed =>
+      localizedMessage('en', AppMessage.fileOperationFailed);
   @override
-  String get unableToExport => 'Unable to export document';
-
-  // 资源侧边栏
+  String get unableToExport =>
+      localizedMessage('en', AppMessage.unableToExport);
   @override
-  String get importImages => 'Import images';
-
+  String get importImages => localizedMessage('en', AppMessage.importImages);
   @override
-  String get stopRemainingWork => 'Stop remaining work';
-
+  String get stopRemainingWork =>
+      localizedMessage('en', AppMessage.stopRemainingWork);
   @override
-  String get cannotReadImages => 'Cannot read images. Check folder access.';
-
+  String get cannotReadImages =>
+      localizedMessage('en', AppMessage.cannotReadImages);
   @override
   String get importOrPasteImages =>
-      'Import images or paste a screenshot.\nOriginals are kept; the asset folder is created as needed.';
-
+      localizedMessage('en', AppMessage.importOrPasteImages);
   @override
-  String get customSyntaxUnchanged => 'Some custom syntax is left unchanged';
-
+  String get customSyntaxUnchanged =>
+      localizedMessage('en', AppMessage.customSyntaxUnchanged);
   @override
-  String get localImages => 'Local images';
-
+  String get localImages => localizedMessage('en', AppMessage.localImages);
   @override
-  String get webImages => 'Web images';
-
+  String get webImages => localizedMessage('en', AppMessage.webImages);
   @override
-  String get needsAttention => 'Needs attention';
-
+  String get needsAttention =>
+      localizedMessage('en', AppMessage.needsAttention);
   @override
-  String get managed => 'Managed';
-
+  String get managed => localizedMessage('en', AppMessage.managed);
   @override
-  String get linkedUrl => 'Linked URL';
-
+  String get linkedUrl => localizedMessage('en', AppMessage.linkedUrl);
   @override
-  String get clickToRepair => 'Click to repair';
-
-  // 导出选项
+  String get clickToRepair => localizedMessage('en', AppMessage.clickToRepair);
   @override
-  String get exportFormat => 'Format';
-
+  String get exportFormat => localizedMessage('en', AppMessage.exportFormat);
   @override
-  String get exportA4Info =>
-      'A4 pages with selectable, copyable text, including equations, Mermaid and images.';
-
+  String get exportA4Info => localizedMessage('en', AppMessage.exportA4Info);
   @override
-  String get useAppAppearance => 'Use app appearance';
-
+  String get useAppAppearance =>
+      localizedMessage('en', AppMessage.useAppAppearance);
   @override
-  String get imageWidth => 'Image width (px)';
-
+  String get imageWidth => localizedMessage('en', AppMessage.imageWidth);
   @override
   String get selfContainedHtml =>
-      'Self-contained HTML with embedded images and diagrams, available offline.';
-
+      localizedMessage('en', AppMessage.selfContainedHtml);
   @override
-  String get exportButton => 'Export';
-
-  // 关于设置
+  String get exportButton => localizedMessage('en', AppMessage.export);
   @override
-  String get version => 'Version';
-
+  String get version => localizedMessage('en', AppMessage.version);
   @override
-  String get loadingVersion => 'Loading version…';
-
+  String get loadingVersion =>
+      localizedMessage('en', AppMessage.loadingVersion);
   @override
-  String get unsavedDoc => 'This file is already open';
-
+  String get unsavedDoc => localizedMessage('en', AppMessage.unsavedDoc);
   @override
-  String get unsupportedLinkType => 'Unsupported link type';
-
+  String get unsupportedLinkType =>
+      localizedMessage('en', AppMessage.unsupportedLinkType);
   @override
-  String get webImageLoadFailed => 'Web image could not be loaded';
-
+  String get webImageLoadFailed =>
+      localizedMessage('en', AppMessage.webImageLoadFailed);
   @override
-  String get cannotAccessImage => 'Cannot access image; allow folder access';
-
+  String get cannotAccessImage =>
+      localizedMessage('en', AppMessage.cannotAccessImage);
   @override
-  String get imageNotFound => 'Image not found';
-
+  String get imageNotFound => localizedMessage('en', AppMessage.imageNotFound);
   @override
-  String get locateImage => 'Locate image';
-
+  String get locateImage => localizedMessage('en', AppMessage.locateImage);
   @override
-  String get allowImageFolderAndRetry => 'Allow image folder and retry';
-
+  String get allowImageFolderAndRetry =>
+      localizedMessage('en', AppMessage.allowImageFolderAndRetry);
   @override
-  String get reloadImage => 'Reload image';
-
+  String get reloadImage => localizedMessage('en', AppMessage.reloadImage);
   @override
   String get saveToResolveImages =>
-      'Save the document to resolve relative images';
-
+      localizedMessage('en', AppMessage.saveToResolveImages);
   @override
-  String get stop => 'Stop';
-
+  String get stop => localizedMessage('en', AppMessage.stop);
   @override
-  String get toggleSidebar => 'Toggle sidebar';
-
+  String get toggleSidebar => localizedMessage('en', AppMessage.toggleSidebar);
   @override
-  String get resources => 'Resources';
-
+  String get resources => localizedMessage('en', AppMessage.resources);
   @override
-  String get files => 'Files';
-
+  String get files => localizedMessage('en', AppMessage.files);
   @override
-  String get documents => 'Documents';
-
+  String get documents => localizedMessage('en', AppMessage.documents);
   @override
-  String get documentResources => 'Document resources';
-
+  String get documentResources =>
+      localizedMessage('en', AppMessage.documentResources);
   @override
-  String get newDocument => 'New';
-
+  String get newDocument => localizedMessage('en', AppMessage.newDocument);
   @override
-  String get openDocument => 'Open';
-
+  String get openDocument => localizedMessage('en', AppMessage.openDocument);
   @override
-  String get undo => 'Undo';
-
+  String get undo => localizedMessage('en', AppMessage.undo);
   @override
-  String get redo => 'Redo';
-
+  String get redo => localizedMessage('en', AppMessage.redo);
   @override
-  String get findAndReplace => 'Find and replace';
-
+  String get findAndReplace =>
+      localizedMessage('en', AppMessage.findAndReplace);
   @override
-  String get textColor => 'Text color';
-
+  String get textColor => localizedMessage('en', AppMessage.textColor);
   @override
-  String get equationTemplates => 'Equation templates';
-
+  String get equationTemplates =>
+      localizedMessage('en', AppMessage.equationTemplates);
   @override
-  String get mermaidTemplates => 'Mermaid templates';
-
+  String get mermaidTemplates =>
+      localizedMessage('en', AppMessage.mermaidTemplates);
   @override
-  String get allMarkdownSyntax => 'All Markdown syntax';
-
+  String get allMarkdownSyntax =>
+      localizedMessage('en', AppMessage.allMarkdownSyntax);
   @override
-  String get serifFont => 'Serif font';
-
+  String get serifFont => localizedMessage('en', AppMessage.serifFont);
   @override
-  String get startWriting => 'Start writing…';
-
+  String get startWriting => localizedMessage('en', AppMessage.startWriting);
   @override
-  String get auto => 'Auto';
-
+  String get auto => localizedMessage('en', AppMessage.auto);
   @override
-  String get lightTheme => 'Light';
-
+  String get lightTheme => localizedMessage('en', AppMessage.themeLight);
   @override
-  String get darkTheme => 'Dark';
-
+  String get darkTheme => localizedMessage('en', AppMessage.themeDark);
   @override
-  String get general => 'General';
-
+  String get general => localizedMessage('en', AppMessage.general);
   @override
-  String get editorAndPreview => 'Editor & preview';
-
+  String get editorAndPreview =>
+      localizedMessage('en', AppMessage.editorAndPreview);
   @override
-  String get keyboardShortcuts => 'Keyboard shortcuts';
-
+  String get keyboardShortcuts =>
+      localizedMessage('en', AppMessage.keyboardShortcuts);
   @override
-  String get about => 'About';
-
+  String get about => localizedMessage('en', AppMessage.about);
   @override
-  String get appearance => 'Appearance';
-
+  String get appearance => localizedMessage('en', AppMessage.appearance);
   @override
-  String get interfaceLanguage => 'Language';
-
+  String get interfaceLanguage =>
+      localizedMessage('en', AppMessage.interfaceLanguage);
   @override
-  String get versionUnavailable => 'Version unavailable';
-
+  String get versionUnavailable =>
+      localizedMessage('en', AppMessage.versionUnavailable);
   @override
-  String get focusedMarkdown => 'Focused Markdown writing and live preview.';
-
+  String get focusedMarkdown =>
+      localizedMessage('en', AppMessage.focusedMarkdown);
   @override
-  String get checkForUpdates => 'Check for updates';
-
+  String get checkForUpdates =>
+      localizedMessage('en', AppMessage.checkForUpdates);
   @override
-  String get versionAvailable => 'is available';
-
+  String get versionAvailable =>
+      localizedMessage('en', AppMessage.versionAvailable);
   @override
-  String get requestLimited => 'Request limited. Try again later.';
-
+  String get requestLimited =>
+      localizedMessage('en', AppMessage.requestLimited);
   @override
-  String get cannotConnect =>
-      'Cannot connect. Check your connection and retry.';
-
+  String get cannotConnect => localizedMessage('en', AppMessage.cannotConnect);
   @override
   String get cannotReadVersion =>
-      'Cannot read the installed version. Please retry.';
-
+      localizedMessage('en', AppMessage.cannotReadVersion);
   @override
   String get invalidReleaseInfo =>
-      'Invalid release information. Try again later.';
-
+      localizedMessage('en', AppMessage.invalidReleaseInfo);
   @override
-  String get checkFailed => 'Check failed. Retry or visit the releases page.';
-
+  String get checkFailed => localizedMessage('en', AppMessage.checkFailed);
   @override
-  String get viewAndDownload => 'View and download';
-
+  String get viewAndDownload =>
+      localizedMessage('en', AppMessage.viewAndDownload);
   @override
-  String get releases => 'Releases';
+  String get releases => localizedMessage('en', AppMessage.releases);
 }

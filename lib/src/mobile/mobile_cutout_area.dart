@@ -3,13 +3,23 @@ import 'dart:ui' show DisplayFeatureType;
 import 'package:flutter/widgets.dart';
 import 'package:flutter/services.dart';
 
-/// Only the central content avoids the camera; top/bottom controls use the edge.
+/// Content avoids the camera; corner controls also avoid rounded screen edges.
 class MobileCutoutArea extends StatefulWidget {
   const MobileCutoutArea({super.key, required this.child});
   final Widget child;
   static EdgeInsets insetsOf(BuildContext context) =>
       context.dependOnInheritedWidgetOfExactType<_CutoutInsets>()?.insets ??
       EdgeInsets.zero;
+  static EdgeInsets controlsOf(BuildContext context) {
+    final safe = MediaQuery.viewPaddingOf(context);
+    // The home surface already reserves 16 logical pixels at each outer edge.
+    return EdgeInsets.only(
+      left: math.max(insetsOf(context).left, math.max(0, safe.left - 16)),
+      right: math.max(insetsOf(context).right, math.max(0, safe.right - 16)),
+      bottom: safe.bottom,
+    );
+  }
+
   @override
   State<MobileCutoutArea> createState() => _MobileCutoutAreaState();
 }

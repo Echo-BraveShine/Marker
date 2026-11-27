@@ -2,7 +2,7 @@ name: marker
 description: "轻量级 Markdown 编辑预览工具"
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev.
 
-version: 0.0.9+1
+version: 0.1.0+1
 
 environment:
   sdk: ^3.12.2
@@ -60,6 +60,7 @@ dependencies:
 
   # Cupertino Icons
   cupertino_icons: ^2.0.0
+  cached_network_image: ^4.0.3
 
 dev_dependencies:
   flutter_test:
@@ -82,8 +83,18 @@ flutter:
     - assets/export/
     - assets/export/fonts/
     - assets/fonts/OFL-NotoSansSC.txt
+    - assets/fonts/OFL-NotoSansKR.txt
 
   fonts:
     - family: Marker Noto Sans SC
       fonts:
         - asset: assets/fonts/NotoSansSC.ttf
+    - family: Marker Noto Sans KR
+      fonts:
+        - asset: assets/fonts/NotoSansKR.ttf
+    - family: Marker Sans
+      fonts:
+        - asset: assets/fonts/MarkerSans-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/MarkerSans-Bold.ttf
+          weight: 700

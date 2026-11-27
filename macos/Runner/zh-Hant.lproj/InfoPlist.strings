@@ -1,0 +1,2 @@
+// System permission prompts follow the device/app language.
+"NSLocalNetworkUsageDescription" = "存取文件所引用的本機網路圖片與連結。";

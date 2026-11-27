@@ -9,17 +9,22 @@ extension _HomeSidebar on _MarkerHomeState {
   }) => Container(
     key: const Key('document-sidebar'),
     width:
-        (_sidebar ? ref.watch(themeProvider).sidebarWidth : 56) +
-        (_isMobile ? MobileCutoutArea.insetsOf(context).left : 0),
+        (_sidebar
+            ? (_isMobile ? 160.0 : ref.watch(themeProvider).sidebarWidth)
+            : (_isMobile ? 48.0 : 56.0)) +
+        (_isMobile ? MobileCutoutArea.controlsOf(context).left : 0),
     clipBehavior: Clip.hardEdge,
     decoration: BoxDecoration(color: c.bgSidebar),
     child: LayoutBuilder(
       builder: (context, constraints) {
-        final expanded = constraints.maxWidth >= 170;
+        final expanded = _sidebar;
         return Column(
           children: [
-            SizedBox(
+            Container(
               height: 44,
+              padding: EdgeInsets.only(
+                left: _isMobile ? MobileCutoutArea.controlsOf(context).left : 0,
+              ),
               child: Row(
                 children: [
                   Expanded(
@@ -89,6 +94,8 @@ extension _HomeSidebar on _MarkerHomeState {
                         onImport: () => _importPictures(),
                         onMenu: _resourceMenu,
                         onItem: _resourceItemMenu,
+                        onLocate: _locateResourceInEditor,
+                        onPreview: _previewResourceImage,
                       )
                     : ListView.builder(
                         padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -225,8 +232,13 @@ extension _HomeSidebar on _MarkerHomeState {
             ),
             CupertinoButton(
               key: const Key('sidebar-settings'),
-              minimumSize: const Size(44, 44),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              minimumSize: const Size(44, 24),
+              padding: EdgeInsets.only(
+                left:
+                    12 +
+                    (_isMobile ? MobileCutoutArea.controlsOf(context).left : 0),
+                right: 12,
+              ),
               alignment: Alignment.centerLeft,
               onPressed: _settings,
               child: Row(

@@ -4,6 +4,8 @@ import 'package:flutter/cupertino.dart';
 /// Every explicit UI style must retain the bundled Chinese fallback.
 abstract final class MarkerFonts {
   static const cjkFamily = 'Marker Noto Sans SC';
+  static const koreanFamily = 'Marker Noto Sans KR';
+  static const latinFamily = 'Marker Sans';
   static String get ui => switch (defaultTargetPlatform) {
     TargetPlatform.linux => cjkFamily,
     TargetPlatform.windows => 'Segoe UI',
@@ -26,9 +28,25 @@ abstract final class MarkerFonts {
   }
 
   static List<String> get fallback => switch (defaultTargetPlatform) {
-    TargetPlatform.linux => [cjkFamily, 'Noto Color Emoji'],
-    TargetPlatform.windows => [cjkFamily, 'Segoe UI Emoji'],
-    _ => ['PingFang SC', cjkFamily, 'Apple Color Emoji'],
+    TargetPlatform.linux => [
+      cjkFamily,
+      latinFamily,
+      koreanFamily,
+      'Noto Color Emoji',
+    ],
+    TargetPlatform.windows => [
+      cjkFamily,
+      latinFamily,
+      koreanFamily,
+      'Segoe UI Emoji',
+    ],
+    _ => [
+      'PingFang SC',
+      cjkFamily,
+      latinFamily,
+      koreanFamily,
+      'Apple Color Emoji',
+    ],
   };
   static String get monospace => switch (defaultTargetPlatform) {
     TargetPlatform.windows => 'Cascadia Code',

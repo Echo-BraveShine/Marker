@@ -1,3 +1,4 @@
+import '../l10n/message_catalog.dart';
 import 'marker_floating_surface.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart' show Theme;
@@ -17,7 +18,7 @@ class MarkdownSyntaxPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = Theme.of(context).extension<MarkerColors>()!;
-    final zh = Localizations.localeOf(context).languageCode == 'zh';
+    final zh = Localizations.localeOf(context).toLanguageTag();
     return MarkerFloatingSurface(
       key: const Key('syntax-floating-panel'),
       child: Column(
@@ -29,7 +30,10 @@ class MarkdownSyntaxPanel extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    zh ? 'Markdown 语法' : 'Markdown syntax',
+                    messageForLanguage(
+                      Localizations.localeOf(context).toLanguageTag(),
+                      AppMessage.markdownSyntax,
+                    ),
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: 14,
@@ -59,7 +63,10 @@ class MarkdownSyntaxPanel extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    zh ? '点击插入 · 可继续在左侧编辑' : 'Insert at cursor · Keep editing',
+                    messageForLanguage(
+                      zh,
+                      AppMessage.insertAtCursorKeepEditing,
+                    ),
                     style: TextStyle(fontSize: 11, color: c.textSecondary),
                   ),
                   for (final group in markdownCommandGroups.entries)

@@ -14,7 +14,7 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$SettingsState {
 
- ThemeMode get mode; Locale get locale; double get sidebarWidth; bool get highlightEnabled; EditorHighlightStyle get highlightStyle;
+ ThemeMode get mode; Locale get locale; bool get followSystemLanguage; double get sidebarWidth; bool get sidebarExpanded; bool get highlightEnabled; EditorHighlightStyle get highlightStyle;
 /// Create a copy of SettingsState
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -25,16 +25,16 @@ $SettingsStateCopyWith<SettingsState> get copyWith => _$SettingsStateCopyWithImp
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is SettingsState&&(identical(other.mode, mode) || other.mode == mode)&&(identical(other.locale, locale) || other.locale == locale)&&(identical(other.sidebarWidth, sidebarWidth) || other.sidebarWidth == sidebarWidth)&&(identical(other.highlightEnabled, highlightEnabled) || other.highlightEnabled == highlightEnabled)&&(identical(other.highlightStyle, highlightStyle) || other.highlightStyle == highlightStyle));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is SettingsState&&(identical(other.mode, mode) || other.mode == mode)&&(identical(other.locale, locale) || other.locale == locale)&&(identical(other.followSystemLanguage, followSystemLanguage) || other.followSystemLanguage == followSystemLanguage)&&(identical(other.sidebarWidth, sidebarWidth) || other.sidebarWidth == sidebarWidth)&&(identical(other.sidebarExpanded, sidebarExpanded) || other.sidebarExpanded == sidebarExpanded)&&(identical(other.highlightEnabled, highlightEnabled) || other.highlightEnabled == highlightEnabled)&&(identical(other.highlightStyle, highlightStyle) || other.highlightStyle == highlightStyle));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,mode,locale,sidebarWidth,highlightEnabled,highlightStyle);
+int get hashCode => Object.hash(runtimeType,mode,locale,followSystemLanguage,sidebarWidth,sidebarExpanded,highlightEnabled,highlightStyle);
 
 @override
 String toString() {
-  return 'SettingsState(mode: $mode, locale: $locale, sidebarWidth: $sidebarWidth, highlightEnabled: $highlightEnabled, highlightStyle: $highlightStyle)';
+  return 'SettingsState(mode: $mode, locale: $locale, followSystemLanguage: $followSystemLanguage, sidebarWidth: $sidebarWidth, sidebarExpanded: $sidebarExpanded, highlightEnabled: $highlightEnabled, highlightStyle: $highlightStyle)';
 }
 
 
@@ -45,7 +45,7 @@ abstract mixin class $SettingsStateCopyWith<$Res>  {
   factory $SettingsStateCopyWith(SettingsState value, $Res Function(SettingsState) _then) = _$SettingsStateCopyWithImpl;
 @useResult
 $Res call({
- ThemeMode mode, Locale locale, double sidebarWidth, bool highlightEnabled, EditorHighlightStyle highlightStyle
+ ThemeMode mode, Locale locale, bool followSystemLanguage, double sidebarWidth, bool sidebarExpanded, bool highlightEnabled, EditorHighlightStyle highlightStyle
 });
 
 
@@ -62,12 +62,14 @@ class _$SettingsStateCopyWithImpl<$Res>
 
 /// Create a copy of SettingsState
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? mode = null,Object? locale = null,Object? sidebarWidth = null,Object? highlightEnabled = null,Object? highlightStyle = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? mode = null,Object? locale = null,Object? followSystemLanguage = null,Object? sidebarWidth = null,Object? sidebarExpanded = null,Object? highlightEnabled = null,Object? highlightStyle = null,}) {
   return _then(_self.copyWith(
 mode: null == mode ? _self.mode : mode // ignore: cast_nullable_to_non_nullable
 as ThemeMode,locale: null == locale ? _self.locale : locale // ignore: cast_nullable_to_non_nullable
-as Locale,sidebarWidth: null == sidebarWidth ? _self.sidebarWidth : sidebarWidth // ignore: cast_nullable_to_non_nullable
-as double,highlightEnabled: null == highlightEnabled ? _self.highlightEnabled : highlightEnabled // ignore: cast_nullable_to_non_nullable
+as Locale,followSystemLanguage: null == followSystemLanguage ? _self.followSystemLanguage : followSystemLanguage // ignore: cast_nullable_to_non_nullable
+as bool,sidebarWidth: null == sidebarWidth ? _self.sidebarWidth : sidebarWidth // ignore: cast_nullable_to_non_nullable
+as double,sidebarExpanded: null == sidebarExpanded ? _self.sidebarExpanded : sidebarExpanded // ignore: cast_nullable_to_non_nullable
+as bool,highlightEnabled: null == highlightEnabled ? _self.highlightEnabled : highlightEnabled // ignore: cast_nullable_to_non_nullable
 as bool,highlightStyle: null == highlightStyle ? _self.highlightStyle : highlightStyle // ignore: cast_nullable_to_non_nullable
 as EditorHighlightStyle,
   ));
@@ -154,10 +156,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( ThemeMode mode,  Locale locale,  double sidebarWidth,  bool highlightEnabled,  EditorHighlightStyle highlightStyle)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( ThemeMode mode,  Locale locale,  bool followSystemLanguage,  double sidebarWidth,  bool sidebarExpanded,  bool highlightEnabled,  EditorHighlightStyle highlightStyle)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _SettingsState() when $default != null:
-return $default(_that.mode,_that.locale,_that.sidebarWidth,_that.highlightEnabled,_that.highlightStyle);case _:
+return $default(_that.mode,_that.locale,_that.followSystemLanguage,_that.sidebarWidth,_that.sidebarExpanded,_that.highlightEnabled,_that.highlightStyle);case _:
   return orElse();
 
 }
@@ -175,10 +177,10 @@ return $default(_that.mode,_that.locale,_that.sidebarWidth,_that.highlightEnable
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( ThemeMode mode,  Locale locale,  double sidebarWidth,  bool highlightEnabled,  EditorHighlightStyle highlightStyle)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( ThemeMode mode,  Locale locale,  bool followSystemLanguage,  double sidebarWidth,  bool sidebarExpanded,  bool highlightEnabled,  EditorHighlightStyle highlightStyle)  $default,) {final _that = this;
 switch (_that) {
 case _SettingsState():
-return $default(_that.mode,_that.locale,_that.sidebarWidth,_that.highlightEnabled,_that.highlightStyle);case _:
+return $default(_that.mode,_that.locale,_that.followSystemLanguage,_that.sidebarWidth,_that.sidebarExpanded,_that.highlightEnabled,_that.highlightStyle);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -195,10 +197,10 @@ return $default(_that.mode,_that.locale,_that.sidebarWidth,_that.highlightEnable
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( ThemeMode mode,  Locale locale,  double sidebarWidth,  bool highlightEnabled,  EditorHighlightStyle highlightStyle)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( ThemeMode mode,  Locale locale,  bool followSystemLanguage,  double sidebarWidth,  bool sidebarExpanded,  bool highlightEnabled,  EditorHighlightStyle highlightStyle)?  $default,) {final _that = this;
 switch (_that) {
 case _SettingsState() when $default != null:
-return $default(_that.mode,_that.locale,_that.sidebarWidth,_that.highlightEnabled,_that.highlightStyle);case _:
+return $default(_that.mode,_that.locale,_that.followSystemLanguage,_that.sidebarWidth,_that.sidebarExpanded,_that.highlightEnabled,_that.highlightStyle);case _:
   return null;
 
 }
@@ -210,12 +212,14 @@ return $default(_that.mode,_that.locale,_that.sidebarWidth,_that.highlightEnable
 
 
 class _SettingsState implements SettingsState {
-  const _SettingsState({this.mode = ThemeMode.system, this.locale = const Locale('zh', 'CN'), this.sidebarWidth = 220.0, this.highlightEnabled = false, this.highlightStyle = EditorHighlightStyle.classic});
+  const _SettingsState({this.mode = ThemeMode.system, this.locale = const Locale('zh', 'CN'), this.followSystemLanguage = true, this.sidebarWidth = 220.0, this.sidebarExpanded = true, this.highlightEnabled = false, this.highlightStyle = EditorHighlightStyle.classic});
   
 
 @override@JsonKey() final  ThemeMode mode;
 @override@JsonKey() final  Locale locale;
+@override@JsonKey() final  bool followSystemLanguage;
 @override@JsonKey() final  double sidebarWidth;
+@override@JsonKey() final  bool sidebarExpanded;
 @override@JsonKey() final  bool highlightEnabled;
 @override@JsonKey() final  EditorHighlightStyle highlightStyle;
 
@@ -229,16 +233,16 @@ _$SettingsStateCopyWith<_SettingsState> get copyWith => __$SettingsStateCopyWith
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _SettingsState&&(identical(other.mode, mode) || other.mode == mode)&&(identical(other.locale, locale) || other.locale == locale)&&(identical(other.sidebarWidth, sidebarWidth) || other.sidebarWidth == sidebarWidth)&&(identical(other.highlightEnabled, highlightEnabled) || other.highlightEnabled == highlightEnabled)&&(identical(other.highlightStyle, highlightStyle) || other.highlightStyle == highlightStyle));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _SettingsState&&(identical(other.mode, mode) || other.mode == mode)&&(identical(other.locale, locale) || other.locale == locale)&&(identical(other.followSystemLanguage, followSystemLanguage) || other.followSystemLanguage == followSystemLanguage)&&(identical(other.sidebarWidth, sidebarWidth) || other.sidebarWidth == sidebarWidth)&&(identical(other.sidebarExpanded, sidebarExpanded) || other.sidebarExpanded == sidebarExpanded)&&(identical(other.highlightEnabled, highlightEnabled) || other.highlightEnabled == highlightEnabled)&&(identical(other.highlightStyle, highlightStyle) || other.highlightStyle == highlightStyle));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,mode,locale,sidebarWidth,highlightEnabled,highlightStyle);
+int get hashCode => Object.hash(runtimeType,mode,locale,followSystemLanguage,sidebarWidth,sidebarExpanded,highlightEnabled,highlightStyle);
 
 @override
 String toString() {
-  return 'SettingsState(mode: $mode, locale: $locale, sidebarWidth: $sidebarWidth, highlightEnabled: $highlightEnabled, highlightStyle: $highlightStyle)';
+  return 'SettingsState(mode: $mode, locale: $locale, followSystemLanguage: $followSystemLanguage, sidebarWidth: $sidebarWidth, sidebarExpanded: $sidebarExpanded, highlightEnabled: $highlightEnabled, highlightStyle: $highlightStyle)';
 }
 
 
@@ -249,7 +253,7 @@ abstract mixin class _$SettingsStateCopyWith<$Res> implements $SettingsStateCopy
   factory _$SettingsStateCopyWith(_SettingsState value, $Res Function(_SettingsState) _then) = __$SettingsStateCopyWithImpl;
 @override @useResult
 $Res call({
- ThemeMode mode, Locale locale, double sidebarWidth, bool highlightEnabled, EditorHighlightStyle highlightStyle
+ ThemeMode mode, Locale locale, bool followSystemLanguage, double sidebarWidth, bool sidebarExpanded, bool highlightEnabled, EditorHighlightStyle highlightStyle
 });
 
 
@@ -266,12 +270,14 @@ class __$SettingsStateCopyWithImpl<$Res>
 
 /// Create a copy of SettingsState
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? mode = null,Object? locale = null,Object? sidebarWidth = null,Object? highlightEnabled = null,Object? highlightStyle = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? mode = null,Object? locale = null,Object? followSystemLanguage = null,Object? sidebarWidth = null,Object? sidebarExpanded = null,Object? highlightEnabled = null,Object? highlightStyle = null,}) {
   return _then(_SettingsState(
 mode: null == mode ? _self.mode : mode // ignore: cast_nullable_to_non_nullable
 as ThemeMode,locale: null == locale ? _self.locale : locale // ignore: cast_nullable_to_non_nullable
-as Locale,sidebarWidth: null == sidebarWidth ? _self.sidebarWidth : sidebarWidth // ignore: cast_nullable_to_non_nullable
-as double,highlightEnabled: null == highlightEnabled ? _self.highlightEnabled : highlightEnabled // ignore: cast_nullable_to_non_nullable
+as Locale,followSystemLanguage: null == followSystemLanguage ? _self.followSystemLanguage : followSystemLanguage // ignore: cast_nullable_to_non_nullable
+as bool,sidebarWidth: null == sidebarWidth ? _self.sidebarWidth : sidebarWidth // ignore: cast_nullable_to_non_nullable
+as double,sidebarExpanded: null == sidebarExpanded ? _self.sidebarExpanded : sidebarExpanded // ignore: cast_nullable_to_non_nullable
+as bool,highlightEnabled: null == highlightEnabled ? _self.highlightEnabled : highlightEnabled // ignore: cast_nullable_to_non_nullable
 as bool,highlightStyle: null == highlightStyle ? _self.highlightStyle : highlightStyle // ignore: cast_nullable_to_non_nullable
 as EditorHighlightStyle,
   ));

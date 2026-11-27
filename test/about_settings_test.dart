@@ -18,62 +18,66 @@ class _FakeReleaseClient extends GitHubReleaseClient {
 }
 
 void main() {
-  testWidgets(
-    'shows actual version and offers release downloads after checking',
-    (tester) async {
-      var exampleOpened = false;
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            packageInfoProvider.overrideWith(
-              (ref) async => PackageInfo(
-                appName: 'Marker',
-                packageName: 'dev.ekko.marker',
-                version: '1.0.0',
-                buildNumber: '7',
-              ),
+  testWidgets('shows version and example without donation or update controls', (
+    tester,
+  ) async {
+    var exampleOpened = false;
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          packageInfoProvider.overrideWith(
+            (ref) async => PackageInfo(
+              appName: 'Marker',
+              packageName: 'dev.ekko.marker',
+              version: '1.0.0',
+              buildNumber: '7',
             ),
-            releaseClientProvider.overrideWithValue(
-              _FakeReleaseClient(ReleaseStatus.available),
-            ),
+          ),
+          releaseClientProvider.overrideWithValue(
+            _FakeReleaseClient(ReleaseStatus.available),
+          ),
+        ],
+        child: MaterialApp(
+          locale: const Locale('zh', 'CN'),
+          supportedLocales: const [Locale('zh', 'CN'), Locale('en', 'US')],
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
           ],
-          child: MaterialApp(
-            locale: const Locale('zh', 'CN'),
-            supportedLocales: const [Locale('zh', 'CN'), Locale('en', 'US')],
-            localizationsDelegates: const [
-              AppLocalizations.delegate,
-              GlobalMaterialLocalizations.delegate,
-              GlobalWidgetsLocalizations.delegate,
-              GlobalCupertinoLocalizations.delegate,
-            ],
-            theme: MarkerAppTheme().light(),
-            home: Scaffold(
-              body: AboutSettings(
-                zh: true,
-                onOpenExample: () => exampleOpened = true,
-              ),
+          theme: MarkerAppTheme().light(),
+          home: Scaffold(
+            body: AboutSettings(
+              zh: true,
+              onOpenExample: () => exampleOpened = true,
             ),
           ),
         ),
-      );
-      await tester.pumpAndSettle();
-      expect(find.text('版本 1.0.0 (7)'), findsOneWidget);
-      expect(find.byKey(const Key('buy-coffee')), findsOneWidget);
-      expect(find.text('请我喝杯咖啡'), findsOneWidget);
-      expect(find.text('打开示例'), findsOneWidget);
-      final exampleRow = tester.getRect(find.byKey(const Key('open-example')));
-      await tester.tapAt(Offset(exampleRow.right - 20, exampleRow.center.dy));
-      expect(exampleOpened, isTrue);
-      await tester.tap(find.byKey(const Key('check-updates')));
-      await tester.pumpAndSettle();
-      expect(find.text('发现新版本 1.2.0'), findsOneWidget);
-      expect(find.byKey(const Key('download-update')), findsOneWidget);
-      expect(tester.takeException(), isNull);
-    },
-  );
-  testWidgets('no public release does not appear as an application failure', (
-    tester,
-  ) async {
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('版本 1.0.0'), findsOneWidget);
+    expect(find.textContaining('(7)'), findsNothing);
+    expect(find.text('GitHub'), findsNothing);
+    expect(find.byKey(const Key('about-app-info')), findsOneWidget);
+    expect(find.byKey(const Key('buy-coffee')), findsNothing);
+    expect(find.text('请我喝杯咖啡'), findsNothing);
+    expect(find.text('打开示例'), findsOneWidget);
+    final exampleRow = tester.getRect(find.byKey(const Key('open-example')));
+    await tester.tapAt(Offset(exampleRow.right - 20, exampleRow.center.dy));
+    expect(exampleOpened, isTrue);
+    for (final key in [
+      'check-updates',
+      'download-update',
+      'release-page',
+      'update-status',
+    ]) {
+      expect(find.byKey(Key(key)), findsNothing);
+    }
+    expect(tester.takeException(), isNull);
+  });
+  testWidgets('about does not expose release controls', (tester) async {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
@@ -104,9 +108,8 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('check-updates')));
-    await tester.pumpAndSettle();
-    expect(find.text('暂未找到公开发布版本。'), findsOneWidget);
+    expect(find.byKey(const Key('check-updates')), findsNothing);
+    expect(find.byKey(const Key('release-page')), findsNothing);
     expect(find.byKey(const Key('download-update')), findsNothing);
   });
 }

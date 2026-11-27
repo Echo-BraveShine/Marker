@@ -54,9 +54,8 @@ extension _ResourceImageOperations on DocumentResourceService {
     if (type == FileSystemEntityType.link ||
         (type != FileSystemEntityType.notFound &&
             type != FileSystemEntityType.directory)) {
-      throw const ResourceFailure(
-        '资源目录不可用，请选择其他保存位置。',
-        'The resource directory is not a regular directory.',
+      throw const ResourceFailure.localized(
+        AppMessage.theResourceDirectoryIsNotARegularDirectory,
       );
     }
   }
@@ -130,9 +129,8 @@ extension _ResourceImageOperations on DocumentResourceService {
         return _rememberDirectory(key, stat, candidate);
       }
     }
-    throw const ResourceFailure(
-      '找不到可用的资源目录名称。',
-      'No available resource directory name.',
+    throw const ResourceFailure.localized(
+      AppMessage.noAvailableResourceDirectoryName,
     );
   }
 
@@ -154,10 +152,7 @@ extension _ResourceImageOperations on DocumentResourceService {
         }
       }
     }
-    throw const ResourceFailure(
-      '图片重名过多，请更改名称。',
-      'Too many image name conflicts.',
-    );
+    throw const ResourceFailure.localized(AppMessage.tooManyImageNameConflicts);
   }
 
   String _format(Uint8List data) {
@@ -173,9 +168,8 @@ extension _ResourceImageOperations on DocumentResourceService {
         ascii.decode(data.sublist(8, 12)) == 'WEBP') {
       return '.webp';
     }
-    throw const ResourceFailure(
-      '图片损坏或格式不支持，请使用 PNG、JPEG、GIF、WebP 或 BMP。',
-      'Invalid image; use PNG, JPEG, GIF, WebP or BMP.',
+    throw const ResourceFailure.localized(
+      AppMessage.invalidImageUsePNGJPEGGIFWebPOrBMP,
     );
   }
 
@@ -186,15 +180,12 @@ extension _ResourceImageOperations on DocumentResourceService {
     } else {
       final file = File(input.path!);
       if (await file.length() > DocumentResourceService.maxImageBytes) {
-        throw const ResourceFailure(
-          '图片超过 50 MB，请先缩小图片。',
-          'Image exceeds 50 MB.',
-        );
+        throw const ResourceFailure.localized(AppMessage.imageExceeds50MB);
       }
       bytes = await file.readAsBytes();
     }
     if (bytes.length > DocumentResourceService.maxImageBytes) {
-      throw const ResourceFailure('图片超过 50 MB。', 'Image exceeds 50 MB.');
+      throw const ResourceFailure.localized(AppMessage.imageExceeds50MB2);
     }
     _format(bytes);
     await validateImage?.call(bytes);
@@ -271,9 +262,8 @@ extension _ResourceImageOperations on DocumentResourceService {
   Future<void> _serviceAtomicWrite(File target, String text) async {
     if (await FileSystemEntity.type(target.path, followLinks: false) ==
         FileSystemEntityType.link) {
-      throw const ResourceFailure(
-        '不能覆盖符号链接文件。',
-        'Cannot overwrite a symbolic link.',
+      throw const ResourceFailure.localized(
+        AppMessage.cannotOverwriteASymbolicLink2,
       );
     }
     final temporary = File('${target.path}.marker-${_token()}.tmp');
@@ -306,7 +296,7 @@ extension _ResourceImageOperations on DocumentResourceService {
         cancellation.check();
         if (!['http', 'https'].contains(uri.scheme) ||
             uri.userInfo.isNotEmpty) {
-          throw const ResourceFailure('图片地址不受支持。', 'Unsupported image URL.');
+          throw const ResourceFailure.localized(AppMessage.unsupportedImageURL);
         }
         final request = await client
             .getUrl(uri)
@@ -324,13 +314,12 @@ extension _ResourceImageOperations on DocumentResourceService {
           continue;
         }
         if (response.statusCode != 200) {
-          throw ResourceFailure(
-            '下载失败：HTTP ${response.statusCode}',
-            'Download failed: HTTP ${response.statusCode}',
-          );
+          throw ResourceFailure.localized(AppMessage.downloadFailedHTTPValue, {
+            "p0": response.statusCode,
+          });
         }
         if (response.contentLength > DocumentResourceService.maxImageBytes) {
-          throw const ResourceFailure('图片超过 50 MB。', 'Image exceeds 50 MB.');
+          throw const ResourceFailure.localized(AppMessage.imageExceeds50MB2);
         }
         final bytes = BytesBuilder(copy: false);
         await for (final chunk in response.timeout(
@@ -339,7 +328,7 @@ extension _ResourceImageOperations on DocumentResourceService {
           cancellation.check();
           if (bytes.length + chunk.length >
               DocumentResourceService.maxImageBytes) {
-            throw const ResourceFailure('图片超过 50 MB。', 'Image exceeds 50 MB.');
+            throw const ResourceFailure.localized(AppMessage.imageExceeds50MB2);
           }
           bytes.add(chunk);
         }
@@ -350,7 +339,7 @@ extension _ResourceImageOperations on DocumentResourceService {
           bytes: data,
         );
       }
-      throw const ResourceFailure('图片重定向次数过多。', 'Too many image redirects.');
+      throw const ResourceFailure.localized(AppMessage.tooManyImageRedirects);
     } catch (_) {
       cancellation.check();
       rethrow;

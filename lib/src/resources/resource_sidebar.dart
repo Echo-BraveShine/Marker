@@ -1,4 +1,5 @@
 import 'dart:io';
+import '../widgets/resource_network_image.dart';
 import 'package:flutter/cupertino.dart';
 export 'resource_text_dialog.dart';
 import 'package:flutter/material.dart' show Theme;
@@ -18,6 +19,8 @@ class ResourceSidebar extends ConsumerWidget {
     required this.onMenu,
     required this.onItem,
     this.mobile = false,
+    this.onLocate,
+    this.onPreview,
   });
   final String text;
   final String? path;
@@ -25,6 +28,7 @@ class ResourceSidebar extends ConsumerWidget {
   final bool mobile;
   final VoidCallback onImport, onMenu;
   final void Function(ResourceItem) onItem;
+  final void Function(ResourceItem)? onLocate, onPreview;
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
@@ -166,40 +170,71 @@ class ResourceSidebar extends ConsumerWidget {
                                 ? () => onItem(item)
                                 : null,
                             padding: const EdgeInsets.all(7),
-                            onPressed: work.busy ? null : () => onItem(item),
+                            onPressed: work.busy
+                                ? null
+                                : () => (onLocate ?? onItem)(item),
                             child: Row(
                               children: [
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(5),
-                                  child: SizedBox(
-                                    width: 34,
-                                    height: 34,
-                                    child:
-                                        item.availability ==
-                                            ResourceAvailability.local
-                                        ? Image.file(
-                                            File(item.path!),
-                                            key: ValueKey((
-                                              item.path,
-                                              work.revision,
-                                            )),
-                                            fit: BoxFit.cover,
-                                            cacheWidth: 96,
-                                            errorBuilder: (_, _, _) => Icon(
-                                              CupertinoIcons.photo,
-                                              color: c.textTertiary,
-                                              size: 22,
+                                GestureDetector(
+                                  onTap: work.busy
+                                      ? null
+                                      : () => (onPreview ?? onItem)(item),
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(5),
+                                    child: SizedBox(
+                                      width: 34,
+                                      height: 34,
+                                      child:
+                                          item.availability ==
+                                              ResourceAvailability.local
+                                          ? Image.file(
+                                              File(item.path!),
+                                              key: ValueKey((
+                                                item.path,
+                                                work.revision,
+                                              )),
+                                              fit: BoxFit.cover,
+                                              cacheWidth: 96,
+                                              errorBuilder: (_, _, _) => Icon(
+                                                CupertinoIcons.photo,
+                                                color: c.textTertiary,
+                                                size: 22,
+                                              ),
+                                            )
+                                          : status ==
+                                                ResourceAvailability.remote
+                                          ? ResourceNetworkImage(
+                                              key: ValueKey((
+                                                item.source,
+                                                work.revision,
+                                              )),
+                                              imageUrl: item.source,
+                                              width: 34,
+                                              height: 34,
+                                              fit: BoxFit.cover,
+                                              memCacheWidth: 96,
+                                              placeholder: (_, _) =>
+                                                  const CupertinoActivityIndicator(
+                                                    animating: false,
+                                                    radius: 7,
+                                                  ),
+                                              errorWidget: (_, _, _) => Icon(
+                                                CupertinoIcons.photo,
+                                                color: c.textTertiary,
+                                                size: 22,
+                                              ),
+                                            )
+                                          : Icon(
+                                              status ==
+                                                      ResourceAvailability
+                                                          .remote
+                                                  ? CupertinoIcons.link
+                                                  : CupertinoIcons
+                                                        .exclamationmark_triangle,
+                                              color: c.textSecondary,
+                                              size: 21,
                                             ),
-                                          )
-                                        : Icon(
-                                            status ==
-                                                    ResourceAvailability.remote
-                                                ? CupertinoIcons.link
-                                                : CupertinoIcons
-                                                      .exclamationmark_triangle,
-                                            color: c.textSecondary,
-                                            size: 21,
-                                          ),
+                                    ),
                                   ),
                                 ),
                                 const SizedBox(width: 7),
@@ -238,15 +273,19 @@ class ResourceSidebar extends ConsumerWidget {
                                     ],
                                   ),
                                 ),
-                                if (mobile)
-                                  Padding(
-                                    padding: const EdgeInsets.only(left: 6),
-                                    child: Icon(
-                                      CupertinoIcons.ellipsis,
-                                      size: 18,
-                                      color: c.textSecondary,
-                                    ),
+                                CupertinoButton(
+                                  key: ValueKey('resource-more-${item.source}'),
+                                  padding: const EdgeInsets.only(left: 6),
+                                  minimumSize: const Size(28, 34),
+                                  onPressed: work.busy
+                                      ? null
+                                      : () => onItem(item),
+                                  child: Icon(
+                                    CupertinoIcons.ellipsis,
+                                    size: 18,
+                                    color: c.textSecondary,
                                   ),
+                                ),
                               ],
                             ),
                           ),

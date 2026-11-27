@@ -30,9 +30,9 @@ flutter run -d macos
 | `lib/src/export/` | 导出选项、HTML 构建、网络图片内嵌及输出文件保护 |
 | `lib/src/widgets/` | 编辑器、预览、滚动联动、共用弹窗与设置组件 |
 | `lib/src/mobile/` | 移动文档存储、沙盒路径恢复、横屏缩放及安全区域 |
-| `lib/src/theme/`、`lib/src/l10n/` | 配色、字体、样式与中英文文案 |
+| `lib/src/theme/`、`lib/src/l10n/` | 配色、字体、样式与多语言文案 |
 | `ios/`、`android/`、`macos/`、`windows/`、`linux/` | 原生工程、系统集成与导出桥接 |
-| `assets/` | 品牌资源、中文字体、离线公式与 Mermaid 渲染资源 |
+| `assets/` | 品牌资源、中日韩及扩展拉丁字体、离线公式与 Mermaid 渲染资源 |
 | `test/`、`scripts/tests/` | Dart / Flutter 测试与 Python 发布工具回归测试 |
 | `.github/release/`、`.github/workflows/` | 平台打包、校验、发布与 Pages 部署 |
 | `website/` | 用户官网，静态 HTML / CSS / JavaScript |
@@ -96,6 +96,28 @@ flutter build ios --simulator --no-pub
 
 macOS 原生导出回归：`bash scripts/ci/test-macos-export.sh`；共享 Mermaid 资源与深浅中文图表回归：`bash scripts/ci/test-macos-mermaid.sh`。其他原生测试入口见 `scripts/ci/`，文件关联与窗口配置见 [DESKTOP_INTEGRATION.md](docs/DESKTOP_INTEGRATION.md)。
 
+## APP 国际化资源
+
+Flutter 界面的多语言文案统一位于 `lib/src/l10n/`：
+
+- `message_key.dart`：类型明确的文案标识 `AppMessage`。
+- `messages/`：14 种语言的实际文案，按语言及条目分片。
+- `message_catalog.dart`：集中加载、参数替换与错误信息本地化。
+- `app_localizations.dart`：Flutter 页面入口及支持语言列表。
+- `syntax_messages.dart`：Markdown 命令稳定标识与文案的映射；语法分隔符和示例文档内容不属于界面翻译。
+
+页面使用 `AppLocalizations.of(context).message(AppMessage.settings)`；无页面上下文的逻辑使用 `localizedMessage(languageCode, key, arguments)`。动态文案使用资源中的 `{p0}`、`{p1}` 等参数，同一条文案在所有语言中必须保持参数一致。不要在页面中新增中英文三元表达式或 `t('中文', 'English')`。
+
+APP 已支持英语、简体中文、繁体中文、日语、韩语、德语、法语、西班牙语、巴西葡萄牙语、意大利语、俄语、土耳其语、波兰语、印尼语。新安装默认跟随系统；手动选择使用完整语言标签持久化，旧的中英文偏好继续有效。界面语言使用原生名称展示，未知语言回退到英语。
+
+`app_language.dart` 统一登记语言标签、脚本、区域及原生名称。新增语言需在此登记、增加 `messages/` 对应文案分片并接入 `messageCatalogs`，同时补齐 Apple `InfoPlist.strings`、项目语言声明和 Android `locales_config.xml`。`zh-Hans`/`zh-Hant` 分开处理，`pt-BR` 不使用丢失区域信息的单独 `pt` 偏好。
+
+旧 getter 和 bool 语言参数保持兼容；生产界面使用完整 Locale 或语言标签，尚未切换到 ARB。Apple 系统权限说明也提供以上语言，安装器和网站仍维护独立资源。
+
+翻译初稿由本机 Claude 生成，已做条目、占位符、换行及五端 UI 变体检查；欢迎母语使用者改进术语与表达。原始 Markdown 示例及用户文档不会随界面语言自动翻译。
+
+验证：`flutter test test/localization_catalog_test.dart test/language_preferences_test.dart test/language_ui_test.dart test/native_language_resources_test.dart`，检查文案完整性、参数一致性和语法模板行为。
+
 ## CI 与发布
 
 | 工作流 | 触发与产物 |
@@ -109,4 +131,10 @@ Release 标签必须匹配 `pubspec.yaml` 的公开版本，发布前递增合�
 
 Android 发布依赖四项 Repository secrets：`ANDROID_KEYSTORE_BASE64`、`ANDROID_KEYSTORE_PASSWORD`、`ANDROID_KEY_ALIAS`、`ANDROID_KEY_PASSWORD`。CI 缺少固定签名配置时停止，不回退开发签名；本地未配置时可使用开发签名测试。密钥和密码不得提交仓库，后续版本保持签名一致。完整配置、签名现状及安全重跑策略见 [RELEASING.md](docs/RELEASING.md)。
 
-设置中的检查更新读取 GitHub 最新公开 Release，显示实际应用版本，提供下载页跳转，不自动安装更新。网站只展示实际存在的 Release 附件。网站维护方式见 [website/README.md](website/README.md)。
+设置中的关于页显示实际应用版本和示例文档入口，不提供捐赠或版本更新入口。网站只展示实际存在的 Release 附件。网站维护方式见 [website/README.md](website/README.md)。
+
+字体及商店分发授权清单见 [FONT_LICENSES.md](docs/FONT_LICENSES.md)。
+
+移动端编辑副本保存在应用 Documents 目录，不保留在文件选择器缓存中；顶部导出面板统一提供 PDF、PNG、HTML、MD 和 ZIP；其中 MD 分享当前 UTF-8 原始内容，ZIP 分享含本地图片的文档资源包。单独 MD 保留原始图片链接，不携带本地图片，网络图片仍需要联网。导出副本不改变应用内文档的保存位置。
+
+Microsoft Store 专用 MSIX：手动运行 `Windows Store MSIX` 工作流，操作与身份配置见 [MICROSOFT_STORE.md](docs/MICROSOFT_STORE.md)。该流程只构建商店包，不自动提交、发布，也不改变现有安装包。

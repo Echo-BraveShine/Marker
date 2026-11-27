@@ -1,4 +1,8 @@
+import 'src/widgets/settings_option_row.dart';
+import 'src/mobile/mobile_workbench_surface.dart';
+import 'dart:convert' show utf8;
 import 'package:desktop_drop/desktop_drop.dart';
+import 'src/widgets/resource_network_image.dart';
 import 'package:pasteboard/pasteboard.dart';
 import 'package:path/path.dart' as p;
 import 'src/resources/resource_service.dart';
@@ -7,6 +11,7 @@ import 'src/resources/resource_provider.dart';
 import 'src/resources/resource_sidebar.dart';
 import 'src/widgets/shortcut_settings.dart';
 import 'src/widgets/settings_scroll_frame.dart';
+import 'src/widgets/language_settings_panel.dart';
 import 'package:share_plus/share_plus.dart';
 import 'src/export/document_exporter.dart';
 import 'src/export/export_destination.dart';
@@ -72,6 +77,7 @@ import 'src/widgets/marker_markdown_style.dart';
 part 'src/resources/resource_actions.dart';
 part 'src/resources/resource_management_actions.dart';
 part 'src/resources/resource_import_actions.dart';
+part 'src/resources/resource_image_actions.dart';
 part 'src/home/home_toolbar.dart';
 part 'src/home/home_sidebar.dart';
 part 'src/home/home_preview.dart';
@@ -177,8 +183,10 @@ class MarkerApp extends ConsumerWidget {
       theme: MarkerAppTheme().light(),
       darkTheme: MarkerAppTheme().dark(),
       themeMode: vm.mode,
-      locale: vm.locale,
-      supportedLocales: const [Locale('zh', 'CN'), Locale('en', 'US')],
+      locale: vm.followSystemLanguage ? null : vm.locale,
+      localeListResolutionCallback: (locales, _) =>
+          AppLocalizations.resolveLocales(locales),
+      supportedLocales: AppLocalizations.supportedLocales,
       localizationsDelegates: const [
         AppLocalizations.delegate,
         GlobalMaterialLocalizations.delegate,

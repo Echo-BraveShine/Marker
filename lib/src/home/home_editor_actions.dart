@@ -200,9 +200,9 @@ extension _HomeEditorActions on _MarkerHomeState {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                t(
-                  '选择模板插入；有选区时使用所选内容，可继续编辑。',
-                  'Choose a template to insert. Selected text replaces the sample.',
+                _l10n.message(
+                  AppMessage
+                      .chooseATemplateToInsertSelectedTextReplacesTheSample,
                 ),
                 style: TextStyle(fontSize: 12, color: c.textSecondary),
               ),
@@ -229,7 +229,7 @@ extension _HomeEditorActions on _MarkerHomeState {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              _zh ? item.label : item.englishLabel,
+                              item.labelFor(_languageTag),
                               style: TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,

@@ -20,25 +20,10 @@ extension _HomeSettings on _MarkerHomeState {
             _l10n.about,
           ];
           Widget row(IconData icon, String title, Widget control) =>
-              ConstrainedBox(
-                constraints: const BoxConstraints(
-                  minHeight: MarkerStyle.settingsRowHeight,
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(icon, size: 16, color: c.textSecondary),
-                      const SizedBox(width: 8),
-                      Expanded(child: Text(title, style: MarkerStyle.body)),
-                      const SizedBox(width: 12),
-                      control,
-                    ],
-                  ),
-                ),
+              SettingsOptionRow(
+                leading: Icon(icon, size: 16, color: c.textSecondary),
+                title: title,
+                control: control,
               );
           Widget group(String title, List<Widget> rows) => Padding(
             padding: const EdgeInsets.only(bottom: 12),
@@ -85,7 +70,7 @@ extension _HomeSettings on _MarkerHomeState {
               children: [
                 const MarkerLogo(),
                 const SizedBox(width: 8),
-                Text(t('设置', 'Settings')),
+                Text(_l10n.message(AppMessage.settings)),
               ],
             ),
             width: 860,
@@ -171,7 +156,7 @@ extension _HomeSettings on _MarkerHomeState {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               if (page == 0) ...[
-                                group(t('外观', 'Appearance'), [
+                                group(_l10n.message(AppMessage.appearance), [
                                   row(
                                     CupertinoIcons.circle_lefthalf_fill,
                                     _l10n.theme,
@@ -216,79 +201,114 @@ extension _HomeSettings on _MarkerHomeState {
                                     ),
                                   ),
                                 ]),
-                                group(t('语言', 'Language'), [
+                                group(_l10n.message(AppMessage.language), [
                                   row(
                                     CupertinoIcons.globe,
                                     _l10n.interfaceLanguage,
                                     SizedBox(
                                       width: 224,
-                                      child:
-                                          CupertinoSlidingSegmentedControl<
-                                            String
-                                          >(
-                                            key: const Key('settings-language'),
-                                            groupValue:
-                                                settings.locale.languageCode,
-                                            children: const {
-                                              'zh': Text(
-                                                '简体中文',
-                                                style: TextStyle(fontSize: 12),
-                                              ),
-                                              'en': Text(
-                                                'English',
-                                                style: TextStyle(fontSize: 12),
-                                              ),
-                                            },
-                                            onValueChanged: (v) {
-                                              if (v != null) {
-                                                ref
-                                                    .read(
-                                                      themeProvider.notifier,
-                                                    )
-                                                    .setLocale(
-                                                      Locale(
-                                                        v,
-                                                        v == 'zh' ? 'CN' : 'US',
+                                      child: CupertinoButton(
+                                        key: const Key('settings-language'),
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 8,
+                                        ),
+                                        minimumSize: const Size(0, 34),
+                                        onPressed: () async {
+                                          final selected =
+                                              await showMarkerDialog<String>(
+                                                context: context,
+                                                builder: (_) => LanguageSettingsPanel(
+                                                  selected:
+                                                      settings
+                                                          .followSystemLanguage
+                                                      ? 'system'
+                                                      : AppLocalizations.languageTagForLocale(
+                                                          settings.locale,
+                                                        ),
+                                                ),
+                                              );
+                                          if (selected == null || !mounted) {
+                                            return;
+                                          }
+                                          await ref
+                                              .read(themeProvider.notifier)
+                                              .setLocale(
+                                                selected == 'system'
+                                                    ? null
+                                                    : AppLocalizations.localeForLanguage(
+                                                        selected,
                                                       ),
-                                                    );
-                                              }
-                                            },
-                                          ),
+                                              );
+                                        },
+                                        child: Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.end,
+                                          children: [
+                                            Flexible(
+                                              child: Text(
+                                                settings.followSystemLanguage
+                                                    ? _l10n.message(
+                                                        AppMessage
+                                                            .followSystemLanguage,
+                                                      )
+                                                    : _l10n.languageName(
+                                                        AppLocalizations.languageTagForLocale(
+                                                          settings.locale,
+                                                        ),
+                                                      ),
+                                                overflow: TextOverflow.ellipsis,
+                                                style: const TextStyle(
+                                                  fontSize: 12,
+                                                ),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Icon(
+                                              CupertinoIcons.chevron_down,
+                                              size: 12,
+                                              color: c.textSecondary,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
                                     ),
                                   ),
                                 ]),
                               ] else if (page == 1) ...[
-                                group(t('语法高亮', 'Syntax highlighting'), [
-                                  row(
-                                    CupertinoIcons.textformat,
-                                    _l10n.fontSize,
-                                    CupertinoSwitch(
-                                      key: const Key(
-                                        'settings-highlight-enabled',
-                                      ),
-                                      value: settings.highlightEnabled,
-                                      onChanged: (value) => ref
-                                          .read(themeProvider.notifier)
-                                          .setHighlightEnabled(value),
-                                    ),
-                                  ),
-                                  if (settings.highlightEnabled)
-                                    Padding(
-                                      padding: const EdgeInsets.all(12),
-                                      child: HighlightStylePicker(
+                                group(
+                                  _l10n.message(AppMessage.syntaxHighlighting),
+                                  [
+                                    row(
+                                      CupertinoIcons.textformat,
+                                      _l10n.fontSize,
+                                      CupertinoSwitch(
                                         key: const Key(
-                                          'settings-highlight-style',
+                                          'settings-highlight-enabled',
                                         ),
-                                        selected: settings.highlightStyle,
-                                        colors: c,
-                                        zh: _zh,
+                                        value: settings.highlightEnabled,
                                         onChanged: (value) => ref
                                             .read(themeProvider.notifier)
-                                            .setHighlightStyle(value),
+                                            .setHighlightEnabled(value),
                                       ),
                                     ),
-                                ]),
-                                group(t('编辑器', 'Editor'), [
+                                    if (settings.highlightEnabled)
+                                      Padding(
+                                        padding: const EdgeInsets.all(12),
+                                        child: HighlightStylePicker(
+                                          key: const Key(
+                                            'settings-highlight-style',
+                                          ),
+                                          selected: settings.highlightStyle,
+                                          colors: c,
+                                          zh: _zh,
+                                          onChanged: (value) => ref
+                                              .read(themeProvider.notifier)
+                                              .setHighlightStyle(value),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                                group(_l10n.message(AppMessage.editor), [
                                   row(
                                     CupertinoIcons.textformat_size,
                                     _l10n.fontSize,

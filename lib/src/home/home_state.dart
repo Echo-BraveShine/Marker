@@ -27,11 +27,10 @@ class _MarkerHomeState extends ConsumerState<MarkerHome>
       .read(editorProvider.notifier)
       .update((s) => s.copyWith(restoring: value));
 
-  bool get _sidebar => ref.read(editorProvider).sidebar;
+  bool get _sidebar => ref.read(themeProvider).sidebarExpanded;
 
-  set _sidebar(bool value) => ref
-      .read(editorProvider.notifier)
-      .update((s) => s.copyWith(sidebar: value));
+  set _sidebar(bool value) =>
+      unawaited(ref.read(themeProvider.notifier).setSidebarExpanded(value));
 
   String? _lastDraftText;
 
@@ -73,6 +72,7 @@ class _MarkerHomeState extends ConsumerState<MarkerHome>
   final _previewScroll = ScrollController();
 
   final _undo = UndoHistoryController();
+  final _editorMountKey = GlobalKey();
 
   final _previewAnchors = MarkdownScrollAnchors();
   late final LinkedScroll _linkedScroll;
@@ -121,14 +121,13 @@ class _MarkerHomeState extends ConsumerState<MarkerHome>
   bool get _isMobile => mobileWindow;
 
   bool get _zh => _l10n.locale.languageCode == 'zh';
+  String get _languageTag => _l10n.languageTag;
 
   bool get _dirty => _controller.text != _saved;
 
   String get _name => _path?.split(RegExp(r'[/\\]')).last ?? 'Untitled.md';
 
   AppLocalizations get _l10n => AppLocalizations.of(context);
-
-  String t(String zh, String en) => _l10n.locale.languageCode == 'zh' ? zh : en;
 
   @override
   void initState() {
@@ -287,7 +286,7 @@ class _MarkerHomeState extends ConsumerState<MarkerHome>
       if (mounted &&
           ref.read(workspaceProvider).documents.any((d) => d.dirty)) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) _toast(t('已恢复未保存的草稿。', 'Unsaved drafts restored.'));
+          if (mounted) _toast(_l10n.message(AppMessage.unsavedDraftsRestored));
         });
       }
     } catch (e) {

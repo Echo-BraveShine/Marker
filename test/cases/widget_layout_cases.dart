@@ -189,7 +189,7 @@ void _registerWidgetLayoutCases() {
       tester
           .widget<CupertinoTextField>(find.byKey(const Key('editor')))
           .padding,
-      const EdgeInsets.fromLTRB(4, 10, 4, 10),
+      const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
     );
     await tester.tap(
       find.descendant(

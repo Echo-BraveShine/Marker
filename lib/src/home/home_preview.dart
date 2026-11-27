@@ -114,14 +114,14 @@ extension _HomePreview on _MarkerHomeState {
                     'mailto',
                     'file',
                   ].contains(uri.scheme)) {
-                    _toast(t('不支持此链接类型', 'Unsupported link type'));
+                    _toast(_l10n.message(AppMessage.unsupportedLinkType));
                     return;
                   }
                   if (!await launchUrl(
                     uri,
                     mode: LaunchMode.externalApplication,
                   )) {
-                    throw StateError('无法打开链接');
+                    throw LocalizedMessageError(AppMessage.cannotOpenLink);
                   }
                 } catch (e) {
                   _error(e);
@@ -145,17 +145,13 @@ extension _HomePreview on _MarkerHomeState {
                         13,
                         if (Platform.isWindows) 5,
                       ].contains(error.osError?.errorCode)) {
-                    reason = t(
-                      '无法访问图片，请授权目录',
-                      'Cannot access image; allow folder access',
-                    );
+                    reason = _l10n.message(AppMessage.cannotAccessImage);
                   } else if (error is FileSystemException &&
                       [2, 3].contains(error.osError?.errorCode)) {
                     reason = _l10n.imageNotFound;
                   } else {
-                    reason = t(
-                      '无法解析图片，请检查格式或文件是否损坏',
-                      'Cannot decode image; check its format or integrity',
+                    reason = _l10n.message(
+                      AppMessage.cannotDecodeImageCheckItsFormatOrIntegrity,
                     );
                   }
                   return Text(
@@ -165,67 +161,70 @@ extension _HomePreview on _MarkerHomeState {
                 }
 
                 if (resolved.scheme == 'file') {
-                  return Image.file(
-                    File.fromUri(resolved),
-                    key: ValueKey((resolved.toString(), _imageEpoch, config)),
-                    width: config.width,
-                    height: config.height,
-                    errorBuilder: (context, error, stack) => Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        failure(context, error, stack),
-                        CupertinoButton(
-                          minimumSize: const Size(0, 28),
-                          onPressed: () =>
-                              _action(() => _relocateResource(uri.toString())),
-                          child: Text(t('重新定位图片', 'Locate image')),
-                        ),
-                        CupertinoButton(
-                          onPressed: () => _action(() async {
-                            await _authorizeResourceFolder(
-                              p.dirname(File.fromUri(resolved).path),
-                            );
-                            await FileImage(File.fromUri(resolved)).evict();
-                            _imageEpoch++;
-                          }),
-                          child: Text(_l10n.allowImageFolderAndRetry),
-                        ),
-                      ],
+                  return _resourcePreviewTarget(
+                    Image.file(
+                      File.fromUri(resolved),
+                      key: ValueKey((resolved.toString(), _imageEpoch, config)),
+                      width: config.width,
+                      height: config.height,
+                      errorBuilder: (context, error, stack) => Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          failure(context, error, stack),
+                          CupertinoButton(
+                            minimumSize: const Size(0, 28),
+                            onPressed: () => _action(
+                              () => _relocateResource(uri.toString()),
+                            ),
+                            child: Text(_l10n.message(AppMessage.locateImage)),
+                          ),
+                          CupertinoButton(
+                            onPressed: () => _action(() async {
+                              await _authorizeResourceFolder(
+                                p.dirname(File.fromUri(resolved).path),
+                              );
+                              await FileImage(File.fromUri(resolved)).evict();
+                              _imageEpoch++;
+                            }),
+                            child: Text(_l10n.allowImageFolderAndRetry),
+                          ),
+                        ],
+                      ),
                     ),
+                    uri,
+                    alt,
                   );
                 }
                 if (['http', 'https'].contains(resolved.scheme)) {
-                  return Image.network(
-                    resolved.toString(),
-                    key: ValueKey((resolved.toString(), _imageEpoch, config)),
-                    errorBuilder: (context, error, stack) => Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        failure(context, error, stack),
-                        CupertinoButton(
-                          minimumSize: const Size(0, 28),
-                          onPressed: () async {
-                            await NetworkImage(resolved.toString()).evict();
-                            _imageEpoch++;
-                            _previewSignature = null;
-                            _resourceWork.refresh();
-                          },
-                          child: Text(t('重新加载图片', 'Reload image')),
-                        ),
-                      ],
+                  return _resourcePreviewTarget(
+                    ResourceNetworkImage(
+                      imageUrl: resolved.toString(),
+                      key: ValueKey((resolved.toString(), _imageEpoch, config)),
+                      retryBuilder: (context, url, error, retry) => Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          failure(context, error, null),
+                          CupertinoButton(
+                            minimumSize: const Size(0, 28),
+                            onPressed: retry,
+                            child: Text(_l10n.message(AppMessage.reloadImage)),
+                          ),
+                        ],
+                      ),
                     ),
+                    uri,
+                    alt,
                   );
                 }
                 return Text(
-                  t(
-                    '请先保存文档以加载相对路径图片',
-                    'Save the document to resolve relative images',
+                  _l10n.message(
+                    AppMessage.saveTheDocumentToResolveRelativeImages,
                   ),
                 );
               },
               data: _controller.text,
               selectable: true,
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+              padding: MarkerStyle.documentPadding,
               styleSheet: MarkerMarkdownStyle.build(context).copyWith(
                 p: TextStyle(
                   fontFamily: _serif ? 'New York' : MarkerFonts.ui,

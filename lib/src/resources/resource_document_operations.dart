@@ -16,11 +16,7 @@ extension _ResourceDocumentOperations on DocumentResourceService {
         issues = <ResourceIssue>[];
     issues.addAll(
       refs.unsupported.map(
-        (s) => ResourceIssue(
-          s,
-          'Unsupported syntax; left unchanged.',
-          chinese: '特殊语法保持原样。',
-        ),
+        (s) => ResourceIssue.localized(s, AppMessage.unsupportedSyntaxKept),
       ),
     );
     for (var i = 0; i < sources.length; i++) {
@@ -43,11 +39,13 @@ extension _ResourceDocumentOperations on DocumentResourceService {
         } else if (uri.scheme == 'file') {
           final file = File.fromUri(uri);
           if (!await file.exists()) {
-            throw const ResourceFailure('图片未找到', 'Image not found');
+            throw const ResourceFailure.localized(AppMessage.imageNotFound);
           }
           input = ResourceInput(name: p.basename(file.path), path: file.path);
         } else {
-          throw const ResourceFailure('图片地址不受支持', 'Unsupported image address');
+          throw const ResourceFailure.localized(
+            AppMessage.unsupportedImageAddress,
+          );
         }
         final image = await importImage(documentPath, input);
         images.add(image);
@@ -57,11 +55,12 @@ extension _ResourceDocumentOperations on DocumentResourceService {
         rethrow;
       } catch (e) {
         issues.add(
-          ResourceIssue(
-            source,
-            e is ResourceFailure ? e.en : 'Cannot read or copy this image.',
-            chinese: e is ResourceFailure ? e.zh : '无法读取或复制图片，请检查权限和剩余空间。',
-          ),
+          e is ResourceFailure && e._message != null
+              ? ResourceIssue.localized(source, e._message, e._arguments)
+              : ResourceIssue.localized(
+                  source,
+                  AppMessage.cannotReadOrCopyImage,
+                ),
         );
       }
     }
@@ -131,24 +130,21 @@ extension _ResourceDocumentOperations on DocumentResourceService {
   }) async {
     if (p.dirname(p.absolute(sourcePath)) !=
         p.dirname(p.absolute(targetPath))) {
-      throw const ResourceFailure(
-        '重命名只能在当前目录进行，请使用另存为移动文档。',
-        'Use Save As to move the document to another folder.',
+      throw const ResourceFailure.localized(
+        AppMessage.useSaveAsToMoveTheDocumentToAnotherFolder,
       );
     }
     if (sourcePath == targetPath) return text;
     if (await FileSystemEntity.type(targetPath, followLinks: false) !=
         FileSystemEntityType.notFound) {
-      throw const ResourceFailure(
-        '同名文件已存在，请换一个名称。',
-        'A file with this name already exists.',
+      throw const ResourceFailure.localized(
+        AppMessage.aFileWithThisNameAlreadyExists,
       );
     }
     if (await FileSystemEntity.type(sourcePath, followLinks: false) !=
         FileSystemEntityType.file) {
-      throw const ResourceFailure(
-        '原文档不可访问，未执行重命名。',
-        'The source document is unavailable.',
+      throw const ResourceFailure.localized(
+        AppMessage.theSourceDocumentIsUnavailable,
       );
     }
     final parent = p.dirname(p.absolute(sourcePath));
@@ -183,9 +179,8 @@ extension _ResourceDocumentOperations on DocumentResourceService {
       if (!p.equals(owned[i].directory.path, destination.path) &&
           await FileSystemEntity.type(destination.path, followLinks: false) !=
               FileSystemEntityType.notFound) {
-        throw const ResourceFailure(
-          '同名资源目录已存在，未执行重命名。',
-          'An asset folder with the new name already exists. Nothing was renamed.',
+        throw const ResourceFailure.localized(
+          AppMessage.anAssetFolderWithTheNewNameAlreadyExistsNothingWasRenamed,
         );
       }
       moves.add((
@@ -272,9 +267,8 @@ extension _ResourceDocumentOperations on DocumentResourceService {
     final inventory = await scan(text, sourcePath);
     if (!allowIncomplete &&
         (inventory.unresolved.isNotEmpty || inventory.unsupported.isNotEmpty)) {
-      throw const ResourceFailure(
-        '仍有无法读取的图片，请先修复或明确选择保留原引用。',
-        'Resolve unavailable images or explicitly keep their original references.',
+      throw const ResourceFailure.localized(
+        AppMessage.resolveImagesBeforeExport,
       );
     }
     final stage = await Directory(

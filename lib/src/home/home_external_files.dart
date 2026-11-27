@@ -60,9 +60,9 @@ extension _HomeExternalFiles on _MarkerHomeState {
           final file = _pendingMobileFiles.removeAt(0);
           try {
             if (file.error != null) {
-              throw ResourceFailure(
-                '无法导入文件：${file.error}',
-                'Cannot import file: ${file.error}',
+              throw ResourceFailure.localized(
+                AppMessage.cannotImportFileValue,
+                {"p0": file.error},
               );
             }
             await _importMobileFile(
@@ -91,9 +91,9 @@ extension _HomeExternalFiles on _MarkerHomeState {
       }
       if (mounted && opened > 0 && failed > 0) {
         _toast(
-          t(
-            '部分文件导入失败（$failed 份），其余文档已打开。',
-            '$failed file(s) could not be imported. The other documents are open.',
+          _l10n.message(
+            AppMessage.valueFileSCouldNotBeImportedTheOtherDocumentsAreOpen,
+            {"p0": failed},
           ),
         );
       }
@@ -114,19 +114,13 @@ extension _HomeExternalFiles on _MarkerHomeState {
     final inventory = await _resources.scan(_controller.text, imported.path);
     if (!mounted) return;
     if (inventory.unresolved.isNotEmpty) {
-      _toast(
-        t(
-          '文档已打开，部分图片缺失。请导入包含文档与图片的 ZIP。',
-          'Document opened with missing images. Import a ZIP containing the document and images.',
-        ),
-      );
+      _toast(_l10n.message(AppMessage.openedDocumentMissingImages));
     } else {
       _toast(
         imported.reused
-            ? t('已打开 Marker 中的文档副本。', 'Opened the existing copy in Marker.')
-            : t(
-                '已导入文档副本，编辑不会修改原文件。',
-                'Imported a copy. Edits will not change the original file.',
+            ? _l10n.message(AppMessage.openedTheExistingCopyInMarker)
+            : _l10n.message(
+                AppMessage.importedACopyEditsWillNotChangeTheOriginalFile,
               ),
       );
     }

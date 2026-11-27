@@ -1,0 +1,91 @@
+name: Windows Store MSIX
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_ref:
+        description: Branch, commit or tag containing Store packaging support
+        required: true
+        default: main
+        type: string
+      store_version:
+        description: 'Store package version: Major.Minor.Build.0 (Major >= 1; increase for updates)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-store-${{ inputs.source_ref }}-${{ inputs.store_version }}
+  cancel-in-progress: false
+
+env:
+  PYTHONUTF8: '1'
+  FLUTTER_SUPPRESS_ANALYTICS: 'true'
+
+jobs:
+  package:
+    runs-on: windows-2025
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      STORE_VERSION: ${{ inputs.store_version }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.source_ref }}
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Validate package version and record source commit
+        id: version
+        run: |
+          $name = & python scripts/windows_store.py --version $env:STORE_VERSION
+          if ($LASTEXITCODE -ne 0) { throw 'Invalid Store package version' }
+          "build_name=$name" >> $env:GITHUB_OUTPUT
+          git rev-parse HEAD
+      - name: Validate packaging contracts
+        run: python -m unittest discover -s scripts/tests -p test_windows_store.py -v
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version-file: .fvmrc
+          cache: true
+      - run: flutter pub get
+      - name: Validate application
+        run: |
+          flutter analyze --no-pub
+          if ($LASTEXITCODE -ne 0) { throw 'Flutter analysis failed' }
+          flutter test --no-pub
+          if ($LASTEXITCODE -ne 0) { throw 'Flutter tests failed' }
+      - name: Build Store release
+        env:
+          STORE_BUILD_NAME: ${{ steps.version.outputs.build_name }}
+        run: flutter build windows --release --no-pub --build-name $env:STORE_BUILD_NAME --build-number 0
+      - name: Package and inspect unsigned Store MSIX
+        run: ./.github/release/windows-store.ps1 -StoreVersion $env:STORE_VERSION
+      - name: Record build provenance
+        run: |
+          $sha = git rev-parse HEAD
+          @{
+            source_sha = $sha
+            store_version = $env:STORE_VERSION
+            workflow_run = '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
+          } | ConvertTo-Json | Set-Content -Encoding utf8 dist/windows-store/build-info.json
+      - uses: actions/upload-artifact@v6
+        with:
+          name: Marker-Microsoft-Store-x64-${{ inputs.store_version }}
+          path: dist/windows-store/
+          if-no-files-found: error
+          retention-days: 30
+      - name: Submission instructions
+        run: |
+          @'
+          ## Microsoft Store package
+          Download the workflow artifact and upload the .msix in Partner Center.
+          Store ID: 9MZ7T2N8TWM4. No submission or publication was performed.
+          Store distribution signing is handled by Microsoft; this artifact is unsigned.
+          Complete listing/privacy/age-rating information and WACK validation before submission.
+          '@ >> $env:GITHUB_STEP_SUMMARY

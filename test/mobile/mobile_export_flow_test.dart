@@ -1,3 +1,6 @@
+import 'package:marker/src/resources/resource_provider.dart';
+import 'package:marker/src/resources/resource_service.dart';
+import 'dart:convert';
 import 'package:share_plus/share_plus.dart';
 import 'package:marker/src/export/export_share.dart';
 import 'package:file_picker/file_picker.dart';
@@ -49,6 +52,63 @@ class _Saver extends FilePickerPlatform {
 }
 
 void main() {
+  testWidgets(
+    'mobile shares exact UTF-8 Markdown source without moving the document',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      mobileWindow = true;
+      addTearDown(() {
+        mobileWindow = false;
+      });
+      await tester.binding.setSurfaceSize(const Size(844, 390));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      ShareParams? shared;
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            resourceInventoryProvider.overrideWith(
+              (ref, input) async => const ResourceInventory([], []),
+            ),
+            exportShareProvider.overrideWithValue((params) async {
+              shared = params;
+              return const ShareResult('target.app', ShareResultStatus.success);
+            }),
+            mermaidPreviewEnabledProvider.overrideWithValue(false),
+          ],
+          child: const MarkerApp(),
+        ),
+      );
+      await tester.pumpAndSettle();
+      const source =
+          '# 中文 café\n![本地](note.assets/photo.png)\n![网络](https://example.com/a.png)\n';
+      await tester.enterText(find.byKey(const Key('editor')), source);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(CupertinoIcons.square_arrow_up));
+      await tester.pumpAndSettle();
+      expect(find.text('ZIP'), findsOneWidget);
+      await tester.tap(find.text('MD'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('导出'));
+      await tester.pumpAndSettle();
+      expect(shared, isNotNull);
+      expect(shared!.fileNameOverrides!.single, endsWith('.md'));
+      expect(shared!.files!.single.mimeType, 'text/markdown');
+      expect(utf8.decode(await shared!.files!.single.readAsBytes()), source);
+      expect(
+        tester
+            .widget<CupertinoTextField>(find.byKey(const Key('editor')))
+            .controller!
+            .text,
+        source,
+      );
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+    variant: TargetPlatformVariant({
+      TargetPlatform.android,
+      TargetPlatform.iOS,
+    }),
+  );
+
   test(
     'long PNG tiling covers every row and oversized output can use split mode',
     () {

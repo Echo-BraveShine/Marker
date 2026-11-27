@@ -1,3 +1,4 @@
+import '../l10n/message_catalog.dart';
 import '../theme/marker_fonts.dart';
 import 'dart:math' as math;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -51,11 +52,15 @@ class _TextColorPickerState extends ConsumerState<TextColorPicker> {
 
   @override
   Widget build(BuildContext context) {
-    final zh = Localizations.localeOf(context).languageCode == 'zh';
     final state = ref.watch(textColorProvider);
     final colors = Theme.of(context).extension<MarkerColors>()!;
     return MarkerDialog(
-      title: Text(zh ? '文字颜色' : 'Text color'),
+      title: Text(
+        messageForLanguage(
+          Localizations.localeOf(context).toLanguageTag(),
+          AppMessage.textColor,
+        ),
+      ),
       width: 380,
       content: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -93,7 +98,10 @@ class _TextColorPickerState extends ConsumerState<TextColorPicker> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      zh ? '颜色预览' : 'Color preview',
+                      messageForLanguage(
+                        Localizations.localeOf(context).toLanguageTag(),
+                        AppMessage.colorPreview,
+                      ),
                       style: const TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
@@ -135,7 +143,10 @@ class _TextColorPickerState extends ConsumerState<TextColorPicker> {
                   }
 
                   return Semantics(
-                    label: zh ? '拖动色盘选择颜色' : 'Drag color wheel',
+                    label: messageForLanguage(
+                      Localizations.localeOf(context).toLanguageTag(),
+                      AppMessage.dragColorWheel,
+                    ),
                     child: GestureDetector(
                       key: const Key('text-color-wheel'),
                       onTapDown: (d) => select(d.localPosition),
@@ -155,7 +166,10 @@ class _TextColorPickerState extends ConsumerState<TextColorPicker> {
           Row(
             children: [
               Text(
-                zh ? '亮度' : 'Brightness',
+                messageForLanguage(
+                  Localizations.localeOf(context).toLanguageTag(),
+                  AppMessage.brightness,
+                ),
                 style: const TextStyle(fontSize: 12),
               ),
               Expanded(
@@ -176,7 +190,10 @@ class _TextColorPickerState extends ConsumerState<TextColorPicker> {
           ),
           const SizedBox(height: 12),
           Text(
-            zh ? '常用颜色' : 'Common colors',
+            messageForLanguage(
+              Localizations.localeOf(context).toLanguageTag(),
+              AppMessage.commonColors,
+            ),
             style: TextStyle(fontSize: 12, color: colors.textSecondary),
           ),
           const SizedBox(height: 8),
@@ -272,7 +289,10 @@ class _TextColorPickerState extends ConsumerState<TextColorPicker> {
           ),
           const SizedBox(height: 6),
           Text(
-            zh ? '支持 #RGB / #RRGGBB，选择后点击应用' : 'Use #RGB / #RRGGBB, then Apply',
+            messageForLanguage(
+              Localizations.localeOf(context).toLanguageTag(),
+              AppMessage.useRGBRRGGBBThenApply,
+            ),
             style: TextStyle(fontSize: 11, color: colors.textSecondary),
           ),
         ],
@@ -285,7 +305,12 @@ class _TextColorPickerState extends ConsumerState<TextColorPicker> {
             onPressed: normalizeTextColor(value.text) == null
                 ? null
                 : () => Navigator.pop(context, normalizeTextColor(value.text)),
-            child: Text(zh ? '应用颜色' : 'Apply color'),
+            child: Text(
+              messageForLanguage(
+                Localizations.localeOf(context).toLanguageTag(),
+                AppMessage.applyColor,
+              ),
+            ),
           ),
         ),
       ],

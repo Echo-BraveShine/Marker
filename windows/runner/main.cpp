@@ -1,6 +1,7 @@
 #include <flutter/dart_project.h>
 #include <flutter/flutter_view_controller.h>
 #include <windows.h>
+#include <appmodel.h>
 #include <shobjidl.h>
 
 #include "flutter_window.h"
@@ -17,7 +18,13 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   // Initialize COM, so that it is available for use in the library and/or
   // plugins.
   ::CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
-  ::SetCurrentProcessExplicitAppUserModelID(L"dev.ekko.marker");
+  // Store packages use their registered PFN!App identity for shell grouping.
+  // Only the unpackaged installer/portable edition needs a custom AUMID.
+  UINT32 package_name_length = 0;
+  if (::GetCurrentPackageFullName(&package_name_length, nullptr) ==
+      APPMODEL_ERROR_NO_PACKAGE) {
+    ::SetCurrentProcessExplicitAppUserModelID(L"dev.ekko.marker");
+  }
 
   flutter::DartProject project(L"data");
 

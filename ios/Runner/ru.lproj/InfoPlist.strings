@@ -1,0 +1,4 @@
+// System permission prompts follow the device/app language.
+"NSCameraUsageDescription" = "Снимать фото для вставки в документы Markdown.";
+"NSPhotoLibraryUsageDescription" = "Выбирать фото для вставки в документы Markdown.";
+"NSLocalNetworkUsageDescription" = "Доступ к изображениям и ссылкам в локальной сети, на которые ссылаются ваши документы.";

@@ -37,14 +37,17 @@ extension _HomeFileActions on _MarkerHomeState {
       }
       if (!mounted) return false;
       final choice = await _resourceChoice(
-        t('保存失败', 'Save failed'),
+        _l10n.message(AppMessage.saveFailed),
         [
-          ('retry', t('重试', 'Retry'), CupertinoIcons.arrow_clockwise),
+          (
+            'retry',
+            _l10n.message(AppMessage.retry),
+            CupertinoIcons.arrow_clockwise,
+          ),
           ('copy', _l10n.saveAs, CupertinoIcons.doc_on_doc),
         ],
-        description: t(
-          '编辑已保留为草稿。请检查目录权限和可用空间。',
-          'Your edits are kept as a draft. Check folder access and free space.',
+        description: _l10n.message(
+          AppMessage.yourEditsAreKeptAsADraftCheckFolderAccessAndFreeSpace,
         ),
       );
       if (!mounted) return false;
@@ -151,12 +154,7 @@ extension _HomeFileActions on _MarkerHomeState {
       return true;
     } on ResourceCancelled {
       if (mounted) {
-        _toast(
-          t(
-            '已取消保存，文档内容已保留。',
-            'Save cancelled. Your document content is preserved.',
-          ),
-        );
+        _toast(_l10n.message(AppMessage.saveCancelled));
       }
       return false;
     } catch (e) {
@@ -175,11 +173,16 @@ extension _HomeFileActions on _MarkerHomeState {
         await ref.read(exportAppearanceProvider.notifier).ready;
         if (!mounted) return;
         var saveToFiles = false;
+        String? sourceFormat;
+        ref.read(exportSourceFormatProvider.notifier).select(null);
         final options = await showMarkerDialog<DocumentExportOptions>(
           context: context,
           builder: (context) => ExportOptionsPanel(
             zh: _zh,
             mobile: _isMobile,
+            onExportSource: _isMobile
+                ? (format) => sourceFormat = format
+                : null,
             onSaveToFiles:
                 _isMobile && defaultTargetPlatform != TargetPlatform.iOS
                 ? () {
@@ -188,7 +191,16 @@ extension _HomeFileActions on _MarkerHomeState {
                 : null,
           ),
         );
-        if (options == null || !mounted) return;
+        if (!mounted) return;
+        if (sourceFormat != null) {
+          if (sourceFormat == 'md') {
+            await _exportMobileMarkdown();
+          } else {
+            await _exportMobileDocument();
+          }
+          return;
+        }
+        if (options == null) return;
         final basename = title.replaceFirst(
           RegExp(r'\.(md|markdown)$', caseSensitive: false),
           '',
@@ -231,7 +243,9 @@ extension _HomeFileActions on _MarkerHomeState {
                     DocumentExportFormat.html => 'text/html',
                   },
           );
-          if (mounted && saved != null) _toast(t('导出完成。', 'Export complete.'));
+          if (mounted && saved != null) {
+            _toast(_l10n.message(AppMessage.exportComplete));
+          }
           return;
         }
         final extension = options.format.name;
@@ -274,7 +288,9 @@ extension _HomeFileActions on _MarkerHomeState {
           ),
           directory: p.dirname(destination),
         );
-        if (mounted) _toast(t('已导出到 $savedPath', 'Exported to $savedPath'));
+        if (mounted) {
+          _toast(_l10n.message(AppMessage.exportedToValue, {"p0": savedPath}));
+        }
       } on ResourceCancelled {
         // Cancelling source-folder authorization leaves the destination intact.
         return;
@@ -284,7 +300,9 @@ extension _HomeFileActions on _MarkerHomeState {
           context: context,
           builder: (_) => MarkerDialog(
             title: Text(_l10n.unableToExport),
-            content: Text(exportFailureMessage(error, chinese: _zh)),
+            content: Text(
+              exportFailureMessage(error, languageTag: _languageTag),
+            ),
           ),
         );
       }
@@ -299,7 +317,7 @@ extension _HomeFileActions on _MarkerHomeState {
       if (!mounted) return;
       await action();
     } on ResourceCancelled {
-      if (mounted) _toast(t('已停止后续资源处理', 'Remaining work stopped'));
+      if (mounted) _toast(_l10n.message(AppMessage.remainingWorkStopped));
     } catch (e) {
       _error(e);
     } finally {
@@ -332,17 +350,14 @@ extension _HomeFileActions on _MarkerHomeState {
         .firstOrNull;
     if (existing != null) {
       await _selectDocument(existing.id);
-      _toast(t('此文件已打开', 'This file is already open'));
+      _toast(_l10n.message(AppMessage.thisFileIsAlreadyOpen));
       return;
     }
     if (await File(location.path).exists()) {
       await _openPath(location.path);
       if (mounted) {
         _toast(
-          t(
-            '已打开现有文件，未覆盖原内容。',
-            'Opened the existing file without overwriting it.',
-          ),
+          _l10n.message(AppMessage.openedTheExistingFileWithoutOverwritingIt),
         );
       }
       return;

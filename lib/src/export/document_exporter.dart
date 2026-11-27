@@ -1,3 +1,4 @@
+import '../l10n/message_catalog.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -173,32 +174,36 @@ class DocumentExporter {
 }
 
 /// Actionable messages use the same shared panel as other app errors.
-String exportFailureMessage(Object error, {required bool chinese}) {
-  String t(String zh, String en) => chinese ? zh : en;
-  if (error is ExportDestinationException) return t(error.zh, error.en);
+String exportFailureMessage(
+  Object error, {
+  bool chinese = false,
+  String? languageTag,
+}) {
+  final language = languageTag ?? (chinese ? 'zh-Hans' : 'en');
+  if (error is LocalizedMessageError) {
+    return error.localize(language);
+  }
+  if (error is ExportDestinationException) {
+    return error.localize(language);
+  }
   if (error is TimeoutException) {
-    return t(
-      '导出超时。请减少图片或图表后重试。',
-      'Export timed out. Try reducing the number of images or diagrams.',
+    return messageForLanguage(
+      language,
+      AppMessage.exportTimedOutTryReducingTheNumberOfImagesOrDiagrams,
     );
   }
   if (error is FileSystemException) {
-    return t(
-      '无法访问图片或保存位置。请检查文件是否存在、目录权限和剩余空间。\n${error.path ?? ''}',
-      'Cannot access an image or the destination. Check the file exists, folder permissions and free space.\n${error.path ?? ''}',
-    );
+    return messageForLanguage(chinese, AppMessage.exportFileAccessFailed, {
+      "p0": error.path ?? '',
+    });
   }
   if (error is HttpException || error is SocketException) {
-    return t(
-      '无法下载文档中的网络图片。请检查网络或改用本地图片后重试。',
-      'Could not download a remote image. Check your connection or use a local image.',
-    );
+    return messageForLanguage(chinese, AppMessage.exportNetworkImageFailed);
   }
   final detail = error is PlatformException
       ? error.message ?? error.code
       : error.toString();
-  return t(
-    '导出未完成，文件未写入。请检查图片、公式和 Mermaid 语法。文档过长时请选择 PDF。\n$detail',
-    'Export did not complete. No output was written. Check images, equations and Mermaid syntax. For long documents, choose PDF.\n$detail',
-  );
+  return messageForLanguage(chinese, AppMessage.exportIncomplete, {
+    "p0": detail,
+  });
 }

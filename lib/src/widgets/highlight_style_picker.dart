@@ -1,3 +1,4 @@
+import '../l10n/app_localizations.dart';
 import 'package:flutter/cupertino.dart';
 import '../theme/highlight_style.dart';
 import '../theme/marker_colors.dart';
@@ -56,7 +57,12 @@ class HighlightStylePicker extends StatelessWidget {
                           children: [
                             Expanded(
                               child: Text(
-                                style.label(zh),
+                                style.label(
+                                  AppLocalizations.languageTagOf(
+                                    context,
+                                    fallbackChinese: zh,
+                                  ),
+                                ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(

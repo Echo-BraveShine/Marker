@@ -1,3 +1,4 @@
+import '../l10n/message_catalog.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart' show Theme, Tooltip;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -88,7 +89,7 @@ class _EditorSearchBarState extends ConsumerState<EditorSearchBar> {
   Widget build(BuildContext context) {
     final state = ref.watch(editorProvider);
     final c = Theme.of(context).extension<MarkerColors>()!;
-    final zh = Localizations.localeOf(context).languageCode == 'zh';
+    final zh = Localizations.localeOf(context).toLanguageTag();
     final matches = findEditorMatches(
       widget.editor.text,
       state.searchQuery,
@@ -126,7 +127,10 @@ class _EditorSearchBarState extends ConsumerState<EditorSearchBar> {
                 state.replaceVisible
                     ? CupertinoIcons.chevron_down
                     : CupertinoIcons.chevron_right,
-                zh ? '替换' : 'Replace',
+                messageForLanguage(
+                  Localizations.localeOf(context).toLanguageTag(),
+                  AppMessage.replace,
+                ),
                 () => ref
                     .read(editorProvider.notifier)
                     .update(
@@ -143,7 +147,10 @@ class _EditorSearchBarState extends ConsumerState<EditorSearchBar> {
                     horizontal: 9,
                     vertical: 6,
                   ),
-                  placeholder: zh ? '查找文本' : 'Find text',
+                  placeholder: messageForLanguage(
+                    Localizations.localeOf(context).toLanguageTag(),
+                    AppMessage.findText,
+                  ),
                   style: TextStyle(fontSize: 12, color: c.textPrimary),
                   onChanged: (value) {
                     ref
@@ -187,19 +194,28 @@ class _EditorSearchBarState extends ConsumerState<EditorSearchBar> {
               ),
               icon(
                 CupertinoIcons.chevron_up,
-                zh ? '上一个' : 'Previous',
+                messageForLanguage(
+                  Localizations.localeOf(context).toLanguageTag(),
+                  AppMessage.previous,
+                ),
                 widget.onPrevious,
                 key: const Key('search-previous'),
               ),
               icon(
                 CupertinoIcons.chevron_down,
-                zh ? '下一个' : 'Next',
+                messageForLanguage(
+                  Localizations.localeOf(context).toLanguageTag(),
+                  AppMessage.next,
+                ),
                 widget.onNext,
                 key: const Key('search-next'),
               ),
               icon(
                 CupertinoIcons.xmark,
-                zh ? '关闭搜索' : 'Close search',
+                messageForLanguage(
+                  Localizations.localeOf(context).toLanguageTag(),
+                  AppMessage.closeSearch,
+                ),
                 widget.onClose,
                 key: const Key('search-close'),
               ),
@@ -218,7 +234,10 @@ class _EditorSearchBarState extends ConsumerState<EditorSearchBar> {
                         horizontal: 9,
                         vertical: 6,
                       ),
-                      placeholder: zh ? '替换为' : 'Replace with',
+                      placeholder: messageForLanguage(
+                        zh,
+                        AppMessage.replaceWith,
+                      ),
                       style: TextStyle(fontSize: 12, color: c.textPrimary),
                       onChanged: (value) => ref
                           .read(editorProvider.notifier)
@@ -234,7 +253,10 @@ class _EditorSearchBarState extends ConsumerState<EditorSearchBar> {
                     ),
                     onPressed: matches.isEmpty ? null : widget.onReplace,
                     child: Text(
-                      zh ? '替换' : 'Replace',
+                      messageForLanguage(
+                        Localizations.localeOf(context).toLanguageTag(),
+                        AppMessage.replace,
+                      ),
                       style: const TextStyle(fontSize: 12),
                     ),
                   ),
@@ -247,7 +269,10 @@ class _EditorSearchBarState extends ConsumerState<EditorSearchBar> {
                     ),
                     onPressed: matches.isEmpty ? null : widget.onReplaceAll,
                     child: Text(
-                      zh ? '全部替换' : 'Replace all',
+                      messageForLanguage(
+                        Localizations.localeOf(context).toLanguageTag(),
+                        AppMessage.replaceAll,
+                      ),
                       style: const TextStyle(fontSize: 12),
                     ),
                   ),

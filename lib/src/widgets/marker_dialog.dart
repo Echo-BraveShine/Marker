@@ -1,3 +1,4 @@
+import '../l10n/message_catalog.dart';
 import '../theme/marker_fonts.dart';
 import 'marker_floating_surface.dart';
 import '../theme/marker_style.dart';
@@ -14,9 +15,10 @@ Future<T?> showMarkerDialog<T>({
   return showGeneralDialog<T>(
     context: context,
     barrierDismissible: barrierDismissible,
-    barrierLabel: Localizations.localeOf(context).languageCode == 'zh'
-        ? '关闭面板'
-        : 'Dismiss panel',
+    barrierLabel: messageForLanguage(
+      Localizations.localeOf(context).toLanguageTag(),
+      AppMessage.dismissPanel,
+    ),
     barrierColor: CupertinoColors.black.withValues(alpha: .18),
     transitionDuration: const Duration(milliseconds: 180),
     pageBuilder: (context, animation, secondary) => builder(context),

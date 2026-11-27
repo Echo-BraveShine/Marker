@@ -1,0 +1,80 @@
+part of '../message_catalog.dart';
+
+const _zh4 = <AppMessage, String>{
+  AppMessage.invalidDocumentName: "文档名称无效。",
+  AppMessage.saveAndRename: "保存并重命名？",
+  AppMessage.renameDocumentResourcesDescription:
+      "将保存当前内容并重命名文档。同时重命名资源目录并更新本文中的图片引用。其他文档如引用此资源目录，需要同步修改。",
+  AppMessage.rename2: "重命名",
+  AppMessage.renamingDocument: "重命名文档",
+  AppMessage.packageDocumentAndImages2: "打包文档与图片",
+  AppMessage.packagingDocument: "打包文档",
+  AppMessage.packageCreatedWithReferencesThatStillNeedRepair: "已生成副本，部分引用仍需修复。",
+  AppMessage.currentDocumentAndImagesPackaged: "已打包当前编辑内容与图片。",
+  AppMessage.dropToImportImages: "松开以导入图片",
+  AppMessage.copyToDocumentAssetsOriginalsAreKept: "复制到文档资源目录，保留原图",
+  AppMessage.saveTheDocumentFirst: "先保存文档",
+  AppMessage.saveBeforeImportImages: "保存后就能把图片放在文档旁边，并使用可随文档移动的相对路径。",
+  AppMessage.saveAndContinue: "保存并继续",
+  AppMessage.allowFolderAccess2: "允许访问目录",
+  AppMessage.chooseTheContainingFolderOrOneOfItsParentFolders:
+      "请选择图片或文档所在目录，或其上级目录。",
+  AppMessage.folderAccessGranted: "已获得目录访问权限。",
+  AppMessage.theDocumentChangedImportTheImagesAgain: "文档已切换，请重新导入图片。",
+  AppMessage.importingImages: "导入图片",
+  AppMessage.noTextOrImageToPaste: "剪贴板中没有可插入的文本或图片。",
+  AppMessage.clipboardImagesAreUnavailableInThisEnvironment: "当前环境无法读取剪贴板图片。",
+  AppMessage.dropAccessDenied: "系统未能提供拖入文件的访问权限，请使用“导入图片”选择文件。",
+  AppMessage.dropPNGJPEGGIFWebPOrBMPImages: "请拖入 PNG、JPEG、GIF、WebP 或 BMP 图片。",
+  AppMessage.insertWebImage2: "插入网络图片",
+  AppMessage.enterAValidHTTPOrHTTPSImageURL: "请输入有效的 HTTP 或 HTTPS 图片地址。",
+  AppMessage.imageDescription: "图片说明",
+  AppMessage.unsupportedImageAddress: "图片地址不受支持",
+  AppMessage.useSaveAsToMoveTheDocumentToAnotherFolder:
+      "重命名只能在当前目录进行，请使用另存为移动文档。",
+  AppMessage.aFileWithThisNameAlreadyExists: "同名文件已存在，请换一个名称。",
+  AppMessage.theSourceDocumentIsUnavailable: "原文档不可访问，未执行重命名。",
+  AppMessage.anAssetFolderWithTheNewNameAlreadyExistsNothingWasRenamed:
+      "同名资源目录已存在，未执行重命名。",
+  AppMessage.resolveImagesBeforeExport: "仍有无法读取的图片，请先修复或明确选择保留原引用。",
+  AppMessage.thisImageIsNotReferencedInTheDocument: "文档中没有这张图片的引用。",
+  AppMessage.cannotLoadImageRetryOrCheckNetworkAndFileAccess:
+      "无法加载图片，请重新加载或检查网络与文件权限。",
+  AppMessage.more: "更多",
+  AppMessage.cannotOverwriteASymbolicLink: "不能覆盖符号链接。",
+  AppMessage.theResourceDirectoryIsNotARegularDirectory: "资源目录不可用，请选择其他保存位置。",
+  AppMessage.noAvailableResourceDirectoryName: "找不到可用的资源目录名称。",
+  AppMessage.tooManyImageNameConflicts: "图片重名过多，请更改名称。",
+  AppMessage.invalidImageUsePNGJPEGGIFWebPOrBMP:
+      "图片损坏或格式不支持，请使用 PNG、JPEG、GIF、WebP 或 BMP。",
+  AppMessage.imageExceeds50MB: "图片超过 50 MB，请先缩小图片。",
+  AppMessage.imageExceeds50MB2: "图片超过 50 MB。",
+  AppMessage.cannotOverwriteASymbolicLink2: "不能覆盖符号链接文件。",
+  AppMessage.unsupportedImageURL: "图片地址不受支持。",
+  AppMessage.downloadFailedHTTPValue: "下载失败：HTTP {p0}",
+  AppMessage.tooManyImageRedirects: "图片重定向次数过多。",
+  AppMessage.continueText: "确定",
+  AppMessage.someImagesNeedAttention: "部分图片需要处理",
+  AppMessage.partialResourceCopyWarning: "以下引用无法完整复制。可以先修复，或继续并保留其原始地址。",
+  AppMessage.customSyntax: "特殊语法",
+  AppMessage.continueWithOriginalAddresses: "继续并保留原地址",
+  AppMessage.resourceInventorySummary:
+      "本地图片 {p0} 张（已托管 {p1} 张），网络图片 {p2} 张。\n需复制 {p3} 张，本地图片总大小 {p4} MB。\n{p5}{p6}",
+  AppMessage.alsoDownloadWebImages: "同时下载网络图片",
+  AppMessage.copyLocalImages: "仅复制本地图片",
+  AppMessage.folderAccessIsRequiredAllowAccessToThisLocationAndRetry:
+      "尚未获得此位置的访问权限，请授权对应目录后重试。",
+  AppMessage.theFileOrFolderIsMissingMovedOrNotDownloadedLocally:
+      "文件或目录不存在，可能已移动或尚未下载到本地。",
+  AppMessage.theDiskIsFullFreeSomeSpaceAndRetry: "磁盘剩余空间不足，请释放空间后重试。",
+  AppMessage.thisLocationIsReadOnlyChooseAWritableFolder: "此位置为只读，请选择可写入的保存目录。",
+  AppMessage.fileOperationFailedCheckTheLocationAndSystemDetailsBelow:
+      "文件操作失败，请查看下方位置和系统信息。",
+  AppMessage.location: "位置",
+  AppMessage.unknown: "未知",
+  AppMessage.error: "错误码",
+  AppMessage.unableToProcessTheImageCheckItsFormatOrConnectionAndRetry:
+      "无法处理图片，请检查格式或网络后重试。",
+  AppMessage.someImagesCouldNotBeCopied: "部分图片未能复制",
+  AppMessage.originalImagesUnchanged: "原文件未被改动。可以先修复，或保留这些地址继续生成副本。",
+};

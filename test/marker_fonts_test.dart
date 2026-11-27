@@ -113,7 +113,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('关于').last);
       await tester.pumpAndSettle();
-      for (final label in ['设置', '关于', '检查更新', '发布页面']) {
+      for (final label in ['设置', '关于', '打开示例']) {
         final paragraphs = tester
             .widgetList<RichText>(find.byType(RichText))
             .where((widget) => widget.text.toPlainText() == label);

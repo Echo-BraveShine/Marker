@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:marker/main.dart';
@@ -12,6 +13,17 @@ void main() {
   testWidgets(
     'landscape phones retain desktop sidebar toolbar panes and settings',
     (tester) async {
+      const display = MethodChannel('marker/display');
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        display,
+        (_) async => 'right',
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          display,
+          null,
+        ),
+      );
       SharedPreferences.setMockInitialValues({});
       final android = defaultTargetPlatform == TargetPlatform.android;
       final top = android ? 24.0 : 0.0;
@@ -42,6 +54,15 @@ void main() {
       final originalSidebarWidth = tester
           .getSize(find.byKey(const Key('document-sidebar')))
           .width;
+      expect(originalSidebarWidth, lessThan(200));
+      expect(
+        tester.getRect(find.byIcon(CupertinoIcons.sidebar_left)).left,
+        greaterThanOrEqualTo(44),
+      );
+      expect(
+        tester.getRect(find.byIcon(CupertinoIcons.gear)).left,
+        greaterThanOrEqualTo(44),
+      );
       await tester.tap(find.text('文件'));
       await tester.pumpAndSettle();
       expect(
@@ -104,6 +125,10 @@ void main() {
         );
         final editor = tester.getRect(find.byKey(const Key('editor')));
         final preview = tester.getRect(find.byKey(const Key('preview')));
+        expect(
+          tester.getSize(find.byKey(const Key('document-status-bar'))).height,
+          closeTo(24, 0.01),
+        );
         expect(sidebar.top, closeTo(top, 0.01));
         expect(sidebar.bottom, closeTo(size.height - bottom, 0.01));
         expect(sidebar.left, greaterThan(0));
@@ -111,6 +136,16 @@ void main() {
         expect(sidebar.right, lessThan(editor.left));
         expect(editor.right, lessThanOrEqualTo(preview.left));
         expect((editor.top - preview.top).abs(), lessThan(2));
+        expect(
+          tester.getRect(find.byKey(const Key('sidebar-settings'))).center.dy,
+          closeTo(
+            tester
+                .getRect(find.byKey(const Key('document-status-bar')))
+                .center
+                .dy,
+            0.01,
+          ),
+        );
         final toolbar = tester.getRect(
           find.descendant(
             of: find.byType(CupertinoSlidingSegmentedControl<int>),
@@ -119,6 +154,18 @@ void main() {
         );
         expect(toolbar.top, greaterThanOrEqualTo(top));
         expect(toolbar.center.dy, lessThan(editor.top));
+        expect(
+          tester.getRect(find.byKey(const Key('document-statistics'))).right,
+          lessThanOrEqualTo(size.width - 43),
+        );
+        final previewButton = find.descendant(
+          of: find.byType(CupertinoSlidingSegmentedControl<int>),
+          matching: find.text('预览'),
+        );
+        expect(
+          tester.getRect(previewButton).right,
+          lessThanOrEqualTo(size.width - 43),
+        );
         expect(find.byIcon(CupertinoIcons.ellipsis_circle), findsNothing);
         expect(tester.takeException(), isNull);
       }

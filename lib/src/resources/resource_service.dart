@@ -1,3 +1,4 @@
+import '../l10n/message_catalog.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -21,8 +22,24 @@ class ResourceCancelled implements Exception {}
 class ResourceConflict implements Exception {}
 
 class ResourceFailure implements Exception {
-  const ResourceFailure(this.zh, this.en);
-  final String zh, en;
+  const ResourceFailure(String zh, String en)
+    : _zh = zh,
+      _en = en,
+      _message = null,
+      _arguments = const {};
+  const ResourceFailure.localized(this._message, [this._arguments = const {}])
+    : _zh = null,
+      _en = null;
+  final String? _zh, _en;
+  final AppMessage? _message;
+  final Map<String, Object?> _arguments;
+  String get zh =>
+      _message == null ? _zh! : localizedMessage('zh', _message, _arguments);
+  String get en =>
+      _message == null ? _en! : localizedMessage('en', _message, _arguments);
+  String localize(String languageCode) => _message == null
+      ? (normalizeLanguageTag(languageCode).startsWith('zh') ? _zh! : _en!)
+      : localizedMessage(languageCode, _message, _arguments);
   @override
   String toString() => en;
 }
@@ -103,9 +120,34 @@ class ResourceInventory {
 }
 
 class ResourceIssue {
-  const ResourceIssue(this.source, this.reason, {this.chinese});
-  final String source, reason;
-  final String? chinese;
+  const ResourceIssue(this.source, String reason, {String? chinese})
+    : _reason = reason,
+      // Keep the existing public named parameter for older callers.
+      // ignore: prefer_initializing_formals
+      _chinese = chinese,
+      _message = null,
+      _arguments = const {};
+  const ResourceIssue.localized(
+    this.source,
+    this._message, [
+    this._arguments = const {},
+  ]) : _reason = '',
+       _chinese = null;
+  final String source;
+  final String _reason;
+  final String? _chinese;
+  final AppMessage? _message;
+  final Map<String, Object?> _arguments;
+  String get reason =>
+      _message == null ? _reason : localizedMessage('en', _message, _arguments);
+  String? get chinese => _message == null
+      ? _chinese
+      : localizedMessage('zh-Hans', _message, _arguments);
+  String localize(String languageTag) => _message != null
+      ? localizedMessage(languageTag, _message, _arguments)
+      : (normalizeLanguageTag(languageTag).startsWith('zh')
+            ? chinese ?? reason
+            : reason);
 }
 
 class ResourceIncomplete extends ResourceFailure {

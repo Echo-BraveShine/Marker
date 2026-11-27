@@ -1,3 +1,4 @@
+import '../l10n/app_localizations.dart';
 import '../theme/marker_fonts.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
@@ -15,7 +16,13 @@ class ShortcutSettings extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(zh ? '快捷键' : 'Keyboard shortcuts', style: MarkerStyle.heading),
+        Text(
+          messageForLanguage(
+            AppLocalizations.languageTagOf(context, fallbackChinese: zh),
+            AppMessage.keyboardShortcuts,
+          ),
+          style: MarkerStyle.heading,
+        ),
         const SizedBox(height: 12),
         Expanded(
           child: Container(
@@ -46,7 +53,12 @@ class ShortcutSettings extends StatelessWidget {
                     children: [
                       Expanded(
                         child: Text(
-                          zh ? shortcut.zh : shortcut.en,
+                          shortcut.labelFor(
+                            AppLocalizations.languageTagOf(
+                              context,
+                              fallbackChinese: zh,
+                            ),
+                          ),
                           style: const TextStyle(fontSize: 12),
                         ),
                       ),
@@ -69,9 +81,10 @@ class ShortcutSettings extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         Text(
-          zh
-              ? 'Esc 关闭搜索或语法面板。编辑框内支持系统原生剪贴板与撤销操作。'
-              : 'Esc closes search or syntax panel. Text fields retain native clipboard and undo shortcuts.',
+          messageForLanguage(
+            AppLocalizations.languageTagOf(context, fallbackChinese: zh),
+            AppMessage.shortcutFooter,
+          ),
           style: TextStyle(fontSize: 11, color: c.textSecondary),
         ),
       ],

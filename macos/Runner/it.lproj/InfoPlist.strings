@@ -1,0 +1,2 @@
+// System permission prompts follow the device/app language.
+"NSLocalNetworkUsageDescription" = "Accedi alle immagini e ai link della rete locale a cui fanno riferimento i tuoi documenti.";

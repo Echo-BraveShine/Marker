@@ -17,17 +17,27 @@ String mermaidHtml(
   bool dark, {
   bool linux = false,
   String? fontUri,
+  String? koreanFontUri,
+  String? latinFontUri,
   String? scriptUri,
 }) {
   final encoded = jsonEncode(source).replaceAll('<', r'\u003c');
-  final fontFace = fontUri == null
-      ? ''
-      : '@font-face{font-family:MarkerNoto;src:url(${jsonEncode(fontUri)});font-weight:400}';
+  final fontFace =
+      (fontUri == null
+          ? ''
+          : '@font-face{font-family:MarkerNoto;src:url(${jsonEncode(fontUri)});font-weight:400}') +
+      (koreanFontUri == null
+          ? ''
+          : '@font-face{font-family:MarkerNoto;src:url(${jsonEncode(koreanFontUri)});font-weight:400;unicode-range:U+1100-11FF,U+3130-318F,U+A960-A97F,U+AC00-D7FF;}') +
+      (latinFontUri == null
+          ? ''
+          : '@font-face{font-family:MarkerNoto;src:url(${jsonEncode(latinFontUri)});font-weight:400;unicode-range:U+0000-024F,U+0400-052F;}');
   return '''<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' file:; style-src 'unsafe-inline'; img-src data:; font-src file: data:;"><style>$fontFace html,body{margin:0;background:${dark ? '#2b2b2d' : '#ffffff'}}body{padding:0;box-sizing:border-box;color:${dark ? '#f5f5f7' : '#1d1d1f'};font:14px MarkerNoto,-apple-system,'Segoe UI','Noto Sans CJK SC',sans-serif}#document{padding:12px;box-sizing:border-box}svg{max-width:100%;height:auto}pre{white-space:pre-wrap}</style></head><body><div id="document"></div>${scriptUri == null ? '<script>$script</script>' : '<script src=${jsonEncode(scriptUri)}></script>'}<script>
 const notify = value => { window.markerExport=value.error?value:{ready:true,width:value.width,height:value.height}; ${linux ? 'window.webkit.messageHandlers.marker.postMessage(value);' : ''} };
 (async()=>{try{
 mermaid.initialize({${fontUri == null ? '' : "fontFamily:'MarkerNoto, sans-serif',"}startOnLoad:false,securityLevel:'strict',themeVariables:{fontSize:'14px'},theme:'${dark ? 'dark' : 'default'}'});
 ${fontUri == null ? '' : "await document.fonts.load('400 14px MarkerNoto','中文 ABC');"}
+${koreanFontUri == null ? '' : "await document.fonts.load('400 14px MarkerNoto','한국어');"}
 await document.fonts.ready;
 const result=await mermaid.render('markerDiagram',$encoded);
 const container=document.getElementById('document');
@@ -125,6 +135,8 @@ class MermaidRenderer {
       dark,
       linux: linux,
       fontUri: assets.fontUri,
+      koreanFontUri: assets.koreanFontUri,
+      latinFontUri: assets.latinFontUri,
       scriptUri: assets.scriptUri,
     );
     if (linux) {

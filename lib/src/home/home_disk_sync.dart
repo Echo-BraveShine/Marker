@@ -27,10 +27,7 @@ extension _HomeDiskSync on _MarkerHomeState {
       await _persist();
       if (mounted) {
         _toast(
-          t(
-            '已同步磁盘变更，未保存的内容已保留。',
-            'Disk changes synced. Unsaved edits were preserved.',
-          ),
+          _l10n.message(AppMessage.diskChangesSyncedUnsavedEditsWerePreserved),
         );
       }
     } catch (error) {

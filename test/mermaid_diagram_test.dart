@@ -116,16 +116,26 @@ html,body{margin:0;background:#2b2b2d}
     for (final folder in [directory, '$directory/windows']) {
       await File('$folder/mermaid.min.js').writeAsString(script);
       await File('assets/fonts/NotoSansSC.ttf').copy('$folder/NotoSansSC.ttf');
+      await File('assets/fonts/NotoSansKR.ttf').copy('$folder/NotoSansKR.ttf');
+      await File(
+        'assets/fonts/MarkerSans-Regular.ttf',
+      ).copy('$folder/MarkerSans-Regular.ttf');
       for (final dark in [false, true]) {
         await File(
           '$folder/shared-assets-${dark ? 'dark' : 'light'}.html',
         ).writeAsString(
           mermaidHtml(
-            'flowchart TD\nA["中文 Start"] --> B["Prepare"] --> C["Render"] --> D["Ready"]',
+            'flowchart TD\nA["中文 Start"] --> B["한국어 설정"] --> C["Türkçe Polski"] --> D["Ready"]',
             '',
             dark,
             linux: folder == directory,
             fontUri: File('$folder/NotoSansSC.ttf').absolute.uri.toString(),
+            koreanFontUri: File(
+              '$folder/NotoSansKR.ttf',
+            ).absolute.uri.toString(),
+            latinFontUri: File(
+              '$folder/MarkerSans-Regular.ttf',
+            ).absolute.uri.toString(),
             scriptUri: File('$folder/mermaid.min.js').absolute.uri.toString(),
           ),
         );

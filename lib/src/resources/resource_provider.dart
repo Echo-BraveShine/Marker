@@ -1,3 +1,4 @@
+import '../l10n/message_catalog.dart';
 import 'dart:async';
 import 'dart:ui' as ui;
 import 'dart:io';
@@ -30,9 +31,8 @@ final resourceServiceProvider = Provider(
       try {
         descriptor = await ui.ImageDescriptor.encoded(buffer);
         if (descriptor.width * descriptor.height > 40000000) {
-          throw const ResourceFailure(
-            '图片尺寸过大，请先缩小图片。',
-            'Image dimensions are too large.',
+          throw const ResourceFailure.localized(
+            AppMessage.imageDimensionsAreTooLarge,
           );
         }
         final codec = await descriptor.instantiateCodec();
@@ -92,9 +92,8 @@ class ResourceController extends Notifier<ResourceUiState> {
     task,
   ) async {
     if (state.busy) {
-      throw const ResourceFailure(
-        '正在处理资源，请稍候。',
-        'A resource operation is already running.',
+      throw const ResourceFailure.localized(
+        AppMessage.aResourceOperationIsAlreadyRunning,
       );
     }
     final token = ResourceCancellation();
@@ -130,9 +129,8 @@ class ResourcePlatform {
       final root = await getApplicationDocumentsDirectory();
       final canonical = await File(path).resolveSymbolicLinks();
       if (!p.isWithin(await root.resolveSymbolicLinks(), canonical)) {
-        throw const ResourceFailure(
-          '只能删除 Marker 内的文件。',
-          'Only files inside Marker can be deleted.',
+        throw const ResourceFailure.localized(
+          AppMessage.onlyFilesInsideMarkerCanBeDeleted,
         );
       }
       await File(canonical).delete();
@@ -141,28 +139,35 @@ class ResourcePlatform {
     try {
       await channel.invokeMethod<void>('trash', path);
     } on Exception {
-      throw const ResourceFailure(
-        '无法移到废纸篓，原文件已保留。请检查目录权限或回收站状态。',
-        'Cannot move to Trash. The original file was kept. Check folder access or the recycle bin.',
-      );
+      throw const ResourceFailure.localized(AppMessage.trashFailedFileKept);
     }
   }
 
   Future<String?> authorizeDirectory(
     String path, {
     bool chinese = false,
+    String? languageTag,
   }) async {
     try {
-      return await channel.invokeMethod<
-        String
-      >('authorizeDirectoryWithContext', {
-        'path': path,
-        'title': chinese ? '允许访问文档或图片目录' : 'Allow folder access',
-        'prompt': chinese ? '允许访问此目录' : 'Allow folder access',
-        'message': chinese
-            ? 'Marker 需要访问下方目录，才能读取图片或在文档旁创建图片资源。请选择此目录并允许访问；取消将停止本次操作。\n$path'
-            : 'Marker needs this folder to read images or create assets beside your document. Allow access to continue, or cancel to stop this operation.\n$path',
-      });
+      return await channel.invokeMethod<String>(
+        'authorizeDirectoryWithContext',
+        {
+          'path': path,
+          'title': messageForLanguage(
+            languageTag ?? (chinese ? 'zh-Hans' : 'en'),
+            AppMessage.allowFolderAccess3,
+          ),
+          'prompt': messageForLanguage(
+            languageTag ?? (chinese ? 'zh-Hans' : 'en'),
+            AppMessage.allowFolderAccess4,
+          ),
+          'message': messageForLanguage(
+            languageTag ?? (chinese ? 'zh-Hans' : 'en'),
+            AppMessage.folderAccessPurpose,
+            {"p0": path},
+          ),
+        },
+      );
     } on MissingPluginException {
       // Keep hot reload usable with a running pre-update native host.
       return channel.invokeMethod<String>('authorizeDirectory', path);

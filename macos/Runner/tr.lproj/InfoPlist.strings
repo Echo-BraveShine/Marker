@@ -1,0 +1,2 @@
+// System permission prompts follow the device/app language.
+"NSLocalNetworkUsageDescription" = "Belgelerinizin başvurduğu yerel ağ görsellerine ve bağlantılarına erişin.";

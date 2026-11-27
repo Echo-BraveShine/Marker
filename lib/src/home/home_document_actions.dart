@@ -12,7 +12,11 @@ extension _HomeDocumentActions on _MarkerHomeState {
   Future<void> _documentMenu(OpenDocument document, Offset position) async {
     if (_isMobile) _focus.unfocus();
     final entries = [
-      ('save', t('立即保存', 'Save now'), CupertinoIcons.square_arrow_down),
+      (
+        'save',
+        _l10n.message(AppMessage.saveNow),
+        CupertinoIcons.square_arrow_down,
+      ),
       ('saveAs', _l10n.saveAs, CupertinoIcons.doc_on_doc),
       ('close', _l10n.closeDocument, CupertinoIcons.xmark),
       if (document.path != null)
@@ -20,7 +24,9 @@ extension _HomeDocumentActions on _MarkerHomeState {
       if (document.path != null)
         (
           'delete',
-          _isMobile ? t('删除文档', 'Delete document') : _l10n.moveToTrash,
+          _isMobile
+              ? _l10n.message(AppMessage.deleteDocument)
+              : _l10n.moveToTrash,
           CupertinoIcons.trash,
         ),
     ];
@@ -100,17 +106,21 @@ extension _HomeDocumentActions on _MarkerHomeState {
                                             : c.textSecondary,
                                       ),
                                       const SizedBox(width: 8),
-                                      Text(
-                                        entry.$2,
-                                        style: TextStyle(
-                                          fontFamily: MarkerFonts.ui,
-                                          fontFamilyFallback:
-                                              MarkerFonts.fallback,
-                                          fontSize: 13,
-                                          color: entry.$1 == 'delete'
-                                              ? CupertinoColors.systemRed
-                                              : c.textPrimary,
-                                          decoration: TextDecoration.none,
+                                      Expanded(
+                                        child: Text(
+                                          entry.$2,
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            fontFamily: MarkerFonts.ui,
+                                            fontFamilyFallback:
+                                                MarkerFonts.fallback,
+                                            fontSize: 13,
+                                            color: entry.$1 == 'delete'
+                                                ? CupertinoColors.systemRed
+                                                : c.textPrimary,
+                                            decoration: TextDecoration.none,
+                                          ),
                                         ),
                                       ),
                                     ],
@@ -158,17 +168,21 @@ extension _HomeDocumentActions on _MarkerHomeState {
         builder: (context) => MarkerDialog(
           title: Text(
             _isMobile
-                ? t('删除文档？', 'Delete document?')
+                ? _l10n.message(AppMessage.deleteDocument2)
                 : _l10n.moveToTrashPrompt,
           ),
           content: Text(
-            '${document.path}\n\n${_isMobile ? t('将永久删除 Marker 内的文档，图片资源保留。未保存的编辑也将关闭。', 'Permanently delete this document from Marker. Images are kept. Unsaved edits will also be closed.') : _l10n.moveToTrashContent}',
+            '${document.path}\n\n${_isMobile ? _l10n.message(AppMessage.deleteDocumentConfirmation) : _l10n.moveToTrashContent}',
           ),
           actions: [
             MarkerDialogButton(
               isDestructiveAction: true,
               onPressed: () => Navigator.pop(context, true),
-              child: Text(_isMobile ? t('删除', 'Delete') : _l10n.moveToTrash),
+              child: Text(
+                _isMobile
+                    ? _l10n.message(AppMessage.delete)
+                    : _l10n.moveToTrash,
+              ),
             ),
           ],
         ),
@@ -232,8 +246,8 @@ extension _HomeDocumentActions on _MarkerHomeState {
     if (mounted) {
       _toast(
         e is ResourceFailure
-            ? t(e.zh, e.en)
-            : t('文件操作失败：$e', 'File operation failed: $e'),
+            ? e.localize(_languageTag)
+            : _l10n.message(AppMessage.fileOperationFailedValue, {"p0": e}),
       );
     }
   }
@@ -246,17 +260,19 @@ extension _HomeDocumentActions on _MarkerHomeState {
     final answer = await showMarkerDialog<int>(
       context: context,
       builder: (context) => MarkerDialog(
-        title: Text(t('保存更改？', 'Save changes?')),
-        content: Text(t('\$_name 有未保存的内容。', '$_name has unsaved changes.')),
+        title: Text(_l10n.message(AppMessage.saveChanges)),
+        content: Text(
+          _l10n.message(AppMessage.valueHasUnsavedChanges, {"p0": _name}),
+        ),
         actions: [
           MarkerDialogButton(
             onPressed: () => Navigator.pop(context, 1),
-            child: Text(t('不保存', 'Discard')),
+            child: Text(_l10n.message(AppMessage.discard)),
           ),
           MarkerDialogButton(
             primary: true,
             onPressed: () => Navigator.pop(context, 2),
-            child: Text(t('保存', 'Save')),
+            child: Text(_l10n.message(AppMessage.save)),
           ),
         ],
       ),

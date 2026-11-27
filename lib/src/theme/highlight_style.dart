@@ -1,3 +1,4 @@
+import '../l10n/message_catalog.dart';
 import 'package:flutter/painting.dart';
 import 'marker_colors.dart';
 
@@ -15,8 +16,8 @@ enum EditorHighlightStyle {
   gruvbox,
   ayu;
 
-  String label(bool zh) => switch (this) {
-    classic => zh ? '经典' : 'Classic',
+  String label(Object zh) => switch (this) {
+    classic => messageForLanguage(zh, AppMessage.classic),
     github => 'GitHub',
     solarized => 'Solarized',
     monokai => 'Monokai',

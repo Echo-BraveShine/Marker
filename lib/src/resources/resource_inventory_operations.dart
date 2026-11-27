@@ -204,9 +204,8 @@ extension _ResourceInventoryOperations on DocumentResourceService {
       cancellation?.check();
       if (await FileSystemEntity.type(zipPath, followLinks: false) ==
           FileSystemEntityType.link) {
-        throw const ResourceFailure(
-          '不能覆盖符号链接。',
-          'Cannot overwrite a symbolic link.',
+        throw const ResourceFailure.localized(
+          AppMessage.cannotOverwriteASymbolicLink,
         );
       }
       await File(temporaryZip).rename(zipPath);

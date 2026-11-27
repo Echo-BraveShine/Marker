@@ -28,7 +28,7 @@ class LandscapeDesktopViewport extends StatelessWidget {
             : Brightness.dark,
       ),
       child: ColoredBox(
-        color: theme.extension<MarkerColors>()!.bgWindow,
+        color: theme.extension<MarkerColors>()!.bgToolbar,
         // Apply physical system-bar insets before scaling desktop geometry.
         // iOS retains its existing edge layout and camera-side handling.
         child: SafeArea(

@@ -1,14 +1,52 @@
+import 'message_catalog.dart';
+export 'message_catalog.dart';
 import 'package:flutter/material.dart';
 
 part 'app_strings.dart';
 part 'translations/strings_zh.dart';
 part 'translations/strings_en.dart';
+part 'translations/catalog_strings.dart';
 
-/// 轻量级 i18n（中/英），不依赖 flutter gen-l10n 生成代码
+/// Typed multilingual resources with script/region-aware locale resolution.
 class AppLocalizations {
   const AppLocalizations(this.locale);
 
   final Locale locale;
+  static Locale _locale(AppLanguage language) => Locale.fromSubtags(
+    languageCode: language.languageCode,
+    scriptCode: language.scriptCode,
+    countryCode: language.countryCode,
+  );
+  static final supportedLocales = List<Locale>.unmodifiable(
+    appLanguages.map(_locale),
+  );
+  static Locale localeForLanguage(String code) => _locale(appLanguageFor(code));
+  static String languageTagForLocale(Locale locale) =>
+      normalizeLanguageTag(locale.toLanguageTag());
+  static Locale resolveLocales(List<Locale>? locales) {
+    for (final locale in locales ?? const <Locale>[]) {
+      final language = locale.languageCode.toLowerCase();
+      if (appLanguages.any((l) => l.languageCode == language) ||
+          language == 'in') {
+        return localeForLanguage(locale.toLanguageTag());
+      }
+    }
+    return supportedLocales.first;
+  }
+
+  String get languageTag => languageTagForLocale(locale);
+  String languageName(String code) => appLanguageFor(code).nativeName;
+
+  String message(AppMessage key, [Map<String, Object?> arguments = const {}]) =>
+      localizedMessage(languageTag, key, arguments);
+
+  static String languageTagOf(BuildContext context, {bool? fallbackChinese}) {
+    final l10n = Localizations.of<AppLocalizations>(context, AppLocalizations);
+    if (l10n != null) return l10n.languageTag;
+    return fallbackChinese == null
+        ? languageTagForLocale(Localizations.localeOf(context))
+        : languageTagFrom(fallbackChinese);
+  }
 
   static AppLocalizations of(BuildContext context) {
     return Localizations.of<AppLocalizations>(context, AppLocalizations)!;
@@ -17,8 +55,7 @@ class AppLocalizations {
   static const LocalizationsDelegate<AppLocalizations> delegate =
       _AppLocalizationsDelegate();
 
-  AppStrings get strings =>
-      locale.languageCode == 'en' ? StringsEn() : StringsZh();
+  AppStrings get strings => CatalogStrings(languageTag);
 
   String get title => strings.title;
   String get file => strings.file;
@@ -119,32 +156,23 @@ class AppLocalizations {
   String get appearance => strings.appearance;
   String get interfaceLanguage => strings.interfaceLanguage;
 
-  String get exportDocument =>
-      locale.languageCode == 'zh' ? '导出文档' : 'Export document';
+  String get exportDocument => message(AppMessage.exportDocument);
   String get format => exportFormat;
-  String get exportingDocument =>
-      locale.languageCode == 'zh' ? '正在导出文档…' : 'Exporting document…';
-  String get manualCheckForUpdates => locale.languageCode == 'zh'
-      ? '手动检查 GitHub 上的最新公开版本。'
-      : 'Check the latest public release on GitHub.';
-  String get checkingForUpdates =>
-      locale.languageCode == 'zh' ? '正在检查更新…' : 'Checking for updates…';
-  String get noPublicRelease => locale.languageCode == 'zh'
-      ? '暂未找到公开发布版本。'
-      : 'No public release was found.';
-  String get currentVersion =>
-      locale.languageCode == 'zh' ? '当前已是最新版本。' : 'You are up to date.';
+  String get exportingDocument => message(AppMessage.exportingDocument);
+  String get manualCheckForUpdates =>
+      message(AppMessage.checkTheLatestPublicReleaseOnGitHub);
+  String get checkingForUpdates => message(AppMessage.checkingForUpdates);
+  String get noPublicRelease => message(AppMessage.noPublicReleaseWasFound);
+  String get currentVersion => message(AppMessage.youAreUpToDate);
 }
 
 extension AppLocalizationsX on AppLocalizations {
   String exportedTo(String path) =>
-      locale.languageCode == 'zh' ? '已导出到 $path' : 'Exported to $path';
-  String unsavedChangesWithName(String name) => locale.languageCode == 'zh'
-      ? '$name 有未保存的内容。'
-      : '$name has unsaved changes.';
-  String versionAvailableStr(String latest) => locale.languageCode == 'zh'
-      ? '发现新版本 $latest'
-      : 'Version $latest is available';
+      message(AppMessage.exportedToValue, {"p0": path});
+  String unsavedChangesWithName(String name) =>
+      message(AppMessage.valueHasUnsavedChanges2, {"p0": name});
+  String versionAvailableStr(String latest) =>
+      message(AppMessage.versionValueIsAvailable, {"p0": latest});
 }
 
 class _AppLocalizationsDelegate
@@ -152,7 +180,9 @@ class _AppLocalizationsDelegate
   const _AppLocalizationsDelegate();
 
   @override
-  bool isSupported(Locale locale) => ['zh', 'en'].contains(locale.languageCode);
+  bool isSupported(Locale locale) => appLanguages.any(
+    (language) => language.languageCode == locale.languageCode,
+  );
 
   @override
   Future<AppLocalizations> load(Locale locale) async =>

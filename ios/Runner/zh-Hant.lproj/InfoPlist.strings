@@ -1,0 +1,4 @@
+// System permission prompts follow the device/app language.
+"NSCameraUsageDescription" = "拍攝照片以插入 Markdown 文件。";
+"NSPhotoLibraryUsageDescription" = "選擇照片以插入 Markdown 文件。";
+"NSLocalNetworkUsageDescription" = "存取文件所引用的本機網路圖片與連結。";

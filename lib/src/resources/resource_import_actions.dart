@@ -50,7 +50,7 @@ extension _ResourceDropZoneActions on _MarkerHomeState {
                         ),
                         const SizedBox(height: 12),
                         Text(
-                          t('松开以导入图片', 'Drop to import images'),
+                          _l10n.message(AppMessage.dropToImportImages),
                           style: TextStyle(
                             color: colors.textPrimary,
                             fontSize: 16,
@@ -58,9 +58,8 @@ extension _ResourceDropZoneActions on _MarkerHomeState {
                         ),
                         const SizedBox(height: 6),
                         Text(
-                          t(
-                            '复制到文档资源目录，保留原图',
-                            'Copy to document assets. Originals are kept.',
+                          _l10n.message(
+                            AppMessage.copyToDocumentAssetsOriginalsAreKept,
                           ),
                           style: TextStyle(
                             color: colors.textSecondary,
@@ -105,18 +104,13 @@ extension _ResourceAccessHelpers on _MarkerHomeState {
     final confirm = await showMarkerDialog<bool>(
       context: context,
       builder: (context) => MarkerDialog(
-        title: Text(t('先保存文档', 'Save the document first')),
-        content: Text(
-          t(
-            '保存后就能把图片放在文档旁边，并使用可随文档移动的相对路径。',
-            'Save first so images can be stored beside the document using portable relative paths.',
-          ),
-        ),
+        title: Text(_l10n.message(AppMessage.saveTheDocumentFirst)),
+        content: Text(_l10n.message(AppMessage.saveBeforeImportImages)),
         actions: [
           MarkerDialogButton(
             primary: true,
             onPressed: () => Navigator.pop(context, true),
-            child: Text(t('保存并继续', 'Save and continue')),
+            child: Text(_l10n.message(AppMessage.saveAndContinue)),
           ),
         ],
       ),
@@ -131,26 +125,25 @@ extension _ResourceAccessHelpers on _MarkerHomeState {
     if (desktopWindow && defaultTargetPlatform == TargetPlatform.macOS) {
       selected = await ref
           .read(resourcePlatformProvider)
-          .authorizeDirectory(expected, chinese: _zh);
+          .authorizeDirectory(expected, languageTag: _languageTag);
     } else {
       selected = await getDirectoryPath(
         initialDirectory: expected,
-        confirmButtonText: t('允许访问目录', 'Allow folder access'),
+        confirmButtonText: _l10n.message(AppMessage.allowFolderAccess2),
       );
     }
     if (selected == null) throw ResourceCancelled();
     if (!p.equals(p.normalize(selected), p.normalize(expected)) &&
         !p.isWithin(selected, expected)) {
-      throw const ResourceFailure(
-        '请选择图片或文档所在目录，或其上级目录。',
-        'Choose the containing folder or one of its parent folders.',
+      throw const ResourceFailure.localized(
+        AppMessage.chooseTheContainingFolderOrOneOfItsParentFolders,
       );
     }
     _imageEpoch++;
     _previewSignature = null;
     _resourceWork.refresh();
     if (mounted) {
-      _toast(t('已获得目录访问权限。', 'Folder access granted.'));
+      _toast(_l10n.message(AppMessage.folderAccessGranted));
     }
   }
 
@@ -180,9 +173,7 @@ extension _ResourceImportActions on _MarkerHomeState {
     final files = await _pickResourceImages();
     if (files.isEmpty || !mounted) return;
     if (ref.read(workspaceProvider).activeId != owner) {
-      _toast(
-        t('文档已切换，请重新导入图片。', 'The document changed. Import the images again.'),
-      );
+      _toast(_l10n.message(AppMessage.theDocumentChangedImportTheImagesAgain));
       return;
     }
     await _action(
@@ -205,7 +196,7 @@ extension _ResourceImportActions on _MarkerHomeState {
     final original = _controller.value;
     final markdown = <String>[], failures = <String>[];
     var cancelled = false;
-    await _resourceWork.run(t('导入图片', 'Importing images'), (
+    await _resourceWork.run(_l10n.message(AppMessage.importingImages), (
       token,
       progress,
     ) async {
@@ -250,7 +241,7 @@ extension _ResourceImportActions on _MarkerHomeState {
         } catch (e, stack) {
           if (kDebugMode) debugPrint('Image import failed: $e\n$stack');
           failures.add(
-            '${input.name}\n${t(readingSource ? '读取原图失败' : '写入图片资源失败', readingSource ? 'Cannot read original image' : 'Cannot write image assets')}\n${_resourceMessage(e)}',
+            '${input.name}\n${_l10n.message(readingSource ? AppMessage.cannotReadOriginalImage : AppMessage.cannotWriteImageAssets)}\n${_resourceMessage(e)}',
           );
         }
       }
@@ -275,22 +266,20 @@ extension _ResourceImportActions on _MarkerHomeState {
       await _showResourceIssues(failures);
     } else if (cancelled && mounted) {
       _toast(
-        t(
+        _l10n.message(
           markdown.isEmpty
-              ? '已取消导入，原图未修改。'
-              : '已停止导入，已插入 ${markdown.length} 张图片。',
-          markdown.isEmpty
-              ? 'Import cancelled. Original images are unchanged.'
-              : 'Import stopped. ${markdown.length} images inserted.',
+              ? AppMessage.importCancelledOriginalImagesUnchanged
+              : AppMessage.importStoppedImagesInserted,
+          {'p0': markdown.length},
         ),
       );
     } else if (markdown.isNotEmpty && mounted) {
       _toast(
-        t(
+        _l10n.message(
           referenceOnly
-              ? '已插入原位置引用；移动原图后可能失效。'
-              : '已插入 ${markdown.length} 张图片，原图已保留。',
-          '${markdown.length} images inserted. Originals kept.',
+              ? AppMessage.originalLocationReferencesInserted
+              : AppMessage.imagesInsertedOriginalsKept,
+          {'p0': markdown.length},
         ),
       );
     }
@@ -353,16 +342,15 @@ extension _ResourceImportActions on _MarkerHomeState {
       } else if (plain?.text?.isNotEmpty == true) {
         if (mounted) _insertResourceText(plain!.text!);
       } else if (mounted) {
-        _toast(t('剪贴板中没有可插入的文本或图片。', 'No text or image to paste.'));
+        _toast(_l10n.message(AppMessage.noTextOrImageToPaste));
       }
     } on MissingPluginException {
       if (plain?.text?.isNotEmpty == true && mounted) {
         _insertResourceText(plain!.text!);
       } else if (mounted) {
         _toast(
-          t(
-            '当前环境无法读取剪贴板图片。',
-            'Clipboard images are unavailable in this environment.',
+          _l10n.message(
+            AppMessage.clipboardImagesAreUnavailableInThisEnvironment,
           ),
         );
       }
@@ -434,14 +422,8 @@ extension _ResourceImportActions on _MarkerHomeState {
               !(Uri.tryParse(raw)?.hasScheme ?? false);
           _toast(
             portalDenied
-                ? t(
-                    '系统未能提供拖入文件的访问权限，请使用“导入图片”选择文件。',
-                    'The system could not grant access to the dropped files. Use Import images to select them.',
-                  )
-                : t(
-                    '请拖入 PNG、JPEG、GIF、WebP 或 BMP 图片。',
-                    'Drop PNG, JPEG, GIF, WebP or BMP images.',
-                  ),
+                ? _l10n.message(AppMessage.dropAccessDenied)
+                : _l10n.message(AppMessage.dropPNGJPEGGIFWebPOrBMPImages),
           );
           return;
         }
@@ -463,7 +445,7 @@ extension _ResourceImportActions on _MarkerHomeState {
 
   Future<void> _insertNetworkImage() async {
     final address = await _resourceText(
-      t('插入网络图片', 'Insert web image'),
+      _l10n.message(AppMessage.insertWebImage2),
       'https://…',
     );
     if (address == null || !mounted) return;
@@ -473,15 +455,14 @@ extension _ResourceImportActions on _MarkerHomeState {
         uri.host.isEmpty ||
         uri.userInfo.isNotEmpty) {
       _error(
-        const ResourceFailure(
-          '请输入有效的 HTTP 或 HTTPS 图片地址。',
-          'Enter a valid HTTP or HTTPS image URL.',
+        const ResourceFailure.localized(
+          AppMessage.enterAValidHTTPOrHTTPSImageURL,
         ),
       );
       return;
     }
     _insertResourceText(
-      imageMarkdown(t('图片说明', 'Image description'), uri.toString()),
+      imageMarkdown(_l10n.message(AppMessage.imageDescription), uri.toString()),
     );
   }
 }

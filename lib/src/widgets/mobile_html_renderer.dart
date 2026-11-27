@@ -1,3 +1,4 @@
+import '../l10n/message_catalog.dart';
 import 'dart:async';
 import 'dart:io';
 import 'dart:ui' as ui;
@@ -150,7 +151,7 @@ Future<Uint8List> renderMobileHtml(
           }
           compressedSize += tile.length;
           if (compressedSize > 64 * 1024 * 1024) {
-            throw StateError('Split images exceed 64 MB / 分图总量超过 64 MB');
+            throw LocalizedMessageError(AppMessage.splitImagesTooLarge);
           }
           archive.addFile(
             ArchiveFile(
@@ -215,12 +216,10 @@ List<({int top, int height})> mobileImageBands(
   bool split = false,
 }) {
   if (width < 1 || height < 1 || height > 200000) {
-    throw StateError('Invalid image size / 文档过长');
+    throw LocalizedMessageError(AppMessage.invalidImageExportDimensions);
   }
   if (!split && (height > 32768 || width * height > 16000000)) {
-    throw StateError(
-      'Document too large for one PNG. Enable Split images (ZIP) / 文档过长，请选择分图导出（ZIP）',
-    );
+    throw LocalizedMessageError(AppMessage.documentTooLargeForSinglePng);
   }
   return [
     for (var top = 0; top < height; top += 1024)

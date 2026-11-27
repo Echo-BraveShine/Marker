@@ -8,6 +8,10 @@ class MermaidAssets {
   String get scriptUri =>
       File('${directory.path}/mermaid.min.js').uri.toString();
   String get fontUri => File('${directory.path}/NotoSansSC.ttf').uri.toString();
+  String get koreanFontUri =>
+      File('${directory.path}/NotoSansKR.ttf').uri.toString();
+  String get latinFontUri =>
+      File('${directory.path}/MarkerSans-Regular.ttf').uri.toString();
   static Future<MermaidAssets>? _pending;
 
   static Future<MermaidAssets> load() =>
@@ -24,6 +28,12 @@ class MermaidAssets {
       await Future.wait([
         _write(directory, 'assets/mermaid.min.js', 'mermaid.min.js'),
         _write(directory, 'assets/fonts/NotoSansSC.ttf', 'NotoSansSC.ttf'),
+        _write(directory, 'assets/fonts/NotoSansKR.ttf', 'NotoSansKR.ttf'),
+        _write(
+          directory,
+          'assets/fonts/MarkerSans-Regular.ttf',
+          'MarkerSans-Regular.ttf',
+        ),
       ]);
       return MermaidAssets(directory);
     } catch (_) {
