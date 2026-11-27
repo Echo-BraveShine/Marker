@@ -1,4 +1,5 @@
 from pathlib import Path
+import json
 import shutil
 import subprocess
 import tempfile
@@ -26,7 +27,7 @@ $ErrorActionPreference = 'Stop'
 try {
   $selected = Get-MarkerVisualCppRuntime -RedistRoot $Root
   if ($Expected -eq 'FAIL') { throw 'Expected an incomplete-runtime error' }
-  if ($selected.FullName -ne (Join-Path $Root $Expected)) { throw "Wrong runtime: $($selected.FullName)" }
+  @{ selected = $selected.FullName } | ConvertTo-Json -Compress
 } catch {
   if ($Expected -ne 'FAIL' -or $_.Exception.Message -notlike 'Complete Visual C++ x64 Release CRT not found*') { throw }
 }
@@ -36,6 +37,14 @@ try {
                                      '-Root', str(root), '-Expected', expected],
                                     capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            if expected != 'FAIL':
+                selected = Path(json.loads(result.stdout)['selected'])
+                desired = root / expected
+                # Windows may expand a TEMP 8.3 alias in Get-ChildItem output.
+                # Compare file identities, not long/short-path spelling.
+                self.assertTrue(selected.samefile(desired),
+                                f'Expected runtime: {str(desired)!r}; selected: {str(selected)!r}')
+
 
     def test_family_and_legacy_folders_with_unrelated_and_arm64_entries(self):
         complete = ['msvcp140.dll', 'vcruntime140.dll', 'vcruntime140_1.dll']
